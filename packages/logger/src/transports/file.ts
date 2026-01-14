@@ -2,7 +2,7 @@
  * @fileoverview File transport - writes logs to a file.
  */
 
-import { appendFile, mkdir } from 'node:fs/promises';
+import { appendFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { LogTransport, LogEntry } from '../types';
 import { formatJSON } from '../formatter';
@@ -10,30 +10,31 @@ import { formatJSON } from '../formatter';
 export interface FileTransportOptions {
   /** Path to log file */
   path: string;
-  /** Buffer size before flush (default: 10) */
+  /** Buffer size before flush (default: 1 for immediate writes) */
   bufferSize?: number;
-  /** Format (default: json for machine parsing) */
-  format?: 'json' | 'jsonl';
 }
 
 export function createFileTransport(options: FileTransportOptions): LogTransport {
-  const { path, bufferSize = 10 } = options;
+  const { path, bufferSize = 1 } = options;
   let buffer: LogEntry[] = [];
   let ensuredDir = false;
   
-  async function ensureDir(): Promise<void> {
+  function ensureDir(): void {
     if (ensuredDir) return;
-    await mkdir(dirname(path), { recursive: true });
+    const dir = dirname(path);
+    if (dir && dir !== '.' && !existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
     ensuredDir = true;
   }
   
-  async function flushBuffer(): Promise<void> {
+  function flushBuffer(): void {
     if (buffer.length === 0) return;
     
-    await ensureDir();
+    ensureDir();
     
     const lines = buffer.map(entry => formatJSON(entry)).join('\n') + '\n';
-    await appendFile(path, lines);
+    appendFileSync(path, lines);
     buffer = [];
   }
   
@@ -44,19 +45,22 @@ export function createFileTransport(options: FileTransportOptions): LogTransport
       buffer.push(entry);
       
       if (buffer.length >= bufferSize) {
-        // Fire and forget flush
-        flushBuffer().catch(err => {
+        // Sync write to ensure logs survive crashes
+        try {
+          flushBuffer();
+        } catch (err) {
           console.error('[@agent/logger] Failed to write to file:', err);
-        });
+        }
       }
     },
     
     async flush(): Promise<void> {
-      await flushBuffer();
+      flushBuffer();
     },
     
     async close(): Promise<void> {
-      await flushBuffer();
+      flushBuffer();
     },
   };
 }
+

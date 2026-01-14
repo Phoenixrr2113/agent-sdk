@@ -1,10 +1,10 @@
 import { tool } from 'ai';
 
+import { createLogger } from '@agent/logger';
+import { getToolConfig } from '../../config';
 import { success, error } from '../utils/tool-result';
 
 import { 
-  MAX_PLAN_STEPS, 
-  DELEGATION_THRESHOLD, 
   PLAN_DESCRIPTION, 
   VALIDATION_DESCRIPTION,
   AVAILABLE_AGENTS,
@@ -20,16 +20,33 @@ import {
 } from './types';
 import { runTypeCheck, runTestCommand } from './utils';
 
+const log = createLogger('@agent/sdk:plan');
+
+// Get config values with fallbacks
+function getPlanConfig() {
+  const config = getToolConfig<{
+    maxSteps?: number;
+    delegationThreshold?: number;
+  }>('plan');
+  return {
+    maxSteps: config.maxSteps ?? 100,
+    delegationThreshold: config.delegationThreshold ?? 5,
+  };
+}
+
 export function createPlanTool(config: PlanToolConfig = {}) {
   let currentPlan: Plan | null = null;
   let pendingDecision: PendingDecision | null = null;
 
   function handleCreate(title?: string, steps?: string[]): string {
+    const planConfig = getPlanConfig();
+    log.debug('plan create', { title, stepCount: steps?.length });
+
     if (!title || !steps) {
       return error('Title and steps required for create action');
     }
-    if (steps.length > MAX_PLAN_STEPS) {
-      return error(`Too many steps. Maximum allowed: ${String(MAX_PLAN_STEPS)}, provided: ${String(steps.length)}`);
+    if (steps.length > planConfig.maxSteps) {
+      return error(`Too many steps. Maximum allowed: ${String(planConfig.maxSteps)}, provided: ${String(steps.length)}`);
     }
     currentPlan = {
       title,
@@ -50,7 +67,7 @@ export function createPlanTool(config: PlanToolConfig = {}) {
       });
     }
 
-    const isLargeTask = steps.length >= DELEGATION_THRESHOLD;
+    const isLargeTask = steps.length >= planConfig.delegationThreshold;
 
     let scopeAssessment: ScopeAssessment;
 
@@ -137,11 +154,12 @@ export function createPlanTool(config: PlanToolConfig = {}) {
   }
 
   function handleAddStep(stepName?: string): string {
+    const planConfig = getPlanConfig();
     if (!currentPlan || !stepName) {
       return error('Active plan and stepName required');
     }
-    if (currentPlan.steps.length >= MAX_PLAN_STEPS) {
-      return error(`Cannot add more steps. Maximum allowed: ${String(MAX_PLAN_STEPS)}`);
+    if (currentPlan.steps.length >= planConfig.maxSteps) {
+      return error(`Cannot add more steps. Maximum allowed: ${String(planConfig.maxSteps)}`);
     }
     currentPlan.steps.push({ name: stepName, status: 'pending' });
     currentPlan.updatedAt = Date.now();
@@ -174,7 +192,8 @@ export function createPlanTool(config: PlanToolConfig = {}) {
          return success({ message: 'Proceeding with task.' });
       }
 
-      return error(`Cannot proceed on a ${stepCount}-step plan. Tasks with ${DELEGATION_THRESHOLD}+ steps MUST be delegated to a sub-agent. Call plan({ action: "decide", decision: "delegate" }) instead.`);
+      const planConfig = getPlanConfig();
+      return error(`Cannot proceed on a ${stepCount}-step plan. Tasks with ${planConfig.delegationThreshold}+ steps MUST be delegated to a sub-agent. Call plan({ action: "decide", decision: "delegate" }) instead.`);
     }
   }
 

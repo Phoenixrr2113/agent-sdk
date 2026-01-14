@@ -2,7 +2,7 @@
  * @agent/sdk - Model Configuration
  *
  * Model tier definitions supporting multiple providers.
- * Adapted from packages/core/src/agents/models.ts
+ * Now uses config system for customizable model mappings.
  */
 
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
@@ -10,9 +10,13 @@ import { createOllama } from 'ollama-ai-provider-v2';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createLogger } from '@agent/logger';
+import { getModelForTier, getConfig, DEFAULT_MODELS, DEFAULT_PROVIDER } from './config';
 import type { LanguageModel } from 'ai';
 
 const log = createLogger('@agent/sdk:models');
+
+// Re-export defaults for backward compatibility
+export { DEFAULT_MODELS as defaultModels };
 
 // ============================================================================
 // Provider Instances (Lazy Initialization)
@@ -72,36 +76,8 @@ export interface ModelConfig {
   name: string;
 }
 
-// ============================================================================
-// Default Model Names by Provider and Tier
-// ============================================================================
-
-export const defaultModels: Record<ModelProvider, Record<ModelTier, string>> = {
-  openrouter: {
-    fast: 'deepseek/deepseek-chat-v3-0324:free',
-    standard: 'google/gemini-2.0-flash-001',
-    reasoning: 'deepseek/deepseek-r1:free',
-    powerful: 'anthropic/claude-sonnet-4',
-  },
-  ollama: {
-    fast: 'qwen3:4b',
-    standard: 'qwen2.5-coder:14b',
-    reasoning: 'deepseek-r1:14b',
-    powerful: 'qwen2.5-coder:14b',
-  },
-  openai: {
-    fast: 'gpt-4o-mini',
-    standard: 'gpt-4o',
-    reasoning: 'o3', // or o1-preview
-    powerful: 'gpt-4o',
-  },
-  anthropic: {
-    fast: 'claude-3-haiku-20240307',
-    standard: 'claude-sonnet-4-20250514',
-    reasoning: 'claude-sonnet-4-20250514',
-    powerful: 'claude-sonnet-4-20250514',
-  },
-};
+// NOTE: Default model mappings are now in config/defaults.ts
+// Re-exported as 'defaultModels' above for backward compatibility
 
 // ============================================================================
 // Environment Variable Model Overrides
@@ -149,37 +125,37 @@ function createModelForProvider(
 export const models = {
   fast: (): LanguageModel => {
     if (process.env['OLLAMA_ENABLED'] === 'true') {
-      const modelName = getOllamaEnvModel('fast') || defaultModels.ollama.fast;
+      const modelName = getOllamaEnvModel('fast') || DEFAULT_MODELS.ollama.fast;
       return getOllama()(modelName) as unknown as LanguageModel;
     }
-    const modelName = getEnvModel('fast') || defaultModels.openrouter.fast;
+    const modelName = getEnvModel('fast') || DEFAULT_MODELS.openrouter.fast;
     return getOpenRouter().chat(modelName) as unknown as LanguageModel;
   },
 
   standard: (): LanguageModel => {
     if (process.env['OLLAMA_ENABLED'] === 'true') {
-      const modelName = getOllamaEnvModel('standard') || defaultModels.ollama.standard;
+      const modelName = getOllamaEnvModel('standard') || DEFAULT_MODELS.ollama.standard;
       return getOllama()(modelName) as unknown as LanguageModel;
     }
-    const modelName = getEnvModel('standard') || defaultModels.openrouter.standard;
+    const modelName = getEnvModel('standard') || DEFAULT_MODELS.openrouter.standard;
     return getOpenRouter().chat(modelName) as unknown as LanguageModel;
   },
 
   reasoning: (): LanguageModel => {
     if (process.env['OLLAMA_ENABLED'] === 'true') {
-      const modelName = getOllamaEnvModel('reasoning') || defaultModels.ollama.reasoning;
+      const modelName = getOllamaEnvModel('reasoning') || DEFAULT_MODELS.ollama.reasoning;
       return getOllama()(modelName) as unknown as LanguageModel;
     }
-    const modelName = getEnvModel('reasoning') || defaultModels.openrouter.reasoning;
+    const modelName = getEnvModel('reasoning') || DEFAULT_MODELS.openrouter.reasoning;
     return getOpenRouter().chat(modelName) as unknown as LanguageModel;
   },
 
   powerful: (): LanguageModel => {
     if (process.env['OLLAMA_ENABLED'] === 'true') {
-      const modelName = getOllamaEnvModel('powerful') || defaultModels.ollama.powerful;
+      const modelName = getOllamaEnvModel('powerful') || DEFAULT_MODELS.ollama.powerful;
       return getOllama()(modelName) as unknown as LanguageModel;
     }
-    const modelName = getEnvModel('powerful') || defaultModels.openrouter.powerful;
+    const modelName = getEnvModel('powerful') || DEFAULT_MODELS.openrouter.powerful;
     return getOpenRouter().chat(modelName) as unknown as LanguageModel;
   },
 };
@@ -202,13 +178,14 @@ export interface ModelResolutionOptions {
  *
  * Priority:
  * 1. Explicit modelName with provider
- * 2. Tier-based selection with provider preference
+ * 2. Tier-based selection from config (env vars > config file > defaults)
  * 3. Default tier (standard) with default provider
  */
 export function resolveModel(options: ModelResolutionOptions = {}): LanguageModel {
   const { tier = 'standard', provider, modelName } = options;
+  const config = getConfig();
 
-  // If explicit model name provided
+  // If explicit model name provided with provider
   if (modelName && provider) {
     log.info('Resolving model (explicit)', { provider, modelName });
     return createModelForProvider(provider, modelName);
@@ -220,10 +197,12 @@ export function resolveModel(options: ModelResolutionOptions = {}): LanguageMode
     return getOpenRouter().chat(modelName) as unknown as LanguageModel;
   }
 
-  // Use tier-based selection
-  const info = getModelInfo(tier);
-  log.info('Resolving model (tier-based)', { tier, provider: info.provider, model: info.name });
-  return models[tier]();
+  // Use tier-based selection from config
+  const effectiveProvider = provider ?? config.models?.defaultProvider ?? DEFAULT_PROVIDER;
+  const effectiveModel = getModelForTier(tier, effectiveProvider);
+  log.info('Resolving model (tier-based)', { tier, provider: effectiveProvider, model: effectiveModel });
+
+  return createModelForProvider(effectiveProvider, effectiveModel);
 }
 
 // ============================================================================
@@ -234,12 +213,12 @@ export function getModelInfo(tier: ModelTier): { provider: ModelProvider; name: 
   if (process.env['OLLAMA_ENABLED'] === 'true') {
     return {
       provider: 'ollama',
-      name: getOllamaEnvModel(tier) || defaultModels.ollama[tier],
+      name: getOllamaEnvModel(tier) || DEFAULT_MODELS.ollama[tier],
     };
   }
   return {
     provider: 'openrouter',
-    name: getEnvModel(tier) || defaultModels.openrouter[tier],
+    name: getEnvModel(tier) || DEFAULT_MODELS.openrouter[tier],
   };
 }
 

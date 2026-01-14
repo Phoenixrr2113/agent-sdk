@@ -1,9 +1,27 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
+import { createLogger } from '@agent/logger';
+import { getToolConfig } from '../../config';
 import { runRgFiles } from './cli';
 import { formatGlobResult } from './utils';
 import { success, error } from '../utils/tool-result';
+
+const log = createLogger('@agent/sdk:glob');
+
+// Get config values with fallbacks
+function getGlobConfig() {
+  const config = getToolConfig<{
+    timeout?: number;
+    maxFiles?: number;
+    maxDepth?: number;
+  }>('glob');
+  return {
+    timeout: config.timeout ?? 60_000,
+    maxFiles: config.maxFiles ?? 100,
+    maxDepth: config.maxDepth ?? 20,
+  };
+}
 
 const globInputSchema = z.object({
   pattern: z.string().describe('Glob pattern to match files (e.g., "**/*.ts", "*.json")'),
@@ -14,7 +32,7 @@ const globInputSchema = z.object({
   maxDepth: z
     .number()
     .optional()
-    .describe('Maximum directory depth to search (default: 20)'),
+    .describe('Maximum directory depth to search'),
   hidden: z
     .boolean()
     .optional()
@@ -23,25 +41,32 @@ const globInputSchema = z.object({
 
 export const globTool = tool({
   description:
-    'Fast file pattern matching (60s timeout, 100 file limit). ' +
+    'Fast file pattern matching. ' +
     'Uses ripgrep when available, falls back to find. ' +
     'Supports glob patterns like "**/*.js" or "src/**/*.ts". ' +
     'Returns matching file paths sorted by modification time.',
   inputSchema: globInputSchema,
   execute: async (args) => {
+    const config = getGlobConfig();
+    log.debug('glob execute', { pattern: args.pattern, path: args.path, config });
+
     try {
       const result = await runRgFiles({
         pattern: args.pattern,
         paths: args.path ? [args.path] : undefined,
-        maxDepth: args.maxDepth,
+        maxDepth: args.maxDepth ?? config.maxDepth,
         hidden: args.hidden,
+        timeout: config.timeout,
+        limit: config.maxFiles,
       });
 
       if (result.error) {
+        log.warn('glob error', { pattern: args.pattern, error: result.error });
         return error(result.error);
       }
 
       const output = formatGlobResult(result);
+      log.info('glob complete', { pattern: args.pattern, files: result.totalFiles, truncated: result.truncated });
 
       return success({
         output,
@@ -50,6 +75,7 @@ export const globTool = tool({
         truncated: result.truncated,
       });
     } catch (e) {
+      log.error('glob failed', { pattern: args.pattern, error: e });
       return error(e instanceof Error ? e.message : String(e));
     }
   },

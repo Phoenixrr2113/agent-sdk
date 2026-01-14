@@ -1,8 +1,11 @@
 import { tool } from 'ai';
 
+import { createLogger } from '@agent/logger';
 import { DEEP_REASONING_DESCRIPTION, UNRESTRICTED_MODE_DESCRIPTION } from './constants';
 import { getDeepReasoningEngine, isDeepReasoningEnabled } from './engine';
 import { deepReasoningInputSchema, type ThoughtData } from './types';
+
+const log = createLogger('@agent/sdk:reasoning');
 
 export function createDeepReasoningTool() {
   const description = isDeepReasoningEnabled()
@@ -13,8 +16,10 @@ export function createDeepReasoningTool() {
     description,
     inputSchema: deepReasoningInputSchema,
     execute: async (input) => {
+      log.debug('deep reasoning', { thought: (input as ThoughtData).thoughtNumber, total: (input as ThoughtData).totalThoughts });
       const engine = getDeepReasoningEngine();
       const result = engine.processThought(input as ThoughtData);
+      log.debug('deep reasoning result', { nextNeeded: result.nextThoughtNeeded });
       return JSON.stringify(result);
     },
   });

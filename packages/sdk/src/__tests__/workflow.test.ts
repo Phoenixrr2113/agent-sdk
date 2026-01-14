@@ -52,7 +52,7 @@ describe('wrapToolAsDurableStep', () => {
       parameters: {},
     };
 
-    const wrapped = wrapToolAsDurableStep(toolWithoutExecute as Tool);
+    const wrapped = wrapToolAsDurableStep(toolWithoutExecute as unknown as Tool);
     expect(wrapped).toBe(toolWithoutExecute);
   });
 });

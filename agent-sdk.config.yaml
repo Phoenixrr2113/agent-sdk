@@ -1,0 +1,58 @@
+# Agent SDK Configuration
+# See CONFIGURATION_ARCHITECTURE.md for full documentation
+
+models:
+  # Default provider when none specified
+  defaultProvider: openrouter
+  
+  # Override models per tier (uses default provider)
+  tiers:
+    fast: deepseek/deepseek-chat-v3-0324:free
+    standard: google/gemini-2.0-flash-001
+    reasoning: deepseek/deepseek-r1:free
+    powerful: anthropic/claude-sonnet-4.5
+
+# Custom roles
+roles:
+  debugger:
+    systemPrompt: |
+      You are a debugging specialist for {{projectName}}.
+      Written in {{language}}.
+      
+      You excel at:
+      - Analyzing error messages and stack traces
+      - Identifying root causes of bugs
+      - Suggesting fixes with clear explanations
+    recommendedModel: reasoning
+    defaultTools: [shell, grep, glob]
+
+# Template variables for {{substitution}}
+templates:
+  variables:
+    projectName: agent-sdk
+    language: TypeScript
+    codeStyle: functional
+
+# Tool configuration
+tools:
+  shell:
+    timeout: 30000
+    maxTimeout: 300000
+  glob:
+    timeout: 60000
+    maxFiles: 100
+    maxDepth: 20
+  grep:
+    timeout: 60000
+    maxContext: 10
+  plan:
+    maxSteps: 100
+    delegationThreshold: 5
+
+# Default settings
+maxSteps: 10
+
+# Debug settings (these are also configurable via DEBUG env var)
+debug:
+  enabled: true
+  level: debug

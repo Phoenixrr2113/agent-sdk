@@ -4,8 +4,11 @@
  */
 
 import { serve } from '@hono/node-server';
+import { createLogger } from '@agent/logger';
 import { createAgentRoutes } from './routes';
 import type { AgentServerOptions } from './types';
+
+const log = createLogger('@agent/sdk-server');
 
 export interface AgentServer {
   /** Hono routes instance */
@@ -37,12 +40,12 @@ export interface AgentServer {
 export function createAgentServer(options: AgentServerOptions = {}): AgentServer {
   const port = options.port ?? 3000;
   
+  log.debug('Creating agent server', { port, hasAgent: !!options.agent });
+
   // Create agent if options provided but no agent instance
   let agent = options.agent;
   if (!agent && options.agentOptions) {
-    // Dynamic import to avoid circular dependency
-    // Agent creation deferred to runtime
-    console.warn('agentOptions provided but no agent instance. Agent will need to be created separately.');
+    log.warn('agentOptions provided but no agent instance. Agent will need to be created separately.');
   }
 
   const routes = createAgentRoutes({
@@ -55,11 +58,7 @@ export function createAgentServer(options: AgentServerOptions = {}): AgentServer
       fetch: routes.fetch, 
       port,
     });
-    console.log(`🤖 Agent server running on http://localhost:${port}`);
-    console.log(`   POST /generate - Synchronous completion`);
-    console.log(`   POST /stream   - SSE streaming`);
-    console.log(`   POST /chat     - Stateful chat`);
-    console.log(`   GET  /health   - Health check`);
+    log.info('Agent server started', { port, url: `http://localhost:${port}` });
   };
 
   return { 
@@ -84,10 +83,7 @@ export async function quickStart(options: {
   role?: 'generic' | 'coder' | 'researcher' | 'analyst';
   workspaceRoot?: string;
 } = {}) {
-  // This would dynamically import @agent/sdk to avoid bundling issues
-  // For now, provide a placeholder that logs instructions
-  console.log('quickStart requires @agent/sdk to be configured.');
-  console.log('Use createAgentServer with a pre-configured agent instead.');
+  log.info('quickStart called', { options });
   
   const server = createAgentServer({ port: options.port });
   server.start();

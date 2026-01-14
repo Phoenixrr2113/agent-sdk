@@ -1,7 +1,10 @@
 // WebSocket client for streaming
 
+import { createLogger } from '@agent/logger';
 import { WebSocketError } from './errors';
 import type { StreamingChatCallbacks, ChatMessage } from './types';
+
+const log = createLogger('@agent/sdk-client:ws');
 
 export interface WebSocketClientConfig {
   url: string;
@@ -15,14 +18,22 @@ export class AgentWebSocketClient {
 
   constructor(config: WebSocketClientConfig) {
     this.config = config;
+    log.debug('Created WebSocket client', { url: config.url });
   }
 
   connect(): Promise<void> {
+    log.debug('Connecting');
     return new Promise((resolve, reject) => {
       try {
         this.ws = new WebSocket(this.config.url);
-        this.ws.onopen = () => resolve();
-        this.ws.onerror = (event) => reject(new WebSocketError('Connection failed'));
+        this.ws.onopen = () => {
+          log.info('Connected');
+          resolve();
+        };
+        this.ws.onerror = () => {
+          log.error('Connection failed');
+          reject(new WebSocketError('Connection failed'));
+        };
       } catch (error) {
         reject(new WebSocketError('Failed to create WebSocket'));
       }
@@ -33,6 +44,7 @@ export class AgentWebSocketClient {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new WebSocketError('WebSocket not connected');
     }
+    log.debug('Sending message');
     this.ws.send(JSON.stringify(message));
     
     this.ws.onmessage = (event) => {
@@ -50,6 +62,7 @@ export class AgentWebSocketClient {
   }
 
   disconnect(): void {
+    log.debug('Disconnecting');
     this.ws?.close();
     this.ws = null;
   }

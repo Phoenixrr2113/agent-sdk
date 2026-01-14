@@ -6,8 +6,11 @@
  */
 
 import type { Tool } from 'ai';
+import { createLogger } from '@agent/logger';
 import type { ToolContext } from '../types/lifecycle';
 import type { AgentDataParts, AnyDataPart } from './data-parts';
+
+const log = createLogger('@agent/sdk:streaming');
 
 // ============================================================================
 // Types

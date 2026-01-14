@@ -6,7 +6,10 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
+import { createLogger } from '@agent/logger';
 import type { AgentServerOptions } from './types';
+
+const log = createLogger('@agent/sdk-server:routes');
 
 /**
  * Request body for generate endpoint

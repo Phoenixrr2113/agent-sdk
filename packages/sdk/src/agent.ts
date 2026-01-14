@@ -10,7 +10,7 @@ import type { Tool, ToolSet } from 'ai';
 import { createLogger } from '@agent/logger';
 import type { AgentOptions, AgentRole, ToolPreset } from './types/agent';
 import { resolveModel } from './models';
-import { roleConfigs, getRoleSystemPrompt } from './presets/roles';
+import { getRole } from './presets/role-registry';
 import { createToolPreset, type ToolPresetLevel } from './presets/tools';
 import { createSpawnAgentTool } from './tools/spawn-agent';
 
@@ -112,8 +112,8 @@ export function createAgent(options: AgentOptions = {}): Agent {
 
   log.info('Creating agent', { agentId, role, maxSteps, enableSubAgents });
 
-  // Get role configuration
-  const roleConfig = roleConfigs[role];
+  // Get role configuration from registry
+  const roleConfig = getRole(role);
   
   // Resolve system prompt
   const finalSystemPrompt = systemPrompt ?? roleConfig.systemPrompt;
@@ -126,7 +126,7 @@ export function createAgent(options: AgentOptions = {}): Agent {
   });
 
   const model = options.model ?? resolveModel({
-    tier: roleConfig.recommendedModel as 'fast' | 'standard' | 'reasoning' | 'powerful',
+    tier: (roleConfig.recommendedModel ?? 'standard') as 'fast' | 'standard' | 'reasoning' | 'powerful',
     provider: options.modelProvider as 'openrouter' | 'ollama' | 'openai' | 'anthropic' | undefined,
     modelName: options.modelName,
   });
@@ -206,20 +206,61 @@ export function createAgent(options: AgentOptions = {}): Agent {
     },
     
     generate: async (input) => {
-      agentLog.info('generate() called', { promptLength: input.prompt.length });
+      agentLog.info('generate() called', {
+        promptLength: input.prompt.length,
+        prompt: input.prompt.slice(0, 500) + (input.prompt.length > 500 ? '...' : ''),
+      });
       const done = agentLog.time('generate');
       try {
         const result = await toolLoopAgent.generate({ prompt: input.prompt });
         done();
+
+        // Log each step with tool calls
+        if (result.steps) {
+          for (let i = 0; i < result.steps.length; i++) {
+            const step = result.steps[i];
+            agentLog.debug(`Step ${i + 1}/${result.steps.length}`, {
+              toolCalls: step.toolCalls?.map(tc => ({
+                name: tc.toolName,
+                args: (tc as Record<string, unknown>).args ?? (tc as Record<string, unknown>).input,
+              })),
+              toolResults: step.toolResults?.map(tr => {
+                const output = (tr as Record<string, unknown>).result ?? (tr as Record<string, unknown>).output ?? '';
+                return {
+                  name: tr.toolName,
+                  output: typeof output === 'string'
+                    ? output.slice(0, 200) + (output.length > 200 ? '...' : '')
+                    : output,
+                };
+              }),
+              textLength: step.text?.length ?? 0,
+            });
+          }
+        }
+
+        // Log token usage
+        if (result.totalUsage) {
+          agentLog.info('Token usage', {
+            inputTokens: result.totalUsage.inputTokens,
+            outputTokens: result.totalUsage.outputTokens,
+            totalTokens: result.totalUsage.totalTokens,
+            reasoningTokens: (result.totalUsage as Record<string, unknown>).reasoningTokens ?? 0,
+            cachedInputTokens: (result.totalUsage as Record<string, unknown>).cachedInputTokens ?? 0,
+          });
+        }
+
         agentLog.info('generate() completed', {
-          steps: result.steps?.length,
+          steps: result.steps?.length ?? 0,
           textLength: result.text?.length ?? 0,
+          response: result.text?.slice(0, 500) + ((result.text?.length ?? 0) > 500 ? '...' : ''),
         });
+
         return result;
       } catch (error) {
         done();
         agentLog.error('generate() failed', {
           error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
         });
         throw error;
       }

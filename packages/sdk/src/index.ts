@@ -60,3 +60,15 @@ export { createMemoryTools } from './memory/tools';
 
 // Models
 export { resolveModel, models } from './models';
+
+// Configuration
+export {
+  loadConfig,
+  getConfig,
+  configure,
+  defineConfig,
+  getModelForTier,
+  DEFAULT_MODELS,
+  DEFAULT_PROVIDER,
+} from './config';
+export type { AgentConfig, PartialAgentConfig, ModelsConfig, ModelTier, Provider } from './config';

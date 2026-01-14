@@ -8,7 +8,11 @@
 import { LocalIndex } from 'vectra';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { createLogger } from '@agent/logger';
+import { getConfig } from '../config';
 import type { MemoryOptions } from '../types/agent';
+
+const log = createLogger('@agent/sdk:memory');
 
 // ============================================================================
 // Types
@@ -70,12 +74,18 @@ async function getEmbedding(text: string, modelName?: string): Promise<number[]>
 // ============================================================================
 
 export async function createMemoryStore(options: MemoryOptions = {}): Promise<MemoryStore> {
+  // Merge with config values
+  const config = getConfig();
+  const memoryConfig = (config.memory ?? {}) as Record<string, unknown>;
+
   const {
-    path: storagePath = './.vectra-memory',
-    embedModel = 'text-embedding-3-small',
-    topK = 5,
-    similarityThreshold = 0.7,
+    path: storagePath = (memoryConfig.path as string) ?? './.vectra-memory',
+    embedModel = (memoryConfig.embedModel as string) ?? 'text-embedding-3-small',
+    topK = (memoryConfig.topK as number) ?? 5,
+    similarityThreshold = (memoryConfig.similarityThreshold as number) ?? 0.7,
   } = options;
+
+  log.info('Creating memory store', { path: storagePath, embedModel, topK });
 
   const absolutePath = path.resolve(storagePath);
   await fs.mkdir(absolutePath, { recursive: true });

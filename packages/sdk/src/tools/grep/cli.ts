@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 
+import { createLogger } from '@agent/logger';
 import {
   resolveGrepCli,
   type GrepBackend,
@@ -13,6 +14,8 @@ import {
   GREP_SAFETY_FLAGS,
 } from './constants';
 import type { GrepOptions, GrepMatch, GrepResult, CountResult } from './types';
+
+const log = createLogger('@agent/sdk:grep:cli');
 
 function buildRgArgs(options: GrepOptions): string[] {
   const args: string[] = [

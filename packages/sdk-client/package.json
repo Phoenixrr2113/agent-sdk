@@ -17,7 +17,9 @@
     "test": "vitest",
     "clean": "rm -rf dist"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@agent/logger": "workspace:*"
+  },
   "devDependencies": {
     "@agent/config-typescript": "workspace:*",
     "typescript": "^5.7.3",

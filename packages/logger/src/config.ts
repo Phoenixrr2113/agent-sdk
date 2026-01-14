@@ -5,6 +5,7 @@
 import type { DebugConfig, LogLevel, LogTransport } from './types';
 import { parseDebugEnv } from './namespace';
 import { createConsoleTransport } from './transports/console';
+import { createFileTransport } from './transports/file';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Global Config
@@ -26,12 +27,24 @@ function getDefaultConfig(): DebugConfig {
   
   const colors = process.env['DEBUG_COLORS'] !== 'false' && (process.stdout.isTTY ?? false);
   
+  // Build transports
+  const transports: LogTransport[] = [createConsoleTransport({ format, colors })];
+
+  // Add file transport if DEBUG_FILE is set
+  const debugFile = process.env['DEBUG_FILE'];
+  if (debugFile) {
+    transports.push(createFileTransport({
+      path: debugFile,
+      bufferSize: 1, // Flush immediately for real-time file output
+    }));
+  }
+
   return {
     enabledPatterns: enabled,
     excludedPatterns: excluded,
     level,
     format,
-    transports: [createConsoleTransport({ format, colors })],
+    transports,
     colors,
   };
 }
