@@ -37,3 +37,12 @@ export interface StreamEvent {
 }
 
 export type StreamEventCallback = (event: StreamEvent) => void;
+
+/**
+ * Options for streaming generation.
+ */
+export interface GenerateStreamOptions {
+  /** AbortSignal for timeout/cancellation */
+  signal?: AbortSignal;
+}
+

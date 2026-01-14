@@ -1,131 +1,46 @@
-# Workflow Integration TODO - Unify Agent Factories
+# Workflow Integration - Deferred
 
-## Problem
+## Status: ⏸️ Intentionally Deferred
 
-`createAgent` and `createDurableAgent` are completely separate factories. The durable-agent has stubs that don't call the real agent. They should be unified.
+The workflow integration requires an external workflow runtime. The current stubs provide a stable API surface for future integration.
 
----
+## Why Stubs?
 
-## Current State
+The `"use workflow"` directive and related functions (`workflowSleep`, `waitForWebhook`) require a workflow runtime such as:
 
-### Separate Factories
+- **useworkflow.dev** - Vercel's workflow package
+- **Temporal** - Durable workflow orchestration
+- **Inngest** - Event-driven durable functions
 
-| Factory | File | Status |
-|---------|------|--------|
-| `createAgent` | `src/agent.ts` | ✅ Working, uses ToolLoopAgent |
-| `createDurableAgent` | `src/workflow/durable-agent.ts` | ❌ Stub, doesn't call createAgent |
+Without a runtime, the code cannot actually:
+- Checkpoint and resume on crash
+- Sleep without holding compute
+- Wait for webhooks
 
-### Issues
+## Current API Surface
 
-1. `createDurableAgent` has its own `generate()` stub that doesn't use the real agent
-2. No `durable: boolean` option in `createAgent`
-3. Durable tools (`src/workflow/durable-tool.ts`) are not integrated
-4. Workflow features (crash recovery, scheduling, approval) are not connected
+The following API is stable and ready for integration:
 
----
+| Function | Status | Purpose |
+|----------|--------|---------|
+| `createDurableAgent()` | ✅ Stub | Factory for durable agents |
+| `wrapToolAsDurableStep()` | ✅ Stub | Wrap tools for durability |
+| `parseDuration()` | ✅ Working | Parse "30s", "5m", etc. |
+| `formatDuration()` | ✅ Working | Format ms to human string |
 
-## Files Impacted
+## Integration Path
 
-### Primary Changes
+When ready to integrate:
 
-| File | Change Required |
-|------|-----------------|
-| `src/agent.ts` | Add `durable?: boolean` option, integrate workflow wrapping |
-| `src/workflow/durable-agent.ts` | Refactor to use `createAgent()` internally |
-| `src/workflow/durable-tool.ts` | Integrate with agent tool building |
-| `src/workflow/index.ts` | Update exports |
-| `src/types/agent.ts` | Add durability options to `AgentOptions` |
+1. Add workflow runtime dependency (e.g., `workflow`)
+2. Replace `workflowSleep()` with actual import
+3. Replace `waitForWebhook()` with actual implementation
+4. Update `createDurableAgent.generate()` to call real agent
 
-### Secondary Changes
+## Files
 
-| File | Change Required |
-|------|-----------------|
-| `src/presets/tools.ts` | Optionally wrap tools as durable steps |
-| `src/tools/provider.ts` | Add durable tool wrapper integration |
-| `src/index.ts` | Ensure unified exports |
-
----
-
-## Proposed Solution
-
-### Option A: Unified Factory
-
-```typescript
-// src/agent.ts
-export function createAgent(options: AgentOptions): Agent {
-  const agent = buildBaseAgent(options);
-  
-  if (options.durable) {
-    return wrapWithDurability(agent, options);
-  }
-  
-  return agent;
-}
-```
-
-### Option B: Durable Agent Wraps Base Agent
-
-```typescript
-// src/workflow/durable-agent.ts
-export function createDurableAgent(options: AgentOptions): DurableAgent {
-  const baseAgent = createAgent(options);
-  
-  return {
-    ...baseAgent,
-    durableGenerate: async (prompt) => {
-      "use workflow";
-      return baseAgent.generate({ prompt });
-    },
-    // ... other durable methods
-  };
-}
-```
-
----
-
-## New AgentOptions
-
-```typescript
-interface AgentOptions {
-  // ... existing options
-  
-  // Durability options
-  durable?: boolean;
-  durabilityConfig?: {
-    webhookBasePath?: string;
-    retryCount?: number;
-    timeout?: string;
-  };
-}
-```
-
----
-
-## Implementation Tasks
-
-- [ ] 1. Add durability options to `src/types/agent.ts`
-- [ ] 2. Update `createDurableAgent` to call `createAgent` internally
-- [ ] 3. Integrate `wrapToolAsDurableStep` into tool building
-- [ ] 4. Add `durable: boolean` option to `createAgent`
-- [ ] 5. Connect workflow sleep/webhook to real workflow package
-- [ ] 6. Add integration tests
-- [ ] 7. Update documentation
-
----
-
-## Dependencies
-
-- [ ] useworkflow.dev integration (external)
-- [ ] Workflow runtime availability check
-
----
-
-## References
-
-- `src/agent.ts` - Main agent factory
-- `src/workflow/durable-agent.ts` - Durable agent (stub)
-- `src/workflow/durable-tool.ts` - Durable tool wrappers
-- `src/workflow/index.ts` - Workflow exports
-- `src/types/agent.ts` - Agent options interface
-- `src/presets/tools.ts` - Tool preset creation
-- `src/tools/provider.ts` - Tool provider
+| File | Purpose |
+|------|---------|
+| `durable-agent.ts` | Agent factory with workflow methods |
+| `durable-tool.ts` | Tool wrappers for durability |
+| `index.ts` | Exports |

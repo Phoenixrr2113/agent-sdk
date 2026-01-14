@@ -14,4 +14,5 @@ export type {
   StreamingChatCallbacks,
   StreamEvent,
   StreamEventCallback,
+  GenerateStreamOptions,
 } from './types';

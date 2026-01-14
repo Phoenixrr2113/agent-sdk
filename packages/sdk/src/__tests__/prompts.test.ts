@@ -160,3 +160,161 @@ describe('buildDynamicSystemPrompt', () => {
     expect(dynamicPrompt).toContain('/test/workspace');
   });
 });
+
+describe('buildSystemContext with memory integration', () => {
+  it('should accept memoryStore option without error', async () => {
+    // Mock memory store
+    const mockMemoryStore = {
+      remember: vi.fn(),
+      recall: vi.fn().mockResolvedValue([]),
+      forget: vi.fn(),
+      forgetAll: vi.fn(),
+      count: vi.fn(),
+      close: vi.fn(),
+    };
+
+    const context = await buildSystemContext({
+      memoryStore: mockMemoryStore as any,
+      autoLoadPreferences: true,
+    });
+
+    expect(context).toHaveProperty('currentTime');
+    expect(context).toHaveProperty('userPreferences');
+  });
+
+  it('should load preferences from memory when autoLoadPreferences is true', async () => {
+    const mockMemoryStore = {
+      remember: vi.fn(),
+      recall: vi.fn().mockResolvedValue([
+        {
+          item: {
+            id: 'mem_1',
+            text: 'User prefers concise responses',
+            metadata: { tags: ['preference'], name: 'John' },
+            timestamp: new Date(),
+          },
+          score: 0.9,
+        },
+      ]),
+      forget: vi.fn(),
+      forgetAll: vi.fn(),
+      count: vi.fn(),
+      close: vi.fn(),
+    };
+
+    const context = await buildSystemContext({
+      memoryStore: mockMemoryStore as any,
+      autoLoadPreferences: true,
+    });
+
+    expect(mockMemoryStore.recall).toHaveBeenCalled();
+    expect(context.userPreferences).toBeDefined();
+    expect(context.userPreferences?.name).toBe('John');
+    expect(context.userPreferences?.communicationStyle).toBe('concise');
+  });
+
+  it('should merge explicit preferences with memory preferences (explicit wins)', async () => {
+    const mockMemoryStore = {
+      remember: vi.fn(),
+      recall: vi.fn().mockResolvedValue([
+        {
+          item: {
+            id: 'mem_1',
+            text: 'User prefers detailed responses',
+            metadata: { name: 'Jane' },
+            timestamp: new Date(),
+          },
+          score: 0.9,
+        },
+      ]),
+      forget: vi.fn(),
+      forgetAll: vi.fn(),
+      count: vi.fn(),
+      close: vi.fn(),
+    };
+
+    const context = await buildSystemContext({
+      memoryStore: mockMemoryStore as any,
+      autoLoadPreferences: true,
+      userPreferences: {
+        name: 'Override Name',
+        language: 'Spanish',
+      },
+    });
+
+    // Explicit should override memory
+    expect(context.userPreferences?.name).toBe('Override Name');
+    expect(context.userPreferences?.language).toBe('Spanish');
+    // Memory should fill in gaps
+    expect(context.userPreferences?.communicationStyle).toBe('detailed');
+  });
+
+  it('should not call memory store when autoLoadPreferences is false', async () => {
+    const mockMemoryStore = {
+      remember: vi.fn(),
+      recall: vi.fn(),
+      forget: vi.fn(),
+      forgetAll: vi.fn(),
+      count: vi.fn(),
+      close: vi.fn(),
+    };
+
+    await buildSystemContext({
+      memoryStore: mockMemoryStore as any,
+      autoLoadPreferences: false,
+    });
+
+    expect(mockMemoryStore.recall).not.toHaveBeenCalled();
+  });
+
+  it('should handle memory store errors gracefully', async () => {
+    const mockMemoryStore = {
+      remember: vi.fn(),
+      recall: vi.fn().mockRejectedValue(new Error('Memory error')),
+      forget: vi.fn(),
+      forgetAll: vi.fn(),
+      count: vi.fn(),
+      close: vi.fn(),
+    };
+
+    const context = await buildSystemContext({
+      memoryStore: mockMemoryStore as any,
+      autoLoadPreferences: true,
+    });
+
+    // Should not throw, just return empty preferences
+    expect(context).toHaveProperty('currentTime');
+  });
+});
+
+describe('formatSystemContextBlock with user preferences', () => {
+  it('should include user preferences in formatted output', () => {
+    const context: SystemContext = {
+      currentTime: '10:30 AM',
+      currentDate: 'Tuesday, January 14, 2026',
+      timezone: 'America/New_York',
+      platform: 'darwin',
+      hostname: 'test-machine',
+      username: 'testuser',
+      locale: 'en-US',
+      userPreferences: {
+        name: 'Test User',
+        language: 'English',
+        communicationStyle: 'concise',
+        codeStyle: {
+          indentation: 'spaces',
+          indentSize: 2,
+        },
+      },
+    };
+
+    const block = formatSystemContextBlock(context);
+
+    expect(block).toContain('## User Preferences');
+    expect(block).toContain('**Name**: Test User');
+    expect(block).toContain('**Preferred Language**: English');
+    expect(block).toContain('**Communication Style**: concise');
+    expect(block).toContain('Indentation: spaces');
+    expect(block).toContain('Indent Size: 2');
+  });
+});
