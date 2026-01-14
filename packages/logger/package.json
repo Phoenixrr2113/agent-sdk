@@ -1,0 +1,32 @@
+{
+  "name": "@agent/logger",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Zero-dependency debug logging with namespace filtering, file output, and SSE support",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./transports": {
+      "import": "./dist/transports/index.js",
+      "types": "./dist/transports/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@agent/config-typescript": "workspace:*",
+    "typescript": "^5.7.3",
+    "vitest": "^1.6.1",
+    "@types/node": "^20.17.19"
+  },
+  "keywords": ["logging", "debug", "sse", "ai-agent"],
+  "license": "MIT"
+}

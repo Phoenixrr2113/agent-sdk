@@ -46,8 +46,9 @@ describe('subAgentConfigs', () => {
       expect(subAgentConfigs.coder.instructions).toContain('code');
     });
 
-    it('should include filesystem and shell tools', () => {
-      expect(subAgentConfigs.coder.tools).toContain('filesystem');
+    it('should include glob, grep and shell tools', () => {
+      expect(subAgentConfigs.coder.tools).toContain('glob');
+      expect(subAgentConfigs.coder.tools).toContain('grep');
       expect(subAgentConfigs.coder.tools).toContain('shell');
     });
 

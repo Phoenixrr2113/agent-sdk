@@ -22,6 +22,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@agent/logger": "workspace:*",
     "ai": "6.0.0-beta.120",
     "zod": "^3.25.76",
     "vectra": "^0.9.0",

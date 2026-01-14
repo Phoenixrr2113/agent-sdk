@@ -18,7 +18,7 @@ export const subAgentConfigs: Record<string, SubAgentConfig> = {
 
 Always read relevant code before making changes. Match the existing style.
 Be thorough but efficient. Don't over-engineer simple tasks.`,
-    tools: ['filesystem', 'shell', 'grep', 'glob'],
+    tools: ['glob', 'grep', 'shell', 'ast_grep_search'],
     model: 'anthropic/claude-sonnet-4',
   },
 
@@ -44,7 +44,7 @@ Cite sources and provide confidence levels for findings.`,
 
 Be systematic and logical. Support conclusions with evidence.
 Present findings clearly with actionable insights.`,
-    tools: ['filesystem', 'reasoning'],
+    tools: ['glob', 'grep', 'reasoning'],
     model: 'anthropic/claude-sonnet-4',
   },
 
@@ -52,7 +52,7 @@ Present findings clearly with actionable insights.`,
     instructions: `You are a general-purpose assistant. Adapt your approach to the task at hand.
 Use tools fluidly as part of your reasoning process.
 Be autonomous but ask for clarification when genuinely uncertain.`,
-    tools: ['filesystem', 'shell', 'web', 'grep', 'glob'],
+    tools: ['glob', 'grep', 'shell', 'web'],
     model: 'anthropic/claude-sonnet-4',
   },
 };

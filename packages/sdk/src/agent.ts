@@ -7,11 +7,18 @@
 
 import { generateId, ToolLoopAgent, stepCountIs } from 'ai';
 import type { Tool, ToolSet } from 'ai';
+import { createLogger } from '@agent/logger';
 import type { AgentOptions, AgentRole, ToolPreset } from './types/agent';
 import { resolveModel } from './models';
 import { roleConfigs, getRoleSystemPrompt } from './presets/roles';
 import { createToolPreset, type ToolPresetLevel } from './presets/tools';
 import { createSpawnAgentTool } from './tools/spawn-agent';
+
+// ============================================================================
+// Logger
+// ============================================================================
+
+const log = createLogger('@agent/sdk:agent');
 
 // ============================================================================
 // Agent Instance Type
@@ -44,6 +51,8 @@ export interface Agent {
 function buildTools(options: AgentOptions, workspaceRoot: string): ToolSet {
   const { toolPreset = 'standard', tools = {}, enableTools, disableTools } = options;
   
+  log.debug('Building tools', { preset: toolPreset, customTools: Object.keys(tools).length });
+
   // Create preset tools using factory
   let allTools: ToolSet = createToolPreset(toolPreset as ToolPresetLevel, {
     workspaceRoot,
@@ -67,6 +76,8 @@ function buildTools(options: AgentOptions, workspaceRoot: string): ToolSet {
     }
   }
   
+  log.debug('Tools ready', { tools: Object.keys(allTools) });
+
   return allTools;
 }
 
@@ -99,6 +110,8 @@ export function createAgent(options: AgentOptions = {}): Agent {
     workspaceRoot = process.cwd(),
   } = options;
 
+  log.info('Creating agent', { agentId, role, maxSteps, enableSubAgents });
+
   // Get role configuration
   const roleConfig = roleConfigs[role];
   
@@ -106,6 +119,12 @@ export function createAgent(options: AgentOptions = {}): Agent {
   const finalSystemPrompt = systemPrompt ?? roleConfig.systemPrompt;
   
   // Resolve model
+  log.debug('Resolving model', {
+    tier: roleConfig.recommendedModel,
+    provider: options.modelProvider,
+    modelName: options.modelName,
+  });
+
   const model = options.model ?? resolveModel({
     tier: roleConfig.recommendedModel as 'fast' | 'standard' | 'reasoning' | 'powerful',
     provider: options.modelProvider as 'openrouter' | 'ollama' | 'openai' | 'anthropic' | undefined,
@@ -117,10 +136,17 @@ export function createAgent(options: AgentOptions = {}): Agent {
   
   // Add spawn_agent tool if enabled
   if (enableSubAgents) {
+    log.debug('Enabling sub-agents', { maxSpawnDepth: options.maxSpawnDepth ?? 2 });
+
     const spawnTool = createSpawnAgentTool({
       maxSpawnDepth: options.maxSpawnDepth ?? 2,
       currentDepth: 0,
       createAgent: (subAgentOptions) => {
+        log.info('Spawning sub-agent', {
+          parentId: agentId,
+          role: subAgentOptions.role,
+        });
+
         const subAgent = createAgent({
           role: subAgentOptions.role as AgentRole,
           systemPrompt: subAgentOptions.instructions,
@@ -148,12 +174,20 @@ export function createAgent(options: AgentOptions = {}): Agent {
   }
 
   // Create the ToolLoopAgent
+  log.debug('Creating ToolLoopAgent', {
+    promptLength: finalSystemPrompt.length,
+    toolCount: Object.keys(tools).length,
+  });
+
   const toolLoopAgent = new ToolLoopAgent({
     model,
     instructions: finalSystemPrompt,
     tools,
     stopWhen: stepCountIs(maxSteps),
   });
+
+  // Create a child logger for this agent instance
+  const agentLog = log.child({ agentId });
 
   // Create the agent instance
   const agent: Agent = {
@@ -164,13 +198,35 @@ export function createAgent(options: AgentOptions = {}): Agent {
     getSystemPrompt: () => finalSystemPrompt,
     
     stream: (input) => {
-      return toolLoopAgent.stream({ prompt: input.prompt });
+      agentLog.info('stream() called', { promptLength: input.prompt.length });
+      const done = agentLog.time('stream');
+      const result = toolLoopAgent.stream({ prompt: input.prompt });
+      // Note: Can't await async stream here, timing logged on first await
+      return result;
     },
     
-    generate: (input) => {
-      return toolLoopAgent.generate({ prompt: input.prompt });
+    generate: async (input) => {
+      agentLog.info('generate() called', { promptLength: input.prompt.length });
+      const done = agentLog.time('generate');
+      try {
+        const result = await toolLoopAgent.generate({ prompt: input.prompt });
+        done();
+        agentLog.info('generate() completed', {
+          steps: result.steps?.length,
+          textLength: result.text?.length ?? 0,
+        });
+        return result;
+      } catch (error) {
+        done();
+        agentLog.error('generate() failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
     },
   };
+
+  log.info('Agent created', { agentId, role });
 
   return agent;
 }

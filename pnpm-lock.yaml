@@ -47,8 +47,26 @@ importers:
 
   packages/config-typescript: {}
 
+  packages/logger:
+    devDependencies:
+      '@agent/config-typescript':
+        specifier: workspace:*
+        version: link:../config-typescript
+      '@types/node':
+        specifier: ^20.17.19
+        version: 20.19.29
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.1
+        version: 1.6.1(@types/node@20.19.29)
+
   packages/sdk:
     dependencies:
+      '@agent/logger':
+        specifier: workspace:*
+        version: link:../logger
       '@ai-sdk/anthropic':
         specifier: ^1.2.12
         version: 1.2.12(zod@3.25.76)

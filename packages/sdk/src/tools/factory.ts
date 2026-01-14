@@ -48,9 +48,9 @@ export type ToolCreator = (deps: ToolDependencies) => ToolSet;
  * ```typescript
  * const factory = new ToolFactory();
  *
- * factory.register('filesystem', (deps) => ({
- *   readFile: createReadFileTool(deps.workspaceRoot),
- *   writeFile: createWriteFileTool(deps.workspaceRoot),
+ * factory.register('search', (deps) => ({
+ *   glob: createGlobTool({ defaultCwd: deps.workspaceRoot }),
+ *   grep: createGrepTool({ defaultCwd: deps.workspaceRoot }),
  * }));
  *
  * const tools = factory.createAll({ workspaceRoot: '/my/project' });

@@ -5,7 +5,10 @@
  * Supports crash recovery, scheduled execution, and approval workflows.
  */
 
+import { createLogger } from '@agent/logger';
 import type { AgentOptions } from '../types/agent';
+
+const log = createLogger('@agent/sdk:workflow');
 
 // ============================================================================
 // Types
@@ -139,8 +142,9 @@ export function createDurableAgent(options: AgentOptions): DurableAgent {
   // the agent factory (task 2.1.1) to be complete.
 
   const generate = async (genOptions: GenerateOptions): Promise<GenerateResult> => {
+    log.debug('DurableAgent.generate() called', { promptLength: genOptions.prompt.length, maxSteps: genOptions.maxSteps });
     // Stub - will call actual agent.generate when available
-    console.warn('DurableAgent.generate: stub implementation');
+    log.warn('DurableAgent.generate: stub implementation');
     return {
       text: `[Stub response for: ${genOptions.prompt}]`,
       usage: {
@@ -155,11 +159,13 @@ export function createDurableAgent(options: AgentOptions): DurableAgent {
     generate,
 
     durableGenerate: async (prompt: string): Promise<string> => {
+      log.info('durableGenerate() called', { promptLength: prompt.length });
       // The "use workflow" directive marks this as a durable workflow.
       // The workflow runtime will checkpoint and resume on crash.
       "use workflow";
 
       const result = await generate({ prompt });
+      log.info('durableGenerate() completed');
       return result.text;
     },
 
@@ -167,19 +173,25 @@ export function createDurableAgent(options: AgentOptions): DurableAgent {
       prompt: string,
       webhookPath: string
     ): Promise<GenerateResult> => {
+      log.info('withApproval() called', { promptLength: prompt.length, webhookPath });
       "use workflow";
 
       // Generate draft
+      log.debug('Generating draft for approval');
       const draft = await generate({ prompt });
 
       // Wait for approval via webhook
+      log.info('Waiting for webhook approval', { webhookPath });
       const approval = await waitForWebhook(webhookPath, {
         draft: draft.text,
       });
 
       if (!approval.approved) {
+        log.warn('Approval rejected', { feedback: approval.feedback });
         throw new Error(`Approval rejected: ${approval.feedback || 'No reason provided'}`);
       }
+
+      log.info('Approval received', { hasModifications: !!approval.modifiedContent });
 
       // If approved, finalize (optionally with modifications)
       const finalPrompt = approval.modifiedContent
@@ -193,12 +205,15 @@ export function createDurableAgent(options: AgentOptions): DurableAgent {
       prompt: string,
       delay: string
     ): Promise<GenerateResult> => {
+      log.info('scheduled() called', { promptLength: prompt.length, delay });
       "use workflow";
 
       // Sleep without holding compute
+      log.debug('Sleeping for delay', { delay });
       await workflowSleep(delay);
 
       // Execute after delay
+      log.info('Delay completed, executing prompt');
       return generate({ prompt });
     },
   };

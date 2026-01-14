@@ -16,19 +16,20 @@ describe('Tool Presets', () => {
     });
 
     it('should have minimal preset definition', () => {
-      expect(toolPresets.minimal.description).toContain('Read-only');
-      expect(toolPresets.minimal.tools).toContain('read_text_file');
-      expect(toolPresets.minimal.tools).toContain('list_directory');
+      expect(toolPresets.minimal.description).toContain('Glob');
+      expect(toolPresets.minimal.tools).toContain('glob');
     });
 
     it('should have standard preset definition', () => {
+      expect(toolPresets.standard.tools).toContain('glob');
+      expect(toolPresets.standard.tools).toContain('grep');
       expect(toolPresets.standard.tools).toContain('shell');
       expect(toolPresets.standard.tools).toContain('plan');
-      expect(toolPresets.standard.tools).toContain('reasoning');
+      expect(toolPresets.standard.tools).toContain('deep_reasoning');
     });
 
     it('should have full preset definition', () => {
-      expect(toolPresets.full.tools).toContain('spawn_agent');
+      expect(toolPresets.full.tools).toContain('ast_grep_search');
     });
   });
 
@@ -39,8 +40,7 @@ describe('Tool Presets', () => {
 
     it('should return tool names for minimal', () => {
       const names = getPresetToolNames('minimal');
-      expect(names).toContain('read_text_file');
-      expect(names).toContain('list_directory');
+      expect(names).toContain('glob');
     });
 
     it('should return more tools for standard', () => {
@@ -56,15 +56,13 @@ describe('Tool Presets', () => {
       expect(Object.keys(tools)).toHaveLength(0);
     });
 
-    it('should create minimal preset with read-only tools', () => {
+    it('should create minimal preset with glob tool', () => {
       const tools = createToolPreset('minimal', {
         workspaceRoot: '/tmp',
       });
 
-      expect(tools.read_text_file).toBeDefined();
-      expect(tools.list_directory).toBeDefined();
-      expect(tools.get_file_info).toBeDefined();
-      expect(tools.write_file).toBeUndefined();
+      expect(tools.glob).toBeDefined();
+      expect(tools.grep).toBeUndefined();
     });
 
     it('should create standard preset with all core tools', () => {
@@ -72,21 +70,23 @@ describe('Tool Presets', () => {
         workspaceRoot: '/tmp',
       });
 
-      expect(tools.read_text_file).toBeDefined();
-      expect(tools.write_file).toBeDefined();
+      expect(tools.glob).toBeDefined();
+      expect(tools.grep).toBeDefined();
       expect(tools.shell).toBeDefined();
       expect(tools.plan).toBeDefined();
-      expect(tools.reasoning).toBeDefined();
+      expect(tools.deep_reasoning).toBeDefined();
     });
 
-    it('should create full preset', () => {
+    it('should create full preset with ast-grep', () => {
       const tools = createToolPreset('full', {
         workspaceRoot: '/tmp',
       });
 
-      // Full includes all standard tools
+      // Full includes all standard tools plus ast-grep
+      expect(tools.glob).toBeDefined();
+      expect(tools.grep).toBeDefined();
       expect(tools.shell).toBeDefined();
-      expect(tools.plan).toBeDefined();
+      expect(tools.ast_grep_search).toBeDefined();
     });
 
     it('should include custom tools', () => {
@@ -100,7 +100,7 @@ describe('Tool Presets', () => {
     });
 
     it('should throw for unknown preset', () => {
-      expect(() => createToolPreset('invalid' as any)).toThrow('Unknown tool preset');
+      expect(() => createToolPreset('invalid' as never)).toThrow('Unknown tool preset');
     });
   });
 });

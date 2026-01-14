@@ -9,7 +9,10 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createOllama } from 'ollama-ai-provider-v2';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
+import { createLogger } from '@agent/logger';
 import type { LanguageModel } from 'ai';
+
+const log = createLogger('@agent/sdk:models');
 
 // ============================================================================
 // Provider Instances (Lazy Initialization)
@@ -22,6 +25,7 @@ let _anthropic: ReturnType<typeof createAnthropic> | null = null;
 
 function getOpenRouter() {
   if (!_openrouter) {
+    log.debug('Initializing OpenRouter provider');
     _openrouter = createOpenRouter();
   }
   return _openrouter;
@@ -29,15 +33,16 @@ function getOpenRouter() {
 
 function getOllama() {
   if (!_ollama) {
-    _ollama = createOllama({
-      baseURL: process.env['OLLAMA_BASE_URL'] || 'http://localhost:11434/api',
-    });
+    const baseURL = process.env['OLLAMA_BASE_URL'] || 'http://localhost:11434/api';
+    log.debug('Initializing Ollama provider', { baseURL });
+    _ollama = createOllama({ baseURL });
   }
   return _ollama;
 }
 
 function getOpenAI() {
   if (!_openai) {
+    log.debug('Initializing OpenAI provider');
     _openai = createOpenAI({
       apiKey: process.env['OPENAI_API_KEY'],
     });
@@ -47,6 +52,7 @@ function getOpenAI() {
 
 function getAnthropic() {
   if (!_anthropic) {
+    log.debug('Initializing Anthropic provider');
     _anthropic = createAnthropic({
       apiKey: process.env['ANTHROPIC_API_KEY'],
     });
@@ -204,16 +210,19 @@ export function resolveModel(options: ModelResolutionOptions = {}): LanguageMode
 
   // If explicit model name provided
   if (modelName && provider) {
+    log.info('Resolving model (explicit)', { provider, modelName });
     return createModelForProvider(provider, modelName);
   }
 
   // If modelName looks like "provider/model"
   if (modelName && modelName.includes('/')) {
-    // Use OpenRouter for slash-formatted model names
+    log.info('Resolving model (OpenRouter format)', { modelName });
     return getOpenRouter().chat(modelName) as unknown as LanguageModel;
   }
 
   // Use tier-based selection
+  const info = getModelInfo(tier);
+  log.info('Resolving model (tier-based)', { tier, provider: info.provider, model: info.name });
   return models[tier]();
 }
 
