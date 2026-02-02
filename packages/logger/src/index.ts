@@ -47,6 +47,7 @@ export {
   disable,
   flush,
   close,
+  getLogEmitter,
 } from './config';
 
 // Transports

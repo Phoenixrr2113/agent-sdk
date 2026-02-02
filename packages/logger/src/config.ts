@@ -2,7 +2,8 @@
  * @fileoverview Global debug configuration.
  */
 
-import type { DebugConfig, LogLevel, LogTransport } from './types';
+import { EventEmitter } from 'node:events';
+import type { DebugConfig, LogLevel, LogTransport, LogEntry } from './types';
 import { parseDebugEnv } from './namespace';
 import { createConsoleTransport } from './transports/console';
 import { createFileTransport } from './transports/file';
@@ -12,6 +13,29 @@ import { createFileTransport } from './transports/file';
 // ═══════════════════════════════════════════════════════════════════════════════
 
 let globalConfig: DebugConfig | null = null;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Log Emitter for SSE Streaming
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const logEmitter = new EventEmitter();
+logEmitter.setMaxListeners(100); // Support many concurrent dashboard connections
+
+/**
+ * Get the log event emitter for SSE streaming.
+ * Listen for 'log' events to receive real-time log entries.
+ */
+export function getLogEmitter(): EventEmitter {
+  return logEmitter;
+}
+
+/**
+ * Emit a log entry to all listeners.
+ * @internal
+ */
+export function emitLog(entry: LogEntry): void {
+  logEmitter.emit('log', entry);
+}
 
 function getDefaultConfig(): DebugConfig {
   const debug = process.env['DEBUG'];
@@ -115,3 +139,4 @@ export async function close(): Promise<void> {
   const config = getConfig();
   await Promise.all(config.transports.map(t => t.close?.()));
 }
+

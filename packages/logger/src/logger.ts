@@ -23,7 +23,7 @@
 
 import type { Logger, LoggerOptions, LogEntry, LogLevel } from './types';
 import { LOG_LEVELS } from './types';
-import { getConfig } from './config';
+import { getConfig, emitLog } from './config';
 import { isNamespaceEnabled } from './namespace';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -86,6 +86,9 @@ export function createLogger(namespace: string, options: LoggerOptions = {}): Lo
         console.error(`[@agent/logger] Transport "${transport.name}" failed:`, err);
       }
     }
+
+    // Emit for SSE streaming (dashboard log viewer)
+    emitLog(entry);
   }
   
   const logger: Logger = {

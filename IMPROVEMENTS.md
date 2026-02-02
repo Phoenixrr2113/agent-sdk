@@ -10,34 +10,47 @@
 | Transient Streaming | ✅ Done | Data parts, specialized writers |
 | WebSocket Streaming | ✅ Done | `AgentWebSocketClient` |
 | Durable Agent Types | ✅ Done | Options interface ready |
-| **SSE HTTP Streaming** | ❌ TODO | Client needs async generators |
-| **Memory → Context** | ❌ TODO | Auto-load preferences |
-| **Workflow Runtime** | ⏸️ Deferred | Needs external package |
+| **SSE HTTP Streaming** | ✅ Done | `generateStream()` with AsyncGenerator |
+| **Memory → Context** | ✅ Done | Auto-load preferences via `loadPreferencesFromMemory()` |
+| **Workflow Runtime** | ⏸️ Deferred | Needs external package (Temporal, Inngest, etc.) |
+| **Agent Dashboard** | ✅ Done | Next.js 15 + Tailwind 4 |
 
 ---
 
-## Remaining Work
+## Completed Work (Jan 2026)
 
-### 1. SSE Streaming (Medium Priority)
+### SSE Streaming
 **File:** `packages/sdk-client/src/http-client.ts`
 
-- [ ] Add `generateStream()` with AsyncGenerator
-- [ ] Add `AbortController` for timeout/cancel
-- [ ] Add stream event types
+- [x] Add `generateStream()` with AsyncGenerator
+- [x] Add `AbortController` for timeout/cancel
+- [x] Add stream event types
 
-### 2. Memory → Context Integration (Low Priority)
+### Memory → Context Integration
 **File:** `packages/sdk/src/prompts/context.ts`
 
-- [ ] Add `memoryStore` to `ContextOptions`
-- [ ] Auto-load preferences from memory
-- [ ] Tag-based filtering
+- [x] Add `memoryStore` to `ContextOptions`
+- [x] Auto-load preferences from memory via `loadPreferencesFromMemory()`
+- [x] Tag-based filtering
 
-### 3. Workflow Integration (Deferred)
+### Agent Dashboard
+**Location:** `apps/dashboard`
+
+- [x] Log Viewer with SSE streaming
+- [x] Chat Panel for testing prompts
+- [x] Config Editor for role/tool management
+- [x] Status Panel for health monitoring
+
+---
+
+## Deferred Work
+
+### Workflow Integration
 **File:** `packages/sdk/src/workflow/`
 
 > Intentionally deferred. Requires external workflow runtime (useworkflow.dev, Temporal, Inngest).
 
-Current stubs provide API surface for future integration.
+Current stubs provide API surface for future integration. See `AGENT_INTEGRATION_TODO.md`.
 
 ---
 

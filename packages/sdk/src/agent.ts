@@ -219,20 +219,33 @@ export function createAgent(options: AgentOptions = {}): Agent {
         if (result.steps) {
           for (let i = 0; i < result.steps.length; i++) {
             const step = result.steps[i];
-            agentLog.debug(`Step ${i + 1}/${result.steps.length}`, {
-              toolCalls: step.toolCalls?.map(tc => ({
-                name: tc.toolName,
-                args: (tc as Record<string, unknown>).args ?? (tc as Record<string, unknown>).input,
-              })),
-              toolResults: step.toolResults?.map(tr => {
+
+            // Log each tool call individually at trace level (full details)
+            if (step.toolCalls) {
+              for (const tc of step.toolCalls) {
+                agentLog.trace(`Tool call: ${tc.toolName}`, {
+                  tool: tc.toolName,
+                  input: (tc as Record<string, unknown>).args ?? (tc as Record<string, unknown>).input,
+                });
+              }
+            }
+
+            // Log each tool result individually at trace level (full output)
+            if (step.toolResults) {
+              for (const tr of step.toolResults) {
                 const output = (tr as Record<string, unknown>).result ?? (tr as Record<string, unknown>).output ?? '';
-                return {
-                  name: tr.toolName,
-                  output: typeof output === 'string'
-                    ? output.slice(0, 200) + (output.length > 200 ? '...' : '')
-                    : output,
-                };
-              }),
+                agentLog.trace(`Tool result: ${tr.toolName}`, {
+                  tool: tr.toolName,
+                  output: typeof output === 'string' ? output.slice(0, 1000) : output,
+                  outputLength: typeof output === 'string' ? output.length : undefined,
+                });
+              }
+            }
+
+            // Summary log for step
+            agentLog.debug(`Step ${i + 1}/${result.steps.length}`, {
+              toolCalls: step.toolCalls?.map(tc => tc.toolName) ?? [],
+              toolResults: step.toolResults?.map(tr => tr.toolName) ?? [],
               textLength: step.text?.length ?? 0,
             });
           }
