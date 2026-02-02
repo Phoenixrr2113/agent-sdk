@@ -5,10 +5,11 @@
  * Provides opinionated defaults for tools, roles, and streaming.
  */
 
-import { generateId, ToolLoopAgent, stepCountIs } from 'ai';
+import { generateId, ToolLoopAgent, stepCountIs, tool } from 'ai';
 import type { Tool, ToolSet } from 'ai';
+import { z } from 'zod';
 import { createLogger } from '@agent/logger';
-import type { AgentOptions, AgentRole, ToolPreset } from './types/agent';
+import type { AgentOptions, AgentRole, ToolPreset, BrainInstance } from './types/agent';
 import { resolveModel } from './models';
 import { getRole } from './presets/role-registry';
 import { createToolPreset, type ToolPresetLevel } from './presets/tools';
@@ -79,6 +80,74 @@ function buildTools(options: AgentOptions, workspaceRoot: string): ToolSet {
   log.debug('Tools ready', { tools: Object.keys(allTools) });
 
   return allTools;
+}
+
+// ============================================================================
+// Brain Tools (inline to avoid hard dependency on @agent/brain)
+// ============================================================================
+
+function createBrainToolsFromInstance(brain: BrainInstance): ToolSet {
+  const querySchema = z.object({
+    query: z.string().describe('Search term'),
+    limit: z.number().optional().default(10).describe('Max results'),
+  });
+
+  const rememberSchema = z.object({
+    fact: z.string().describe('Fact to remember'),
+    context: z.record(z.unknown()).optional().describe('Optional context'),
+  });
+
+  const recallSchema = z.object({
+    query: z.string().describe('What to search for'),
+    limit: z.number().optional().default(5).describe('Max results'),
+  });
+
+  const extractSchema = z.object({
+    text: z.string().describe('Text to analyze'),
+    source: z.string().optional().describe('Source of the text'),
+  });
+
+  return {
+    queryKnowledge: tool({
+      description: 'Search the knowledge graph for code entities or facts',
+      inputSchema: querySchema,
+      execute: async ({ query, limit }) => {
+        const results = await brain.query(query, limit ?? 10);
+        return JSON.stringify({ found: results.length > 0, count: results.length, results });
+      },
+    }),
+
+    remember: tool({
+      description: 'Store a fact in memory for later recall',
+      inputSchema: rememberSchema,
+      execute: async ({ fact, context }) => {
+        await brain.remember(fact, context);
+        return JSON.stringify({ stored: true });
+      },
+    }),
+
+    recall: tool({
+      description: 'Retrieve past memories related to a query',
+      inputSchema: recallSchema,
+      execute: async ({ query, limit }) => {
+        const memories = await brain.recall(query, limit ?? 5);
+        return JSON.stringify({ found: memories.length > 0, count: memories.length, memories });
+      },
+    }),
+
+    extractEntities: tool({
+      description: 'Extract entities and relationships from text',
+      inputSchema: extractSchema,
+      execute: async ({ text, source }) => {
+        try {
+          const result = await brain.extract(text, source);
+          return JSON.stringify({ success: true, result });
+        } catch (error) {
+          return JSON.stringify({ success: false, error: String(error) });
+        }
+      },
+    }),
+  } as ToolSet;
 }
 
 // ============================================================================
@@ -171,6 +240,15 @@ export function createAgent(options: AgentOptions = {}): Agent {
       },
     });
     tools = { ...tools, spawn_agent: spawnTool };
+  }
+
+  // Add brain tools if brain is provided
+  if (options.brain) {
+    log.debug('Adding brain tools');
+    
+    // Create brain tools inline (avoids importing @agent/brain as hard dependency)
+    const brainTools = createBrainToolsFromInstance(options.brain);
+    tools = { ...tools, ...brainTools };
   }
 
   // Create the ToolLoopAgent

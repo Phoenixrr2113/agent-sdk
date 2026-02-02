@@ -1,0 +1,68 @@
+{
+  "name": "@agent/brain",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Knowledge graph and memory system for AI agents",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./types": {
+      "import": "./dist/types/index.js",
+      "types": "./dist/types/index.d.ts"
+    },
+    "./graph": {
+      "import": "./dist/graph/index.js",
+      "types": "./dist/graph/index.d.ts"
+    },
+    "./nlp": {
+      "import": "./dist/nlp/index.js",
+      "types": "./dist/nlp/index.d.ts"
+    },
+    "./parser": {
+      "import": "./dist/parser/index.js",
+      "types": "./dist/parser/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@agent/logger": "workspace:*",
+    "falkordb": "^6.4.1",
+    "ai": "6.0.0-beta.120",
+    "@openrouter/ai-sdk-provider": "^1.5.4",
+    "zod": "^3.24.1",
+    "fast-glob": "^3.3.2"
+  },
+  "devDependencies": {
+    "@agent/config-typescript": "workspace:*",
+    "typescript": "^5.7.3",
+    "vitest": "^1.6.1",
+    "@types/node": "^20.17.19",
+    "tree-sitter": "^0.22.4",
+    "tree-sitter-typescript": "^0.23.2",
+    "tree-sitter-python": "^0.23.6",
+    "tree-sitter-c-sharp": "^0.23.1"
+  },
+  "peerDependencies": {
+    "tree-sitter": "^0.22.4",
+    "tree-sitter-typescript": "^0.23.2",
+    "tree-sitter-python": "^0.23.6",
+    "tree-sitter-c-sharp": "^0.23.1"
+  },
+  "peerDependenciesMeta": {
+    "tree-sitter": { "optional": true },
+    "tree-sitter-typescript": { "optional": true },
+    "tree-sitter-python": { "optional": true },
+    "tree-sitter-c-sharp": { "optional": true }
+  },
+  "keywords": ["ai", "agent", "knowledge-graph", "memory", "nlp"],
+  "license": "MIT"
+}

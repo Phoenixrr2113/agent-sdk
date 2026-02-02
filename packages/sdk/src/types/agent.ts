@@ -106,6 +106,21 @@ export interface AgentOptions {
   memoryOptions?: MemoryOptions;
 
   // ─────────────────────────────────────────────────────────────────────────────
+  // Brain (Knowledge Graph + Memory)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** Brain instance for knowledge graph and persistent memory.
+   * When provided, automatically injects queryKnowledge, remember, recall, extractEntities tools.
+   * @example
+   * ```typescript
+   * import { createBrain } from '@agent/brain';
+   * const brain = await createBrain({ graph: { host: 'localhost' } });
+   * const agent = createAgent({ brain });
+   * ```
+   */
+  brain?: BrainInstance;
+
+  // ─────────────────────────────────────────────────────────────────────────────
   // Environment
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -221,4 +236,17 @@ export interface MemoryOptions {
 
   /** Similarity threshold for memory retrieval. Default: 0.7 */
   similarityThreshold?: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Brain Configuration
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Brain instance type (imported from @agent/brain at runtime) */
+export interface BrainInstance {
+  query(term: string, limit?: number): Promise<unknown[]>;
+  remember(fact: string, metadata?: Record<string, unknown>): Promise<void>;
+  recall(query: string, limit?: number): Promise<unknown[]>;
+  extract(text: string, source?: string): Promise<unknown>;
+  close(): Promise<void>;
 }
