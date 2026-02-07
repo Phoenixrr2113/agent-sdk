@@ -7,18 +7,21 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "default": "./dist/index.js"
     }
   },
   "scripts": {
     "build": "tsc",
+    "typecheck": "tsc --noEmit",
     "dev": "tsc --watch",
     "test": "vitest",
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@agent/logger": "workspace:*"
+    "@agent/logger": "workspace:*",
+    "ai": "6.0.0-beta.120"
   },
   "devDependencies": {
     "@agent/config-typescript": "workspace:*",

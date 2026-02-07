@@ -3,7 +3,14 @@
 
 export { AgentClient, type AgentClientOptions } from './client';
 export { AgentHttpClient } from './http-client';
-export { AgentWebSocketClient, type WebSocketClientConfig } from './websocket-client';
+export { ChatClient, type StreamCallbacks, type ChatClientOptions } from './chat-client';
+export { SessionManager, type Session } from './session';
+export { 
+  AgentWebSocketClient, 
+  type WebSocketClientConfig, 
+  type ConnectionState,
+  type WebSocketCallbacks,
+} from './websocket-client';
 export { ApiClientError, WebSocketError } from './errors';
 export type {
   ChatMessage,
@@ -11,8 +18,8 @@ export type {
   ChatResponse,
   SessionResponse,
   HistoryResponse,
-  StreamingChatCallbacks,
   StreamEvent,
   StreamEventCallback,
   GenerateStreamOptions,
+  TokenUsage,
 } from './types';

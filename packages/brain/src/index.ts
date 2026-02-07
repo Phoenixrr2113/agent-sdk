@@ -157,7 +157,7 @@ export {
 export {
   createBrainTools,
   type BrainTools,
-} from './tools';
+} from './brain-tools';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Type exports

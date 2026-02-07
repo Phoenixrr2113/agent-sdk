@@ -6,6 +6,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import type { Brain } from './brain';
+import { createShellTools, createCodeAnalysisTools } from './tools/index';
 
 const queryKnowledgeSchema = z.object({
   query: z.string().describe('Search term - function name, class name, concept, or keyword'),
@@ -32,7 +33,13 @@ const extractEntitiesSchema = z.object({
 });
 
 export function createBrainTools(brain: Brain) {
+  const shellTools = createShellTools();
+  const codeAnalysisTools = createCodeAnalysisTools({ client: brain.client });
+
   return {
+    ...shellTools,
+    ...codeAnalysisTools,
+
     queryKnowledge: tool({
       description: `Search the knowledge graph for code entities (functions, classes, files) or facts.
 Use this to find information about the codebase or recalled facts.

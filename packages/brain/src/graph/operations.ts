@@ -15,6 +15,8 @@ import {
   typeToNodeProps,
   componentToNodeProps,
   commitToNodeProps,
+  episodeToNodeProps,
+  experienceToNodeProps,
   type ParsedFileEntities,
   type FileEntity,
   type FunctionEntity,
@@ -24,6 +26,8 @@ import {
   type TypeEntity,
   type ComponentEntity,
   type CommitEntity,
+  type EntityAliasNodeProps,
+  type ContradictionNodeProps,
 } from './schema';
 import type { ProjectEntity } from '../types';
 
@@ -330,11 +334,181 @@ const CYPHER = {
     MATCH (f:File {path: $filePath})
     MERGE (p)-[:HAS_FILE]->(f)
   `,
+
+  // Episode operations for episodic memory
+  UPSERT_EPISODE: `
+    MERGE (e:Episode {id: $id})
+    SET e.timestamp = $timestamp,
+        e.type = $type,
+        e.summary = $summary,
+        e.content = $content,
+        e.context_project = $contextProject,
+        e.context_task = $contextTask,
+        e.entities = $entities,
+        e.relationships = $relationships,
+        e.outcome_success = $outcomeSuccess,
+        e.outcome_result = $outcomeResult,
+        e.outcome_lessons = $outcomeLessons
+    RETURN e
+  `,
+
+  UPSERT_EXPERIENCE: `
+    MERGE (ex:Experience {id: $id})
+    SET ex.episodeId = $episodeId,
+        ex.timestamp = $timestamp,
+        ex.situation = $situation,
+        ex.action = $action,
+        ex.result = $result,
+        ex.evaluation = $evaluation,
+        ex.lessonsLearned = $lessonsLearned,
+        ex.applicableContexts = $applicableContexts
+    RETURN ex
+  `,
+
+  LINK_EPISODE_ENTITY: `
+    MATCH (e:Episode {id: $episodeId})
+    MATCH (entity {name: $entityName})
+    MERGE (e)-[:MENTIONS]->(entity)
+    RETURN e
+  `,
+
+  LINK_EPISODE_EXPERIENCE: `
+    MATCH (e:Episode {id: $episodeId})
+    MATCH (ex:Experience {episodeId: $episodeId})
+    MERGE (e)-[:GENERATED]->(ex)
+    RETURN e
+  `,
+
+  GET_EPISODES_BY_QUERY: `
+    MATCH (e:Episode)
+    WHERE toLower(e.content) CONTAINS toLower($query) 
+       OR toLower(e.summary) CONTAINS toLower($query)
+    RETURN e
+    ORDER BY e.timestamp DESC
+    LIMIT $limit
+  `,
+
+  GET_EPISODE_BY_ID: `
+    MATCH (e:Episode {id: $id})
+    RETURN e
+  `,
+
+  GET_ALL_EPISODES: `
+    MATCH (e:Episode)
+    RETURN e
+    ORDER BY e.timestamp DESC
+    LIMIT $limit
+  `,
+
+  GET_EXPERIENCES_FOR_EPISODE: `
+    MATCH (e:Episode {id: $episodeId})-[:GENERATED]->(ex:Experience)
+    RETURN ex
+  `,
+
+  COUNT_EPISODES: `
+    MATCH (e:Episode)
+    RETURN count(e) as count
+  `,
+
+  PRUNE_OLD_EPISODES: `
+    MATCH (e:Episode)
+    WITH e ORDER BY e.timestamp ASC LIMIT $limit
+    DETACH DELETE e
+    RETURN count(*) as deleted
+  `,
+
+  // Entity Resolution operations
+  UPSERT_ENTITY_ALIAS: `
+    MERGE (a:EntityAlias {name: $name})
+    SET a.source = $source,
+        a.confidence = $confidence,
+        a.lastUpdated = $lastUpdated
+    RETURN a
+  `,
+
+  CREATE_ALIAS_OF_EDGE: `
+    MATCH (a:EntityAlias {name: $aliasName})
+    MATCH (e) WHERE e.id = $entityId OR e.name = $entityId
+    MERGE (a)-[:ALIAS_OF]->(e)
+  `,
+
+  GET_ENTITY_ALIASES: `
+    MATCH (a:EntityAlias)-[:ALIAS_OF]->(e)
+    WHERE e.id = $entityId OR e.name = $entityId
+    RETURN a
+  `,
+
+  FIND_CANONICAL_ENTITY: `
+    MATCH (a:EntityAlias {name: $aliasName})-[:ALIAS_OF]->(e)
+    RETURN e
+  `,
+
+  // Contradiction operations
+  UPSERT_CONTRADICTION: `
+    MERGE (c:Contradiction {id: $id})
+    SET c.detectedAt = $detectedAt,
+        c.resolution_winner = $resolution_winner,
+        c.resolution_reasoning = $resolution_reasoning,
+        c.factA_id = $factA_id,
+        c.factA_statement = $factA_statement,
+        c.factA_source = $factA_source,
+        c.factA_timestamp = $factA_timestamp,
+        c.factB_id = $factB_id,
+        c.factB_statement = $factB_statement,
+        c.factB_source = $factB_source,
+        c.factB_timestamp = $factB_timestamp
+    RETURN c
+  `,
+
+  GET_UNRESOLVED_CONTRADICTIONS: `
+    MATCH (c:Contradiction)
+    WHERE c.resolution_winner IS NULL
+    RETURN c
+  `,
+
+  RESOLVE_CONTRADICTION: `
+    MATCH (c:Contradiction {id: $id})
+    SET c.resolution_winner = $winner,
+        c.resolution_reasoning = $reasoning
+    RETURN c
+  `,
 };
 
 // ============================================================================
 // Operations Interface
 // ============================================================================
+
+/**
+ * Episode row as returned from FalkorDB query
+ */
+export interface EpisodeRow {
+  properties?: {
+    id: string;
+    timestamp: string;
+    type: string;
+    summary: string;
+    content: string;
+    context_project: string | null;
+    context_task: string | null;
+    entities: string;
+    relationships: string;
+    outcome_success: boolean | null;
+    outcome_result: string | null;
+    outcome_lessons: string | null;
+  };
+  id?: string;
+  timestamp?: string;
+  type?: string;
+  summary?: string;
+  content?: string;
+  context_project?: string | null;
+  context_task?: string | null;
+  entities?: string;
+  relationships?: string;
+  outcome_success?: boolean | null;
+  outcome_result?: string | null;
+  outcome_lessons?: string | null;
+}
 
 /**
  * Graph CRUD operations interface
@@ -405,6 +579,29 @@ export interface GraphOperations {
     linesRemoved?: number,
     complexityDelta?: number
   ): Promise<void>;
+
+  // Episode operations (episodic memory)
+  upsertEpisode(episode: Parameters<typeof episodeToNodeProps>[0]): Promise<void>;
+  upsertExperience(experience: Parameters<typeof experienceToNodeProps>[0]): Promise<void>;
+  linkEpisodeEntity(episodeId: string, entityName: string): Promise<void>;
+  linkEpisodeExperience(episodeId: string): Promise<void>;
+  getEpisodesByQuery(query: string, limit: number): Promise<EpisodeRow[]>;
+  getEpisodeById(id: string): Promise<EpisodeRow[]>;
+  getAllEpisodes(limit: number): Promise<EpisodeRow[]>;
+  getExperiencesForEpisode(episodeId: string): Promise<unknown[]>;
+  countEpisodes(): Promise<number>;
+  pruneOldEpisodes(count: number): Promise<number>;
+
+  // Entity Resolution operations
+  upsertEntityAlias(alias: EntityAliasNodeProps): Promise<void>;
+  createAliasOfEdge(aliasName: string, entityId: string): Promise<void>;
+  getEntityAliases(entityId: string): Promise<unknown[]>;
+  findCanonicalEntity(aliasName: string): Promise<unknown[]>;
+
+  // Contradiction operations
+  upsertContradiction(contradiction: ContradictionNodeProps): Promise<void>;
+  getUnresolvedContradictions(): Promise<unknown[]>;
+  resolveContradiction(id: string, winner: string, reasoning: string): Promise<void>;
 }
 
 // ============================================================================
@@ -689,6 +886,132 @@ class GraphOperationsImpl implements GraphOperations {
         linesRemoved: linesRemoved ?? null,
         complexityDelta: complexityDelta ?? null,
       },
+    });
+  }
+
+  // Episode operations (episodic memory)
+
+  
+  async upsertEpisode(episode: Parameters<typeof episodeToNodeProps>[0]): Promise<void> {
+    const props = episodeToNodeProps(episode);
+    await this.client.query(CYPHER.UPSERT_EPISODE, { params: toParams(props) });
+  }
+
+  
+  async upsertExperience(experience: Parameters<typeof experienceToNodeProps>[0]): Promise<void> {
+    const props = experienceToNodeProps(experience);
+    await this.client.query(CYPHER.UPSERT_EXPERIENCE, { params: toParams(props) });
+  }
+
+  
+  async linkEpisodeEntity(episodeId: string, entityName: string): Promise<void> {
+    await this.client.query(CYPHER.LINK_EPISODE_ENTITY, {
+      params: { episodeId, entityName },
+    });
+  }
+
+  
+  async linkEpisodeExperience(episodeId: string): Promise<void> {
+    await this.client.query(CYPHER.LINK_EPISODE_EXPERIENCE, {
+      params: { episodeId },
+    });
+  }
+
+  
+  async getEpisodesByQuery(query: string, limit: number): Promise<EpisodeRow[]> {
+    const result = await this.client.roQuery(CYPHER.GET_EPISODES_BY_QUERY, {
+      params: { query, limit },
+    });
+    return (result.data ?? []) as EpisodeRow[];
+  }
+
+  
+  async getEpisodeById(id: string): Promise<EpisodeRow[]> {
+    const result = await this.client.roQuery(CYPHER.GET_EPISODE_BY_ID, {
+      params: { id },
+    });
+    return (result.data ?? []) as EpisodeRow[];
+  }
+
+  
+  async getAllEpisodes(limit: number): Promise<EpisodeRow[]> {
+    const result = await this.client.roQuery(CYPHER.GET_ALL_EPISODES, {
+      params: { limit },
+    });
+    return (result.data ?? []) as EpisodeRow[];
+  }
+
+  
+  async getExperiencesForEpisode(episodeId: string): Promise<unknown[]> {
+    const result = await this.client.roQuery(CYPHER.GET_EXPERIENCES_FOR_EPISODE, {
+      params: { episodeId },
+    });
+    return result.data ?? [];
+  }
+
+  
+  async countEpisodes(): Promise<number> {
+    const result = await this.client.roQuery(CYPHER.COUNT_EPISODES, { params: {} });
+    const row = result.data?.[0] as { count?: number } | undefined;
+    return row?.count ?? 0;
+  }
+
+  
+  async pruneOldEpisodes(count: number): Promise<number> {
+    const result = await this.client.query(CYPHER.PRUNE_OLD_EPISODES, {
+      params: { limit: count },
+    });
+    const row = result.data?.[0] as { deleted?: number } | undefined;
+    return row?.deleted ?? 0;
+  }
+
+  // Entity Resolution operations
+
+  
+  async upsertEntityAlias(alias: EntityAliasNodeProps): Promise<void> {
+    await this.client.query(CYPHER.UPSERT_ENTITY_ALIAS, { params: toParams(alias) });
+  }
+
+  
+  async createAliasOfEdge(aliasName: string, entityId: string): Promise<void> {
+    await this.client.query(CYPHER.CREATE_ALIAS_OF_EDGE, {
+      params: { aliasName, entityId },
+    });
+  }
+
+  
+  async getEntityAliases(entityId: string): Promise<unknown[]> {
+    const result = await this.client.roQuery(CYPHER.GET_ENTITY_ALIASES, {
+      params: { entityId },
+    });
+    return result.data ?? [];
+  }
+
+  
+  async findCanonicalEntity(aliasName: string): Promise<unknown[]> {
+    const result = await this.client.roQuery(CYPHER.FIND_CANONICAL_ENTITY, {
+      params: { aliasName },
+    });
+    return result.data ?? [];
+  }
+
+  // Contradiction operations
+
+  
+  async upsertContradiction(contradiction: ContradictionNodeProps): Promise<void> {
+    await this.client.query(CYPHER.UPSERT_CONTRADICTION, { params: toParams(contradiction) });
+  }
+
+  
+  async getUnresolvedContradictions(): Promise<unknown[]> {
+    const result = await this.client.roQuery(CYPHER.GET_UNRESOLVED_CONTRADICTIONS, { params: {} });
+    return result.data ?? [];
+  }
+
+  
+  async resolveContradiction(id: string, winner: string, reasoning: string): Promise<void> {
+    await this.client.query(CYPHER.RESOLVE_CONTRADICTION, {
+      params: { id, winner, reasoning },
     });
   }
 

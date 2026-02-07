@@ -47,3 +47,6 @@ export type {
   EntityType,
   RelationshipType,
 } from '../types';
+
+export { EntityResolver, type EntityResolutionConfig } from './entity-resolution';
+export { ContradictionDetector } from './contradiction';

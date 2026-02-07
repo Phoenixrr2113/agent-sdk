@@ -23,6 +23,9 @@ export interface AgentServerOptions {
   /** Enable request logging */
   enableLogging?: boolean;
 
+  /** API Key for authentication */
+  apiKey?: string;
+
   /** Path to config file for dashboard (default: ./agent-sdk.config.yaml) */
   configPath?: string;
 }

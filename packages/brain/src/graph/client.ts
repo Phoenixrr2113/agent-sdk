@@ -165,6 +165,9 @@ class GraphClientImpl implements GraphClient {
       // Component.name - fulltext index for search
       await this.graph.createNodeFulltextIndex('Component', 'name');
       
+      // Episode.content - fulltext index for episodic memory search
+      await this.graph.createNodeFulltextIndex('Episode', 'content');
+      
       this.indexesCreated = true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

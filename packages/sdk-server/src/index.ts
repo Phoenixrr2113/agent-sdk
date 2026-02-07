@@ -5,6 +5,14 @@ export type { AgentServer } from './server';
 
 export { createAgentRoutes } from './routes';
 
+export {
+  createLoggingMiddleware,
+  createRateLimitMiddleware,
+  createAuthMiddleware,
+  type RateLimitOptions,
+  type AuthOptions,
+} from './middleware';
+
 export type { 
   AgentServerOptions, 
   AgentInstance,

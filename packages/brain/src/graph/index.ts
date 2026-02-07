@@ -14,7 +14,7 @@ export {
 } from './client';
 
 // Operations exports
-export { createOperations, type GraphOperations } from './operations';
+export { createOperations, type GraphOperations, type EpisodeRow } from './operations';
 
 // Query exports
 export { createQueries, type GraphQueries } from './queries';

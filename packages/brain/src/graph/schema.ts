@@ -129,6 +129,67 @@ export interface CommitNodeProps {
   date: string;
 }
 
+/**
+ * Episode node properties for Cypher operations (episodic memory)
+ */
+export interface EpisodeNodeProps {
+  id: string;
+  timestamp: string;
+  type: 'conversation' | 'observation' | 'action' | 'decision' | 'learning';
+  summary: string;
+  content: string;
+  context_project: string | null;
+  context_task: string | null;
+  entities: string;
+  relationships: string;
+  outcome_success: boolean | null;
+  outcome_result: string | null;
+  outcome_lessons: string | null;
+}
+
+/**
+ * Experience node properties for Cypher operations (episodic memory)
+ */
+export interface ExperienceNodeProps {
+  id: string;
+  episodeId: string;
+  timestamp: string;
+  situation: string;
+  action: string;
+  result: string;
+  evaluation: 'positive' | 'negative' | 'neutral';
+  lessonsLearned: string;
+  applicableContexts: string;
+}
+
+/**
+ * EntityAlias node properties for Cypher operations
+ */
+export interface EntityAliasNodeProps {
+  name: string; // The alias name
+  source: string;
+  confidence: number;
+  lastUpdated: string;
+}
+
+/**
+ * Contradiction node properties for Cypher operations
+ */
+export interface ContradictionNodeProps {
+  id: string;
+  detectedAt: string;
+  resolution_winner: string | null;
+  resolution_reasoning: string | null;
+  factA_id: string;
+  factA_statement: string;
+  factA_source: string;
+  factA_timestamp: string;
+  factB_id: string;
+  factB_statement: string;
+  factB_source: string;
+  factB_timestamp: string;
+}
+
 // ============================================================================
 // Entity to Node Property Mappers
 // ============================================================================
@@ -254,6 +315,72 @@ export function commitToNodeProps(entity: CommitEntity): CommitNodeProps {
     author: entity.author,
     email: entity.email,
     date: entity.date,
+  };
+}
+
+/**
+ * Convert Episode to Cypher-compatible node properties
+ */
+export function episodeToNodeProps(episode: {
+  id: string;
+  timestamp: string;
+  type: 'conversation' | 'observation' | 'action' | 'decision' | 'learning';
+  summary: string;
+  content: string;
+  context?: {
+    participants?: string[];
+    location?: string;
+    project?: string;
+    task?: string;
+  };
+  entities: string[];
+  relationships: string[];
+  outcome?: {
+    success?: boolean;
+    result?: string;
+    lessons?: string[];
+  };
+}): EpisodeNodeProps {
+  return {
+    id: episode.id,
+    timestamp: episode.timestamp,
+    type: episode.type,
+    summary: episode.summary,
+    content: episode.content,
+    context_project: episode.context?.project ?? null,
+    context_task: episode.context?.task ?? null,
+    entities: JSON.stringify(episode.entities),
+    relationships: JSON.stringify(episode.relationships),
+    outcome_success: episode.outcome?.success ?? null,
+    outcome_result: episode.outcome?.result ?? null,
+    outcome_lessons: episode.outcome?.lessons ? JSON.stringify(episode.outcome.lessons) : null,
+  };
+}
+
+/**
+ * Convert Experience to Cypher-compatible node properties
+ */
+export function experienceToNodeProps(experience: {
+  id: string;
+  episodeId: string;
+  timestamp: string;
+  situation: string;
+  action: string;
+  result: string;
+  evaluation: 'positive' | 'negative' | 'neutral';
+  lessonsLearned: string[];
+  applicableContexts: string[];
+}): ExperienceNodeProps {
+  return {
+    id: experience.id,
+    episodeId: experience.episodeId,
+    timestamp: experience.timestamp,
+    situation: experience.situation,
+    action: experience.action,
+    result: experience.result,
+    evaluation: experience.evaluation,
+    lessonsLearned: JSON.stringify(experience.lessonsLearned),
+    applicableContexts: JSON.stringify(experience.applicableContexts),
   };
 }
 

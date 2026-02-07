@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
 import { createLogger, getLogEmitter } from '@agent/logger';
+import { createLoggingMiddleware, createRateLimitMiddleware, createAuthMiddleware } from './middleware';
 import type { AgentServerOptions } from './types';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -14,10 +15,19 @@ import * as path from 'node:path';
 const log = createLogger('@agent/sdk-server:routes');
 
 /**
+ * Chat message format
+ */
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+/**
  * Request body for generate endpoint
  */
 interface GenerateRequest {
-  prompt: string;
+  prompt?: string;
+  messages?: ChatMessage[];
   options?: {
     userId?: string;
     sessionId?: string;
@@ -32,7 +42,8 @@ interface GenerateRequest {
  * Request body for stream endpoint
  */
 interface StreamRequest {
-  prompt: string;
+  prompt?: string;
+  messages?: ChatMessage[];
   options?: GenerateRequest['options'];
 }
 
@@ -50,8 +61,28 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
   app.use('/*', cors({
     origin: Array.isArray(corsOrigin) ? corsOrigin : corsOrigin,
     allowMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
+    allowHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
   }));
+
+  // Configure Middleware
+  app.use('*', createLoggingMiddleware());
+
+  // Rate limiter shared instance (avoids creating separate maps per route)
+  const rateLimiter = createRateLimitMiddleware({ windowMs: 60000, max: 100 });
+  const authMiddleware = serverOptions.apiKey 
+    ? createAuthMiddleware({ apiKey: serverOptions.apiKey }) 
+    : null;
+
+  // Apply rate limiting and auth to agent endpoints
+  app.use('/generate', rateLimiter);
+  app.use('/stream', rateLimiter);
+  app.use('/chat', rateLimiter);
+
+  if (authMiddleware) {
+    app.use('/generate', authMiddleware);
+    app.use('/stream', authMiddleware);
+    app.use('/chat', authMiddleware);
+  }
 
   // Health check endpoint
   app.get('/health', (c) => c.json({ 
@@ -146,8 +177,10 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
     try {
       const body = await c.req.json<GenerateRequest>();
       
-      if (!body.prompt) {
-        return c.json({ error: 'prompt is required' }, 400);
+      const prompt = body.prompt ?? body.messages?.map(m => `${m.role}: ${m.content}`).join('\n') ?? '';
+      
+      if (!prompt) {
+        return c.json({ error: 'prompt or messages is required' }, 400);
       }
 
       const agent = serverOptions.agent;
@@ -157,13 +190,12 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
         }, 500);
       }
 
-      // Type assertion - agent should have generate method
       const agentInstance = agent as { 
         generate: (opts: { prompt: string; options?: unknown }) => Promise<{ text: string; steps: unknown[] }>;
       };
 
       const result = await agentInstance.generate({ 
-        prompt: body.prompt, 
+        prompt, 
         options: body.options,
       });
 
@@ -183,8 +215,10 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
     try {
       const body = await c.req.json<StreamRequest>();
       
-      if (!body.prompt) {
-        return c.json({ error: 'prompt is required' }, 400);
+      const prompt = body.prompt ?? body.messages?.map(m => `${m.role}: ${m.content}`).join('\n') ?? '';
+      
+      if (!prompt) {
+        return c.json({ error: 'prompt or messages is required' }, 400);
       }
 
       const agent = serverOptions.agent;
@@ -194,16 +228,14 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
         }, 500);
       }
 
-      // Type assertion - agent should have generate method
       const agentInstance = agent as {
         generate: (opts: { prompt: string; options?: unknown }) => Promise<{ text: string; steps?: unknown[] }>;
       };
 
       return streamSSE(c, async (stream) => {
         try {
-          // Use generate and stream the response character by character for UX
           const result = await agentInstance.generate({ 
-            prompt: body.prompt, 
+            prompt, 
             options: body.options,
           });
 
@@ -246,8 +278,10 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
     try {
       const body = await c.req.json<StreamRequest & { sessionId?: string }>();
       
-      if (!body.prompt) {
-        return c.json({ error: 'prompt is required' }, 400);
+      const prompt = body.prompt ?? body.messages?.map(m => `${m.role}: ${m.content}`).join('\n') ?? '';
+      
+      if (!prompt) {
+        return c.json({ error: 'prompt or messages is required' }, 400);
       }
 
       const agent = serverOptions.agent;
@@ -255,8 +289,6 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
         return c.json({ error: 'Agent not configured' }, 500);
       }
 
-      // For stateful chat, we'd integrate with session management
-      // For now, forward to stream endpoint behavior
       const agentInstance = agent as {
         stream: (opts: { prompt: string; options?: unknown }) => {
           fullStream: AsyncIterable<{ type: string; [key: string]: unknown }>;
@@ -266,7 +298,7 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
 
       return streamSSE(c, async (stream) => {
         const response = agentInstance.stream({ 
-          prompt: body.prompt, 
+          prompt, 
           options: { ...body.options, sessionId: body.sessionId },
         });
 
@@ -287,4 +319,3 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
 
   return app;
 }
-

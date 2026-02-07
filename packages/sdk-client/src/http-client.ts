@@ -47,7 +47,7 @@ export class AgentHttpClient {
    *
    * for await (const event of client.generateStream(request, { signal: controller.signal })) {
    *   if (event.type === 'text-delta') {
-   *     process.stdout.write(event.data as string);
+   *     process.stdout.write(event.textDelta);
    *   }
    * }
    * ```
@@ -58,7 +58,7 @@ export class AgentHttpClient {
   ): AsyncGenerator<StreamEvent> {
     log.debug('generateStream', { messageCount: request.messages?.length });
 
-    const response = await fetch(`${this.baseUrl}/generate/stream`, {
+    const response = await fetch(`${this.baseUrl}/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

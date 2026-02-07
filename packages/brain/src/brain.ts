@@ -4,9 +4,10 @@
  */
 
 import { createLogger } from '@agent/logger';
-import { createClient, createQueries, createOperations, type GraphClient, type GraphQueries, type GraphOperations } from './graph';
-import { EntityExtractor, type ExtractorConfig } from './nlp';
-import type { Episode, Experience, SearchResult, AnnotatedSample, Sample } from './types';
+import { createClient, createQueries, createOperations, type GraphClient, type GraphQueries, type GraphOperations, type EpisodeRow } from './graph';
+import { EntityExtractor, EntityResolver, ContradictionDetector, type ExtractorConfig } from './nlp';
+import { ContextAssembler, type AssembledContext } from './context';
+import type { Episode, Experience, SearchResult, AnnotatedSample, Sample, Contradiction } from './types';
 
 const logger = createLogger('@agent/brain');
 
@@ -34,11 +35,17 @@ export interface Brain {
   readonly queries: GraphQueries;
   readonly operations: GraphOperations;
   readonly extractor: EntityExtractor | null;
+  readonly resolver: EntityResolver;
+  readonly contradictionDetector: ContradictionDetector;
+  readonly contextAssembler: ContextAssembler;
 
   query(term: string, limit?: number): Promise<SearchResult[]>;
   remember(fact: string, metadata?: Record<string, unknown>): Promise<void>;
   recall(query: string, limit?: number): Promise<Episode[]>;
   extract(text: string, source?: string): Promise<AnnotatedSample>;
+  resolveEntity(name: string, type?: string): Promise<string>;
+  detectContradictions(fact: string, metadata?: Record<string, unknown>): Promise<Contradiction | null>;
+  assembleContext(query: string, tokenBudget?: number): Promise<AssembledContext>;
   recordEpisode(episode: Omit<Episode, 'id' | 'timestamp'>): Promise<Episode>;
   close(): Promise<void>;
 }
@@ -60,8 +67,10 @@ class BrainImpl implements Brain {
   readonly queries: GraphQueries;
   readonly operations: GraphOperations;
   readonly extractor: EntityExtractor | null;
+  readonly resolver: EntityResolver;
+  readonly contradictionDetector: ContradictionDetector;
+  readonly contextAssembler: ContextAssembler;
 
-  private episodes: Episode[] = [];
   private config: InternalConfig;
 
   constructor(
@@ -73,6 +82,9 @@ class BrainImpl implements Brain {
     this.queries = createQueries(client);
     this.operations = createOperations(client);
     this.extractor = extractor;
+    this.resolver = new EntityResolver(this.operations);
+    this.contradictionDetector = new ContradictionDetector();
+    this.contextAssembler = new ContextAssembler(this.operations);
     this.config = {
       graph: config.graph ?? {},
       extraction: {
@@ -118,35 +130,66 @@ class BrainImpl implements Brain {
       }
     }
 
-    this.episodes.push(episode);
+    // Check for contradictions before storing
+    try {
+      const contradiction = await this.detectContradictions(fact, metadata);
+      if (contradiction) {
+        logger.info('Contradiction detected', { contradiction });
+      }
+    } catch (error) {
+      logger.error('Failed to detect contradictions', { error });
+    }
 
-    if (this.episodes.length > this.config.memory.maxEpisodes) {
-      this.episodes = this.episodes.slice(-this.config.memory.maxEpisodes);
+    await this.operations.upsertEpisode(episode);
+
+    for (const entity of episode.entities) {
+      try {
+        await this.operations.linkEpisodeEntity(episode.id, entity);
+      } catch (error) {
+        logger.debug('Failed to link episode entity', { entity, error: String(error) });
+      }
+    }
+
+    const episodeCount = await this.operations.countEpisodes();
+    if (episodeCount > this.config.memory.maxEpisodes) {
+      const toDelete = episodeCount - this.config.memory.maxEpisodes;
+      const deleted = await this.operations.pruneOldEpisodes(toDelete);
+      logger.debug('Pruned old episodes', { toDelete, deleted, remaining: episodeCount - deleted });
     }
   }
 
   async recall(query: string, limit = 5): Promise<Episode[]> {
     logger.debug('recall', { query, limit });
 
-    const queryLower = query.toLowerCase();
-    const scored = this.episodes.map((ep) => {
-      let score = 0;
+    const rows = await this.operations.getEpisodesByQuery(query, limit);
+    const episodes: Episode[] = [];
 
-      if (ep.content.toLowerCase().includes(queryLower)) score += 3;
-      if (ep.summary.toLowerCase().includes(queryLower)) score += 2;
+    for (const row of rows) {
+      const props = row.properties ?? row;
+      const episode: Episode = {
+        id: props.id as string,
+        timestamp: props.timestamp as string,
+        type: props.type as Episode['type'],
+        summary: props.summary as string,
+        content: props.content as string,
+        context: {
+          project: props.context_project ?? undefined,
+          task: props.context_task ?? undefined,
+        },
+        entities: JSON.parse((props.entities as string) ?? '[]'),
+        relationships: JSON.parse((props.relationships as string) ?? '[]'),
+        outcome: props.outcome_success !== undefined && props.outcome_success !== null ? {
+          success: props.outcome_success as boolean,
+          result: props.outcome_result ?? undefined,
+          lessons: props.outcome_lessons 
+            ? JSON.parse(props.outcome_lessons as string) 
+            : undefined,
+        } : undefined,
+      };
+      episodes.push(episode);
+    }
 
-      for (const entity of ep.entities) {
-        if (entity.toLowerCase().includes(queryLower)) score += 1;
-      }
-
-      return { episode: ep, score };
-    });
-
-    return scored
-      .filter((s) => s.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map((s) => s.episode);
+    return episodes.slice(0, limit);
   }
 
   async extract(text: string, source?: string): Promise<AnnotatedSample> {
@@ -163,6 +206,52 @@ class BrainImpl implements Brain {
     return this.extractor.extract(sample);
   }
 
+  async resolveEntity(name: string, type?: string): Promise<string> {
+    return this.resolver.resolveEntity(name, type ?? 'unknown');
+  }
+
+  async detectContradictions(fact: string, metadata?: Record<string, unknown>): Promise<Contradiction | null> {
+    // 1. Recall recent facts that might be relevant
+    // Using a broad search for now. In a real system, we'd use vector search or more specific entity queries.
+    // We search for key terms from the fact.
+    const searchTerms = fact.split(' ').filter(w => w.length > 4).slice(0, 3).join(' '); // Simple keyword extraction
+    const recentEpisodes = await this.recall(searchTerms || fact, 10);
+
+    for (const episode of recentEpisodes) {
+      const contradiction = this.contradictionDetector.detect(
+        fact,
+        episode.content,
+        { id: 'new', source: (metadata?.source as string) ?? 'user', timestamp: new Date().toISOString() },
+        { id: episode.id, source: 'memory', timestamp: episode.timestamp }
+      );
+
+      if (contradiction) {
+        // Persist contradiction
+        await this.operations.upsertContradiction({
+          id: contradiction.id,
+          detectedAt: contradiction.detectedAt,
+          resolution_winner: null,
+          resolution_reasoning: null,
+          factA_id: contradiction.factA.id,
+          factA_statement: contradiction.factA.statement,
+          factA_source: contradiction.factA.source,
+          factA_timestamp: contradiction.factA.timestamp,
+          factB_id: contradiction.factB.id,
+          factB_statement: contradiction.factB.statement,
+          factB_source: contradiction.factB.source,
+          factB_timestamp: contradiction.factB.timestamp,
+        });
+        return contradiction;
+      }
+    }
+
+    return null;
+  }
+
+  async assembleContext(query: string, tokenBudget?: number): Promise<AssembledContext> {
+    return this.contextAssembler.assemble(query, tokenBudget);
+  }
+
   async recordEpisode(episodeData: Omit<Episode, 'id' | 'timestamp'>): Promise<Episode> {
     const episode: Episode = {
       ...episodeData,
@@ -170,7 +259,7 @@ class BrainImpl implements Brain {
       timestamp: new Date().toISOString(),
     };
 
-    this.episodes.push(episode);
+    await this.operations.upsertEpisode(episode);
     logger.debug('recordEpisode', { id: episode.id, type: episode.type });
 
     return episode;

@@ -23,18 +23,20 @@ export interface HistoryResponse {
   messages: ChatMessage[];
 }
 
-export interface StreamingChatCallbacks {
-  onText?: (text: string) => void;
-  onToolCall?: (name: string, args: unknown) => void;
-  onToolResult?: (name: string, result: unknown) => void;
-  onError?: (error: Error) => void;
-  onComplete?: () => void;
-}
+export type TokenUsage = {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+};
 
-export interface StreamEvent {
-  type: 'text-delta' | 'tool-call' | 'tool-result' | 'complete' | 'error';
-  data: unknown;
-}
+export type StreamEvent =
+  | { type: 'text-delta'; textDelta: string }
+  | { type: 'tool-call'; toolCallId: string; toolName: string; args: unknown }
+  | { type: 'tool-result'; toolCallId: string; toolName: string; result: unknown }
+  | { type: 'step-start'; stepIndex: number }
+  | { type: 'step-finish'; stepIndex: number; finishReason: string }
+  | { type: 'finish'; text: string; usage?: TokenUsage }
+  | { type: 'error'; error: string };
 
 export type StreamEventCallback = (event: StreamEvent) => void;
 
@@ -45,4 +47,3 @@ export interface GenerateStreamOptions {
   /** AbortSignal for timeout/cancellation */
   signal?: AbortSignal;
 }
-
