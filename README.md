@@ -68,6 +68,71 @@ const result = await client.generate({ prompt: 'Hello!' });
 - **Sub-Agent Spawning** - Hierarchical agent delegation
 - **SSE Streaming** - Real-time response streaming
 - **Memory Integration** - Vectra-based vector memory
+- **Durable Workflows** - Crash recovery, auto-retry, and step-level checkpointing
+- **Workflow Hooks** - Human-in-the-loop approval with `defineHook()`
+- **Resumable Streams** - Survive page refreshes and network disconnects
+
+## Workflow Observability
+
+Durable agents record every LLM call, tool execution, and webhook suspension as discrete workflow steps. Use the built-in inspector to debug agent runs step-by-step.
+
+### Quick Start
+
+```bash
+# Launch the workflow inspector (opens web UI)
+pnpm inspect
+```
+
+This runs `npx workflow inspect runs --web`, which opens a local web UI showing all workflow runs with their individual steps.
+
+### What You'll See
+
+Each durable agent run is broken into named steps visible in the inspector:
+
+| Step Name | Description |
+|-----------|-------------|
+| `llmGenerate` | Standard LLM generation call |
+| `llmDraft` | Draft generation (approval workflow) |
+| `webhookApproval` | Webhook suspension point (zero compute) |
+| `llmFinalize` | Final generation after approval |
+| `durableSleep` | Durable delay (zero compute) |
+| `tool-exec-{name}` | Individual tool executions (e.g. `tool-exec-read_file`) |
+
+### Example: Durable Agent
+
+```typescript
+import { createAgent } from '@agent/sdk';
+
+const agent = createAgent({
+  role: 'coder',
+  durable: true,
+  toolPreset: 'standard',
+});
+
+// Every LLM call and tool execution is checkpointed.
+// If the process crashes, it resumes from the last completed step.
+const result = await agent.generate({ prompt: 'Refactor utils.ts' });
+```
+
+After running a durable agent, launch the inspector to see the step-by-step execution trace:
+
+```bash
+pnpm inspect
+# Opens http://localhost:... with step timeline, inputs/outputs, and durations
+```
+
+### Direct CLI Usage
+
+```bash
+# List recent workflow runs
+npx workflow inspect runs
+
+# Open the web inspector
+npx workflow inspect runs --web
+
+# Inspect a specific run
+npx workflow inspect run <run-id>
+```
 
 ## Requirements
 

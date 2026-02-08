@@ -10,7 +10,8 @@
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "dev": "turbo dev",
-    "clean": "turbo clean && rm -rf .turbo"
+    "clean": "turbo clean && rm -rf .turbo",
+    "inspect": "npx workflow inspect runs --web"
   },
   "devDependencies": {
     "@agent/config-eslint": "workspace:*",

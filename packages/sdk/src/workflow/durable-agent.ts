@@ -155,7 +155,9 @@ export function _resetWorkflowCache(): void {
 /**
  * Wrap an agent's generate call as a workflow.
  * The "use workflow" directive marks the entire function as a durable workflow.
- * The "use step" directives inside mark individual checkpoints.
+ * Named step functions give the workflow inspector descriptive labels.
+ *
+ * Inspector view: durableGenerateWorkflow → llmGenerate
  */
 async function durableGenerateWorkflow(
   agent: Agent,
@@ -165,11 +167,14 @@ async function durableGenerateWorkflow(
 
   log.info('durableGenerateWorkflow started', { promptLength: prompt.length });
 
-  // LLM call as a named step
-  const result = await (async () => {
+  // Named step function — inspector displays "llmGenerate"
+  async function llmGenerate() {
     "use step";
+    log.debug('step:llmGenerate — executing LLM call');
     return agent.generate({ prompt });
-  })();
+  }
+
+  const result = await llmGenerate();
 
   const text = await result.text;
   const totalUsage = result.totalUsage;
@@ -193,6 +198,8 @@ async function durableGenerateWorkflow(
 /**
  * Wrap an agent's generate call with approval workflow.
  * The function suspends (zero compute) while waiting for webhook approval.
+ *
+ * Inspector view: durableWithApprovalWorkflow → llmDraft → webhookApproval → llmFinalize
  */
 async function durableWithApprovalWorkflow(
   agent: Agent,
@@ -203,40 +210,46 @@ async function durableWithApprovalWorkflow(
 
   log.info('durableWithApprovalWorkflow started', { prompt: prompt.slice(0, 100) });
 
-  // Step 1: Generate draft
-  const draftResult = await (async () => {
+  // Step 1: Generate draft — inspector displays "llmDraft"
+  async function llmDraft() {
     "use step";
+    log.debug('step:llmDraft — generating draft');
     return agent.generate({ prompt });
-  })();
+  }
 
+  const draftResult = await llmDraft();
   const draftText = await draftResult.text;
 
-  // Step 2: Wait for approval (webhook)
-  // In production, this suspends the workflow. The Workflow runtime
-  // handles the webhook endpoint and resumes when the webhook fires.
+  // Step 2: Wait for approval — inspector displays "webhookApproval"
   log.info('Waiting for approval webhook');
-  const approval: WebhookResponse = await (async () => {
+
+  async function webhookApproval(): Promise<WebhookResponse> {
     "use step";
+    log.debug('step:webhookApproval — suspending for webhook');
     // The workflow runtime handles webhook suspension here.
     // This stub returns approved=true when not running under the runtime.
     return { approved: true } as WebhookResponse;
-  })();
+  }
+
+  const approval = await webhookApproval();
 
   if (!approval.approved) {
     log.warn('Approval rejected', { feedback: approval.feedback });
     throw new Error(`Approval rejected: ${approval.feedback || 'No reason provided'}`);
   }
 
-  // Step 3: Finalize
+  // Step 3: Finalize — inspector displays "llmFinalize"
   const finalPrompt = approval.modifiedContent
     ? `Finalize with modifications: ${approval.modifiedContent}. Original: ${draftText}`
     : prompt;
 
-  const finalResult = await (async () => {
+  async function llmFinalize() {
     "use step";
+    log.debug('step:llmFinalize — finalizing after approval');
     return agent.generate({ prompt: finalPrompt });
-  })();
+  }
 
+  const finalResult = await llmFinalize();
   const finalText = await finalResult.text;
 
   return {
@@ -252,6 +265,8 @@ async function durableWithApprovalWorkflow(
 /**
  * Wrap an agent's generate call with a durable delay.
  * Uses workflow sleep() — doesn't hold compute during the delay.
+ *
+ * Inspector view: durableScheduledWorkflow → durableSleep → llmGenerate
  */
 async function durableScheduledWorkflow(
   agent: Agent,
@@ -262,9 +277,10 @@ async function durableScheduledWorkflow(
 
   log.info('durableScheduledWorkflow started', { delay });
 
-  // Step 1: Sleep (zero compute)
-  await (async () => {
+  // Step 1: Sleep (zero compute) — inspector displays "durableSleep"
+  async function durableSleep() {
     "use step";
+    log.debug('step:durableSleep — sleeping', { delay });
     try {
       const wf = getWorkflowModule();
       await wf.sleep(delay);
@@ -274,16 +290,19 @@ async function durableScheduledWorkflow(
       log.warn('Workflow sleep unavailable, using setTimeout fallback', { ms });
       await new Promise<void>(resolve => setTimeout(resolve, ms));
     }
-  })();
+  }
 
+  await durableSleep();
   log.info('Sleep completed, executing prompt');
 
-  // Step 2: Generate
-  const result = await (async () => {
+  // Step 2: Generate — inspector displays "llmGenerate"
+  async function llmGenerate() {
     "use step";
+    log.debug('step:llmGenerate — executing LLM call after sleep');
     return agent.generate({ prompt });
-  })();
+  }
 
+  const result = await llmGenerate();
   const text = await result.text;
 
   return {
