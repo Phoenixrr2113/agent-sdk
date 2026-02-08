@@ -90,3 +90,24 @@ export {
   formatDuration,
 } from './workflow';
 export type { DurableAgent, DurableAgentOptions, DurableGenerateResult, DurabilityConfig } from './workflow';
+
+// Workflow Hooks & Human-in-the-Loop
+export {
+  defineHook,
+  createWebhook,
+  sleep,
+  getHookRegistry,
+  HookRegistry,
+  HookNotFoundError,
+  HookNotPendingError,
+  HookRejectedError,
+} from './workflow';
+export type {
+  Hook,
+  HookDefinition,
+  HookInstance,
+  HookStatus,
+  WebhookOptions,
+  WebhookResult,
+  SleepOptions,
+} from './workflow';

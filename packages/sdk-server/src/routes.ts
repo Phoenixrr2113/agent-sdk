@@ -11,6 +11,7 @@ import { createLoggingMiddleware, createRateLimitMiddleware, createAuthMiddlewar
 import { ConcurrencyQueue, QueueFullError, QueueTimeoutError } from './queue';
 import { StreamEventBuffer } from './stream-buffer';
 import type { AgentServerOptions, DurableAgentInstance } from './types';
+import { getHookRegistry, HookNotFoundError, HookNotPendingError } from '@agent/sdk';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -403,6 +404,119 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
         await stream.writeSSE({ event: 'done', data: '' });
       });
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return c.json({ error: message }, 500);
+    }
+  });
+
+  // ============================================================================
+  // Hook Endpoints (Human-in-the-Loop)
+  // ============================================================================
+
+  // List all hooks (optionally filtered by status)
+  app.get('/hooks', (c) => {
+    const registry = getHookRegistry();
+    const status = c.req.query('status');
+    const hooks = status
+      ? registry.list(status as 'pending' | 'resolved' | 'rejected' | 'timed_out')
+      : registry.list();
+
+    return c.json({
+      hooks: hooks.map((h) => ({
+        id: h.id,
+        name: h.name,
+        description: h.description,
+        status: h.status,
+        payload: h.payload,
+        createdAt: h.createdAt.toISOString(),
+        resolvedAt: h.resolvedAt?.toISOString(),
+        timeoutMs: h.timeoutMs,
+      })),
+      total: hooks.length,
+    });
+  });
+
+  // Get a specific hook by ID
+  app.get('/hooks/:id', (c) => {
+    const registry = getHookRegistry();
+    const hook = registry.get(c.req.param('id'));
+
+    if (!hook) {
+      return c.json({ error: `Hook "${c.req.param('id')}" not found` }, 404);
+    }
+
+    return c.json({
+      id: hook.id,
+      name: hook.name,
+      description: hook.description,
+      status: hook.status,
+      payload: hook.payload,
+      result: hook.result,
+      createdAt: hook.createdAt.toISOString(),
+      resolvedAt: hook.resolvedAt?.toISOString(),
+      timeoutMs: hook.timeoutMs,
+    });
+  });
+
+  // Resume a suspended hook with a payload
+  app.post('/hooks/:id/resume', async (c) => {
+    try {
+      const hookId = c.req.param('id');
+      const body = await c.req.json<{ payload?: unknown }>().catch(() => ({} as { payload?: unknown }));
+      const registry = getHookRegistry();
+
+      log.info('Hook resume requested', { hookId });
+
+      const hook = await registry.resume(hookId, body.payload);
+
+      return c.json({
+        success: true,
+        hook: {
+          id: hook.id,
+          name: hook.name,
+          status: hook.status,
+          resolvedAt: hook.resolvedAt?.toISOString(),
+        },
+      });
+    } catch (error) {
+      if (error instanceof HookNotFoundError) {
+        return c.json({ error: error.message }, 404);
+      }
+      if (error instanceof HookNotPendingError) {
+        return c.json({ error: error.message }, 409);
+      }
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return c.json({ error: message }, 500);
+    }
+  });
+
+  // Reject a suspended hook
+  app.post('/hooks/:id/reject', async (c) => {
+    try {
+      const hookId = c.req.param('id');
+      const body = await c.req.json<{ reason?: string }>().catch(() => ({} as { reason?: string }));
+      const registry = getHookRegistry();
+
+      log.info('Hook rejection requested', { hookId });
+
+      const hook = registry.reject(hookId, body.reason ?? 'Rejected by user');
+
+      return c.json({
+        success: true,
+        hook: {
+          id: hook.id,
+          name: hook.name,
+          status: hook.status,
+          resolvedAt: hook.resolvedAt?.toISOString(),
+        },
+      });
+    } catch (error) {
+      if (error instanceof HookNotFoundError) {
+        return c.json({ error: error.message }, 404);
+      }
+      if (error instanceof HookNotPendingError) {
+        return c.json({ error: error.message }, 409);
+      }
       const message = error instanceof Error ? error.message : 'Unknown error';
       return c.json({ error: message }, 500);
     }

@@ -33,3 +33,24 @@ export {
   type DurableGenerateResult,
   type WebhookResponse,
 } from './durable-agent';
+
+// Workflow hooks & human-in-the-loop
+export {
+  defineHook,
+  createWebhook,
+  sleep,
+  getHookRegistry,
+  _resetHookRegistry,
+  _resetHookCounter,
+  HookRegistry,
+  HookNotFoundError,
+  HookNotPendingError,
+  HookRejectedError,
+  type Hook,
+  type HookDefinition,
+  type HookInstance,
+  type HookStatus,
+  type WebhookOptions,
+  type WebhookResult,
+  type SleepOptions,
+} from './hooks';
