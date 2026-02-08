@@ -15,6 +15,8 @@ import { getRole } from './presets/role-registry';
 import { createToolPreset, type ToolPresetLevel } from './presets/tools';
 import { createSpawnAgentTool } from './tools/spawn-agent';
 import { loadSkills, buildSkillsSystemPrompt } from './skills';
+import { createDurableAgent, checkWorkflowAvailability } from './workflow/durable-agent';
+import type { DurableAgent } from './workflow/durable-agent';
 
 // ============================================================================
 // Logger
@@ -370,6 +372,34 @@ export function createAgent(options: AgentOptions = {}): Agent {
       }
     },
   };
+
+  // Wrap with durability if requested
+  if (options.durable) {
+    log.info('Durable mode requested — wrapping agent with workflow', { agentId });
+
+    // Eagerly verify workflow availability. Schedule the async check and attach
+    // a deferred throw: the DurableAgent is created, but its durable methods
+    // (`durableGenerate`, `withApproval`, `scheduled`) need the runtime.
+    // We fire the check immediately so subsequent calls see the cached result.
+    checkWorkflowAvailability().then(available => {
+      if (!available) {
+        log.error(
+          'Workflow package not installed. Durable features will not function. ' +
+          'Install with: npm install workflow'
+        );
+      }
+    }).catch(() => {
+      // Swallow — already logged in checkWorkflowAvailability
+    });
+
+    const durable = createDurableAgent(agent, {
+      ...options,
+      workflowOptions: options.workflowOptions,
+    });
+
+    log.info('Durable agent created', { agentId, role });
+    return durable;
+  }
 
   log.info('Agent created', { agentId, role });
 

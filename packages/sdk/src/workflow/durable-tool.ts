@@ -2,10 +2,16 @@
  * @agent/sdk - Durable Tool Wrapper
  *
  * Wraps tools with durability directives for crash recovery.
- * Uses the 'workflow' package's 'use step' directive to checkpoint tool executions.
+ * Uses the Workflow DevKit's "use step" directive to checkpoint tool executions.
+ * Each tool step gets a descriptive name for observability in the workflow inspector.
+ *
+ * @see https://useworkflow.dev
  */
 
 import type { Tool } from 'ai';
+import { createLogger } from '@agent/logger';
+
+const log = createLogger('@agent/sdk:workflow:tool');
 
 // ============================================================================
 // Types
@@ -22,6 +28,8 @@ export interface DurabilityConfig {
   retryCount?: number;
   /** Timeout duration string (e.g., "30s", "5m"). Default: "5m" */
   timeout?: string;
+  /** Custom step name for the workflow inspector. Default: "tool-exec-{toolName}" */
+  stepName?: string;
 }
 
 // ============================================================================
@@ -31,12 +39,17 @@ export interface DurabilityConfig {
 /**
  * Wrap a single tool with durability directives.
  *
- * When wrapped, the tool's execute function will use the 'use step' directive
- * to create a checkpoint. If the process crashes, the workflow can resume
- * from the last checkpoint.
+ * When wrapped, the tool's execute function uses the "use step" directive
+ * to create a checkpoint. If the process crashes, the workflow runtime
+ * resumes from the last checkpoint.
+ *
+ * Each wrapped tool gets a descriptive step name for the workflow inspector:
+ * - Default: "tool-exec-{toolName}"
+ * - Custom via `config.stepName`
  *
  * @param tool - The tool to wrap
  * @param config - Durability configuration
+ * @param toolName - Name of the tool (used for step naming)
  * @returns Wrapped tool with durability enabled
  *
  * @example
@@ -44,12 +57,13 @@ export interface DurabilityConfig {
  * const durableReadFile = wrapToolAsDurableStep(readFileTool, {
  *   retryCount: 3,
  *   timeout: '30s',
- * });
+ * }, 'read_file');
  * ```
  */
 export function wrapToolAsDurableStep(
   tool: Tool,
-  config: DurabilityConfig = {}
+  config: DurabilityConfig = {},
+  toolName?: string
 ): Tool {
   const { enabled = true } = config;
 
@@ -63,24 +77,41 @@ export function wrapToolAsDurableStep(
     return tool;
   }
 
-  return {
+  const stepName = config.stepName ?? (toolName ? `tool-exec-${toolName}` : 'tool-exec');
+
+  const wrappedTool = {
     ...tool,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     execute: async (input: any, options: any) => {
       // The "use step" directive tells the workflow runtime to checkpoint here.
-      // This is a special directive recognized by the workflow package.
-      // When the workflow resumes after a crash, it will skip to this point
-      // and return the cached result instead of re-executing.
+      // When the workflow resumes after a crash, it skips to this point
+      // and returns the cached result instead of re-executing.
       "use step";
 
+      log.debug(`Executing durable step: ${stepName}`, {
+        stepName,
+        retryCount: config.retryCount,
+        timeout: config.timeout,
+      });
+
       try {
-        return await originalExecute(input, options);
+        const result = await originalExecute(input, options);
+        log.debug(`Durable step completed: ${stepName}`);
+        return result;
       } catch (error) {
+        log.error(`Durable step failed: ${stepName}`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
         // Re-throw to let the workflow runtime handle retries
         throw error;
       }
     },
   } as Tool;
+
+  // Store step name and config as metadata
+  setDurabilityConfig(wrappedTool, { ...config, stepName });
+
+  return wrappedTool;
 }
 
 // ============================================================================
@@ -89,6 +120,7 @@ export function wrapToolAsDurableStep(
 
 /**
  * Wrap all tools in a set with durability directives.
+ * Each tool gets a step name based on its key in the record.
  *
  * @param tools - Record of tools to wrap
  * @param config - Durability configuration applied to all tools
@@ -106,10 +138,12 @@ export function wrapToolsAsDurable(
   tools: ToolSet,
   config: DurabilityConfig = {}
 ): ToolSet {
+  log.debug('Wrapping all tools as durable', { count: Object.keys(tools).length });
+
   return Object.fromEntries(
     Object.entries(tools).map(([name, tool]) => [
       name,
-      wrapToolAsDurableStep(tool, config),
+      wrapToolAsDurableStep(tool, config, name),
     ])
   );
 }
@@ -132,10 +166,15 @@ export function wrapSelectedToolsAsDurable(
   config: DurabilityConfig = {}
 ): ToolSet {
   const nameSet = new Set(toolNames);
+  log.debug('Selectively wrapping tools as durable', {
+    total: Object.keys(tools).length,
+    selected: toolNames,
+  });
+
   return Object.fromEntries(
     Object.entries(tools).map(([name, tool]) => [
       name,
-      nameSet.has(name) ? wrapToolAsDurableStep(tool, config) : tool,
+      nameSet.has(name) ? wrapToolAsDurableStep(tool, config, name) : tool,
     ])
   );
 }
@@ -148,14 +187,14 @@ export function wrapSelectedToolsAsDurable(
  * Wrap a tool as an independent durable step.
  *
  * Independent steps can be executed in parallel with other independent steps.
- * The workflow runtime will optimize execution by running independent steps
- * concurrently when possible.
+ * The workflow runtime optimizes by running these concurrently.
  *
  * @param tool - The tool to wrap
+ * @param toolName - Name of the tool (used for step naming)
  * @returns Wrapped tool marked as independent
  */
-export function wrapToolAsIndependentStep(tool: Tool): Tool {
-  return wrapToolAsDurableStep(tool, { independent: true });
+export function wrapToolAsIndependentStep(tool: Tool, toolName?: string): Tool {
+  return wrapToolAsDurableStep(tool, { independent: true }, toolName);
 }
 
 // ============================================================================
@@ -182,4 +221,11 @@ export function setDurabilityConfig(tool: Tool, config: DurabilityConfig): Tool 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (tool as any)[DURABILITY_CONFIG] = config;
   return tool;
+}
+
+/**
+ * Get the step name assigned to a durable tool.
+ */
+export function getStepName(tool: Tool): string | undefined {
+  return getDurabilityConfig(tool)?.stepName;
 }

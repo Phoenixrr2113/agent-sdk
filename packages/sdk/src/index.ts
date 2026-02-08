@@ -78,3 +78,15 @@ export {
   DEFAULT_PROVIDER,
 } from './config';
 export type { AgentConfig, PartialAgentConfig, ModelsConfig, ModelTier, Provider } from './config';
+
+// Workflow / Durability
+export {
+  createDurableAgent,
+  checkWorkflowAvailability,
+  wrapToolAsDurableStep,
+  wrapToolsAsDurable,
+  wrapSelectedToolsAsDurable,
+  parseDuration,
+  formatDuration,
+} from './workflow';
+export type { DurableAgent, DurableAgentOptions, DurableGenerateResult, DurabilityConfig } from './workflow';
