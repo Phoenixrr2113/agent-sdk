@@ -42,7 +42,8 @@
   "peerDependencies": {
     "workflow": "*",
     "langfuse-vercel": "*",
-    "@vercel/otel": "*"
+    "@vercel/otel": "*",
+    "agent-browser": "*"
   },
   "peerDependenciesMeta": {
     "workflow": {
@@ -52,6 +53,9 @@
       "optional": true
     },
     "@vercel/otel": {
+      "optional": true
+    },
+    "agent-browser": {
       "optional": true
     }
   },

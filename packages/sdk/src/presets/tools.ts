@@ -9,6 +9,7 @@ import { createAstGrepTools } from '../tools/ast-grep';
 import { createShellTool } from '../tools/shell';
 import { createPlanTool, type PlanToolConfig } from '../tools/plan';
 import { createDeepReasoningTool } from '../tools/deep-reasoning';
+import { createBrowserTool } from '../tools/browser';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -107,6 +108,7 @@ function createFullPreset(workspaceRoot: string, planConfig?: PlanToolConfig) {
   return {
     ...createStandardPreset(workspaceRoot, planConfig),
     ...createAstGrepTools(),
+    browser: createBrowserTool(),
   };
 }
 
@@ -132,8 +134,8 @@ export const toolPresets = {
   },
 
   full: {
-    description: 'All standard tools plus AST-grep for structural code search',
-    tools: ['glob', 'grep', 'shell', 'plan', 'deep_reasoning', 'ast_grep_search', 'ast_grep_replace'],
+    description: 'All standard tools plus AST-grep and browser automation',
+    tools: ['glob', 'grep', 'shell', 'plan', 'deep_reasoning', 'ast_grep_search', 'ast_grep_replace', 'browser'],
   },
 } as const;
 

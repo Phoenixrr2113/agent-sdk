@@ -135,3 +135,20 @@ export {
 
 // Spawn Agent Tool
 export { createSpawnAgentTool } from './spawn-agent';
+
+// Browser Tool
+export {
+  createBrowserTool,
+  browserTool,
+  executeBrowserCommand,
+  buildCommand,
+  isBrowserCliAvailable,
+  resetCliAvailability,
+  browserInputSchema,
+  BROWSER_ACTIONS,
+  BROWSER_TOOL_DESCRIPTION,
+  type BrowserInput,
+  type BrowserAction,
+  type BrowserResult,
+  type BrowserConfig,
+} from './browser';
