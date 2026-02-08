@@ -83,6 +83,7 @@ describe('AgentHttpClient', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         body: stream,
+        headers: new Headers(),
       });
 
       const received: StreamEvent[] = [];
@@ -116,6 +117,7 @@ describe('AgentHttpClient', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         body: stream,
+        headers: new Headers(),
       });
 
       const received: StreamEvent[] = [];
@@ -143,6 +145,7 @@ describe('AgentHttpClient', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         body: stream,
+        headers: new Headers(),
       });
 
       const received: StreamEvent[] = [];

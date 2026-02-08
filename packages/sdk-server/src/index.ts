@@ -16,6 +16,7 @@ export {
 export type { 
   AgentServerOptions, 
   AgentInstance,
+  DurableAgentInstance,
   GenerateOptions,
   GenerateResult,
   StreamResult,
@@ -24,3 +25,6 @@ export type {
 
 export { ConcurrencyQueue, QueueFullError, QueueTimeoutError } from './queue';
 export type { QueueConfig, QueueStats } from './queue';
+
+export { StreamEventBuffer } from './stream-buffer';
+export type { BufferedEvent, StreamBufferOptions } from './stream-buffer';

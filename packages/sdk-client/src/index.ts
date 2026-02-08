@@ -22,4 +22,6 @@ export type {
   StreamEventCallback,
   GenerateStreamOptions,
   TokenUsage,
+  ReconnectOptions,
+  StreamMetadata,
 } from './types';

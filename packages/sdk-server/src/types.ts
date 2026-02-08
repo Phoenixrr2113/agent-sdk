@@ -4,6 +4,7 @@
 
 import type { AgentOptions } from '@agent/sdk';
 import type { QueueConfig } from './queue';
+import type { StreamBufferOptions } from './stream-buffer';
 
 /**
  * Options for creating an agent server
@@ -32,6 +33,9 @@ export interface AgentServerOptions {
 
   /** Concurrency queue configuration for limiting simultaneous requests. */
   queue?: QueueConfig;
+
+  /** Stream buffer configuration for resumable streams. */
+  streamBuffer?: StreamBufferOptions;
 }
 
 /**
@@ -41,6 +45,17 @@ export interface AgentServerOptions {
 export interface AgentInstance {
   generate: (opts: GenerateOptions) => Promise<GenerateResult>;
   stream: (opts: GenerateOptions) => StreamResult;
+}
+
+/**
+ * Extended agent instance with durable workflow capabilities.
+ * Used for duck-type checking whether the agent supports resumable streams.
+ */
+export interface DurableAgentInstance extends AgentInstance {
+  /** The workflow run ID from the last durable execution. */
+  readonly workflowRunId?: string;
+  /** Whether workflow runtime is active. */
+  readonly isWorkflowActive?: boolean;
 }
 
 export interface GenerateOptions {

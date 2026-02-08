@@ -9,6 +9,7 @@ import type {
   HistoryResponse,
   StreamEvent,
   GenerateStreamOptions,
+  StreamMetadata,
 } from './types';
 
 const log = createLogger('@agent/sdk-client');
@@ -35,35 +36,60 @@ export class AgentHttpClient {
   /**
    * Stream a generation request using Server-Sent Events.
    * Returns an AsyncGenerator that yields StreamEvents.
+   * 
+   * Supports resumable streams: when the server is a durable agent,
+   * the response includes `x-workflow-run-id`. Use `options.workflowRunId`
+   * and `options.lastEventId` to reconnect and replay.
    *
    * @param request - Chat request with messages
-   * @param options - Streaming options (signal for abort)
-   * @returns AsyncGenerator yielding stream events
+   * @param options - Streaming options (signal for abort, reconnection)
+   * @returns AsyncGenerator yielding stream events with metadata property
    *
    * @example
    * ```typescript
    * const controller = new AbortController();
-   * setTimeout(() => controller.abort(), 30000); // 30s timeout
+   * const gen = client.generateStream(request, { signal: controller.signal });
    *
-   * for await (const event of client.generateStream(request, { signal: controller.signal })) {
+   * for await (const event of gen) {
    *   if (event.type === 'text-delta') {
    *     process.stdout.write(event.textDelta);
    *   }
    * }
+   *
+   * // After disconnect, reconnect:
+   * const metadata = gen.metadata;
+   * const resumed = client.generateStream(request, {
+   *   workflowRunId: metadata?.workflowRunId,
+   *   lastEventId: metadata?.lastEventId,
+   * });
    * ```
    */
   async *generateStream(
     request: ChatRequest,
     options: GenerateStreamOptions = {}
-  ): AsyncGenerator<StreamEvent> {
-    log.debug('generateStream', { messageCount: request.messages?.length });
+  ): AsyncGenerator<StreamEvent> & { metadata?: StreamMetadata } {
+    log.debug('generateStream', {
+      messageCount: request.messages?.length,
+      workflowRunId: options.workflowRunId,
+      lastEventId: options.lastEventId,
+    });
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'text/event-stream',
+    };
+
+    // Add resumable stream headers
+    if (options.workflowRunId) {
+      headers['x-workflow-run-id'] = options.workflowRunId;
+    }
+    if (options.lastEventId) {
+      headers['Last-Event-ID'] = options.lastEventId;
+    }
 
     const response = await fetch(`${this.baseUrl}/stream`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'text/event-stream',
-      },
+      headers,
       body: JSON.stringify(request),
       signal: options.signal,
     });
@@ -76,6 +102,15 @@ export class AgentHttpClient {
     if (!response.body) {
       throw new ApiClientError('No response body for stream', 500);
     }
+
+    // Capture workflow run ID from response headers
+    const workflowRunId = response.headers.get('x-workflow-run-id') ?? undefined;
+    let lastEventId: string | undefined;
+
+    // Attach metadata to the generator (accessible after iteration)
+    const metadata: StreamMetadata = { workflowRunId, lastEventId };
+    const generator = this;
+    (generator as { _lastStreamMetadata?: StreamMetadata })._lastStreamMetadata = metadata;
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -90,14 +125,24 @@ export class AgentHttpClient {
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
 
+        let currentEventId: string | undefined;
+
         for (const line of lines) {
+          // Track SSE event IDs for resumability
+          if (line.startsWith('id: ')) {
+            currentEventId = line.slice(4).trim();
+            lastEventId = currentEventId;
+            metadata.lastEventId = lastEventId;
+            continue;
+          }
+
           if (!line.startsWith('data: ')) continue;
           const data = line.slice(6).trim();
           if (!data || data === '[DONE]') continue;
 
           try {
             const event = JSON.parse(data) as StreamEvent;
-            log.trace('Stream event', { type: event.type });
+            log.trace('Stream event', { type: event.type, eventId: currentEventId });
             yield event;
           } catch {
             log.warn('Failed to parse SSE data', { data });
@@ -119,6 +164,14 @@ export class AgentHttpClient {
     } finally {
       reader.releaseLock();
     }
+  }
+
+  /**
+   * Get metadata from the last stream (workflow run ID, last event ID).
+   * Useful for implementing reconnection.
+   */
+  get lastStreamMetadata(): StreamMetadata | undefined {
+    return (this as { _lastStreamMetadata?: StreamMetadata })._lastStreamMetadata;
   }
 
   async getSession(sessionId: string): Promise<SessionResponse> {

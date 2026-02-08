@@ -4,7 +4,9 @@ import type {
   ChatRequest, 
   GenerateStreamOptions, 
   StreamEvent, 
-  TokenUsage 
+  TokenUsage,
+  ReconnectOptions,
+  StreamMetadata,
 } from './types';
 
 export type StreamCallbacks = {
@@ -15,21 +17,41 @@ export type StreamCallbacks = {
   onStepFinish?: (index: number, finishReason: string) => void;
   onComplete?: (result: { text: string; usage?: TokenUsage }) => void;
   onError?: (error: string) => void;
+  onReconnect?: (attempt: number, runId: string) => void;
 };
 
 export type ChatClientOptions = {
   sessionManager?: SessionManager;
+  reconnect?: ReconnectOptions;
+};
+
+const DEFAULT_RECONNECT: Required<ReconnectOptions> = {
+  enabled: true,
+  maxAttempts: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 30000,
 };
 
 export class ChatClient {
   private sessionManager?: SessionManager;
+  private reconnectConfig: Required<ReconnectOptions>;
+  private _lastStreamMetadata?: StreamMetadata;
 
   constructor(private http: AgentHttpClient, options: ChatClientOptions = {}) {
     this.sessionManager = options.sessionManager;
+    this.reconnectConfig = { ...DEFAULT_RECONNECT, ...options.reconnect };
   }
 
   /**
-   * Stream a chat response with callback handlers
+   * Get metadata from the last stream (workflow run ID, last event ID).
+   */
+  get lastStreamMetadata(): StreamMetadata | undefined {
+    return this._lastStreamMetadata;
+  }
+
+  /**
+   * Stream a chat response with callback handlers.
+   * Supports auto-reconnection for resumable streams.
    */
   async stream(
     request: ChatRequest,
@@ -50,15 +72,79 @@ export class ChatClient {
         }
       }
 
-      const generator = this.http.generateStream(request, options);
-      
       let fullText = '';
+      let attempt = 0;
+      let workflowRunId = options.workflowRunId;
+      let lastEventId = options.lastEventId;
+      let completed = false;
 
-      for await (const event of generator) {
-        if (event.type === 'text-delta') {
-          fullText += event.textDelta;
+      while (!completed) {
+        try {
+          const streamOptions: GenerateStreamOptions = {
+            ...options,
+            workflowRunId,
+            lastEventId,
+          };
+
+          const generator = this.http.generateStream(request, streamOptions);
+
+          for await (const event of generator) {
+            if (event.type === 'text-delta') {
+              fullText += event.textDelta;
+            }
+            this.dispatch(event, callbacks);
+
+            // If we get any event successfully, reset attempt counter
+            attempt = 0;
+          }
+
+          // Stream finished normally
+          completed = true;
+
+          // Capture metadata for potential later reconnection
+          this._lastStreamMetadata = this.http.lastStreamMetadata;
+          if (this._lastStreamMetadata?.workflowRunId) {
+            workflowRunId = this._lastStreamMetadata.workflowRunId;
+          }
+          if (this._lastStreamMetadata?.lastEventId) {
+            lastEventId = this._lastStreamMetadata.lastEventId;
+          }
+        } catch (error) {
+          // Capture what metadata we have before attempting reconnect
+          this._lastStreamMetadata = this.http.lastStreamMetadata;
+          if (this._lastStreamMetadata?.workflowRunId) {
+            workflowRunId = this._lastStreamMetadata.workflowRunId;
+          }
+          if (this._lastStreamMetadata?.lastEventId) {
+            lastEventId = this._lastStreamMetadata.lastEventId;
+          }
+
+          // Only attempt reconnection if:
+          // 1. We have a workflow run ID (durable stream)
+          // 2. Reconnect is enabled
+          // 3. We haven't exhausted attempts
+          // 4. The error isn't from an abort signal
+          const isAbort = error instanceof DOMException && error.name === 'AbortError';
+          const canReconnect = workflowRunId
+            && this.reconnectConfig.enabled
+            && attempt < this.reconnectConfig.maxAttempts
+            && !isAbort;
+
+          if (!canReconnect) {
+            const message = error instanceof Error ? error.message : String(error);
+            callbacks.onError?.(message);
+            return;
+          }
+
+          attempt++;
+          const delay = Math.min(
+            this.reconnectConfig.baseDelayMs * Math.pow(2, attempt - 1),
+            this.reconnectConfig.maxDelayMs
+          );
+
+          callbacks.onReconnect?.(attempt, workflowRunId!);
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
-        this.dispatch(event, callbacks);
       }
 
       // Add assistant response to session

@@ -9,7 +9,8 @@ import { streamSSE } from 'hono/streaming';
 import { createLogger, getLogEmitter } from '@agent/logger';
 import { createLoggingMiddleware, createRateLimitMiddleware, createAuthMiddleware } from './middleware';
 import { ConcurrencyQueue, QueueFullError, QueueTimeoutError } from './queue';
-import type { AgentServerOptions } from './types';
+import { StreamEventBuffer } from './stream-buffer';
+import type { AgentServerOptions, DurableAgentInstance } from './types';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -62,7 +63,8 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
   app.use('/*', cors({
     origin: Array.isArray(corsOrigin) ? corsOrigin : corsOrigin,
     allowMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+    allowHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-workflow-run-id', 'Last-Event-ID'],
+    exposeHeaders: ['x-workflow-run-id'],
   }));
 
   // Configure Middleware
@@ -87,6 +89,9 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
 
   // Create concurrency queue
   const queue = serverOptions.queue ? new ConcurrencyQueue(serverOptions.queue) : null;
+
+  // Create stream event buffer for resumable streams
+  const streamBuffer = new StreamEventBuffer(serverOptions.streamBuffer);
 
   // Queue stats endpoint
   app.get('/queue', (c) => c.json(queue?.getStats() ?? { active: 0, queued: 0, available: Infinity }));
@@ -240,7 +245,42 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
   app.post('/stream', async (c) => {
     try {
       const body = await c.req.json<StreamRequest>();
-      
+
+      // Check for reconnection headers
+      const reconnectRunId = c.req.header('x-workflow-run-id');
+      const lastEventId = c.req.header('Last-Event-ID');
+
+      // Handle reconnection: replay buffered events
+      if (reconnectRunId && streamBuffer.has(reconnectRunId)) {
+        log.info('Resumable stream reconnection', { runId: reconnectRunId, lastEventId });
+
+        return streamSSE(c, async (stream) => {
+          // Set the run-id header for client tracking
+          c.header('x-workflow-run-id', reconnectRunId);
+
+          const events = lastEventId
+            ? streamBuffer.getEventsAfter(reconnectRunId, lastEventId)
+            : streamBuffer.getAllEvents(reconnectRunId);
+
+          log.info('Replaying buffered events', { runId: reconnectRunId, count: events.length });
+
+          for (const buffered of events) {
+            await stream.writeSSE({
+              id: buffered.id,
+              event: buffered.event,
+              data: buffered.data,
+            });
+          }
+
+          // If the run is complete, send done event
+          if (streamBuffer.isCompleted(reconnectRunId)) {
+            await stream.writeSSE({ event: 'done', data: '' });
+          }
+          // Otherwise, the stream stays open for live events
+          // (in a production impl, this would subscribe to live updates)
+        });
+      }
+
       const prompt = body.prompt ?? body.messages?.map(m => `${m.role}: ${m.content}`).join('\n') ?? '';
       
       if (!prompt) {
@@ -254,9 +294,20 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
         }, 500);
       }
 
+      // Duck-type check for durable agent
+      const durableAgent = agent as DurableAgentInstance;
+      const isDurable = typeof durableAgent.workflowRunId === 'string' || durableAgent.isWorkflowActive === true;
+      const runId = isDurable ? (durableAgent.workflowRunId ?? crypto.randomUUID()) : undefined;
+
       const agentInstance = agent as {
         generate: (opts: { prompt: string; options?: unknown }) => Promise<{ text: string; steps?: unknown[] }>;
       };
+
+      // Set run-id header if durable
+      if (runId) {
+        c.header('x-workflow-run-id', runId);
+        log.info('Durable stream started', { runId });
+      }
 
       return streamSSE(c, async (stream) => {
         try {
@@ -271,25 +322,39 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
           const chunkSize = 10;
           for (let i = 0; i < text.length; i += chunkSize) {
             const chunk = text.slice(i, i + chunkSize);
+            const eventData = JSON.stringify({ type: 'text-delta', textDelta: chunk });
+            const eventId = runId ? streamBuffer.store(runId, 'text-delta', eventData) : undefined;
+
             await stream.writeSSE({ 
+              id: eventId,
               event: 'text-delta',
-              data: JSON.stringify({ type: 'text-delta', textDelta: chunk }),
+              data: eventData,
             });
             // Small delay for visual effect
             await new Promise(r => setTimeout(r, 20));
           }
 
           // Send final
+          const doneData = JSON.stringify({ text, steps: result.steps?.length ?? 0 });
+          if (runId) {
+            streamBuffer.store(runId, 'done', doneData);
+            streamBuffer.markCompleted(runId);
+          }
+
           await stream.writeSSE({ 
             event: 'done', 
-            data: JSON.stringify({ text, steps: result.steps?.length ?? 0 }),
+            data: doneData,
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Stream error';
           log.error('Stream error', { error: message });
+          const errorData = JSON.stringify({ error: message });
+          if (runId) {
+            streamBuffer.store(runId, 'error', errorData);
+          }
           await stream.writeSSE({ 
             event: 'error', 
-            data: JSON.stringify({ error: message }),
+            data: errorData,
           });
         }
       });
