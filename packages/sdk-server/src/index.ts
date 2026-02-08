@@ -21,3 +21,6 @@ export type {
   StreamResult,
   StreamChunk,
 } from './types';
+
+export { ConcurrencyQueue, QueueFullError, QueueTimeoutError } from './queue';
+export type { QueueConfig, QueueStats } from './queue';

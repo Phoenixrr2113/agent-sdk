@@ -8,6 +8,7 @@ import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
 import { createLogger, getLogEmitter } from '@agent/logger';
 import { createLoggingMiddleware, createRateLimitMiddleware, createAuthMiddleware } from './middleware';
+import { ConcurrencyQueue, QueueFullError, QueueTimeoutError } from './queue';
 import type { AgentServerOptions } from './types';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -83,6 +84,12 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
     app.use('/stream', authMiddleware);
     app.use('/chat', authMiddleware);
   }
+
+  // Create concurrency queue
+  const queue = serverOptions.queue ? new ConcurrencyQueue(serverOptions.queue) : null;
+
+  // Queue stats endpoint
+  app.get('/queue', (c) => c.json(queue?.getStats() ?? { active: 0, queued: 0, available: Infinity }));
 
   // Health check endpoint
   app.get('/health', (c) => c.json({ 
@@ -190,20 +197,39 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
         }, 500);
       }
 
+      // Acquire queue slot
+      if (queue) {
+        try {
+          await queue.acquire();
+        } catch (error) {
+          if (error instanceof QueueFullError) {
+            return c.json({ error: error.message }, 503);
+          }
+          if (error instanceof QueueTimeoutError) {
+            return c.json({ error: error.message }, 408);
+          }
+          throw error;
+        }
+      }
+
       const agentInstance = agent as { 
         generate: (opts: { prompt: string; options?: unknown }) => Promise<{ text: string; steps: unknown[] }>;
       };
 
-      const result = await agentInstance.generate({ 
-        prompt, 
-        options: body.options,
-      });
+      try {
+        const result = await agentInstance.generate({
+          prompt,
+          options: body.options,
+        });
 
-      return c.json({ 
-        text: result.text, 
-        steps: result.steps?.length ?? 0,
-        success: true,
-      });
+        return c.json({
+          text: result.text,
+          steps: result.steps?.length ?? 0,
+          success: true,
+        });
+      } finally {
+        queue?.release();
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       return c.json({ error: message, success: false }, 500);

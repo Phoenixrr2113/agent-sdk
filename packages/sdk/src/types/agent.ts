@@ -4,6 +4,7 @@
  */
 
 import type { LanguageModel, Tool, StepResult, ToolSet } from 'ai';
+import type { SkillsConfig } from '../skills/types';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Main AgentOptions Interface
@@ -104,6 +105,21 @@ export interface AgentOptions {
 
   /** Configuration for vector memory store. */
   memoryOptions?: MemoryOptions;
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Skills
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** Skills to inject into the agent's system prompt.
+   * Skills are discovered from SKILL.md files in configured directories.
+   * @example
+   * ```typescript
+   * const agent = createAgent({
+   *   skills: { directories: ['.agents/skills'] },
+   * });
+   * ```
+   */
+  skills?: SkillsConfig;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Brain (Knowledge Graph + Memory)

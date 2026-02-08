@@ -3,6 +3,7 @@
  */
 
 import type { AgentOptions } from '@agent/sdk';
+import type { QueueConfig } from './queue';
 
 /**
  * Options for creating an agent server
@@ -28,6 +29,9 @@ export interface AgentServerOptions {
 
   /** Path to config file for dashboard (default: ./agent-sdk.config.yaml) */
   configPath?: string;
+
+  /** Concurrency queue configuration for limiting simultaneous requests. */
+  queue?: QueueConfig;
 }
 
 /**

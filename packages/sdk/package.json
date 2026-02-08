@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "@agent/logger": "workspace:*",
-    "ai": "6.0.0-beta.120",
+    "ai": "6.0.77",
     "zod": "^3.25.76",
     "vectra": "^0.9.0",
     "@openrouter/ai-sdk-provider": "^1.5.4",
@@ -40,10 +40,18 @@
     "@types/node": "^20.17.19"
   },
   "peerDependencies": {
-    "workflow": "*"
+    "workflow": "*",
+    "langfuse-vercel": "*",
+    "@vercel/otel": "*"
   },
   "peerDependenciesMeta": {
     "workflow": {
+      "optional": true
+    },
+    "langfuse-vercel": {
+      "optional": true
+    },
+    "@vercel/otel": {
       "optional": true
     }
   },

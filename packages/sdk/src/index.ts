@@ -3,6 +3,8 @@
 // Core
 export { createAgent } from './agent';
 export type { AgentOptions, SubAgentConfig, WorkflowOptions, MemoryOptions } from './types/agent';
+export type { SkillsConfig, SkillMeta, SkillContent } from './skills';
+export { discoverSkills, loadSkills, loadSkillsFromPaths, buildSkillsSystemPrompt } from './skills';
 
 // Types
 export type { ToolLifecycle, ToolContext, ToolError, ToolErrorType } from './types/lifecycle';
@@ -60,6 +62,10 @@ export { createMemoryTools } from './memory/tools';
 
 // Models
 export { resolveModel, models } from './models';
+
+// Observability
+export { initObservability, createTelemetrySettings, isObservabilityEnabled, shutdownObservability } from './observability';
+export type { ObservabilityConfig, LangfuseConfig, TelemetrySettings } from './observability';
 
 // Configuration
 export {

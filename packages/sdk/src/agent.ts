@@ -14,6 +14,7 @@ import { resolveModel } from './models';
 import { getRole } from './presets/role-registry';
 import { createToolPreset, type ToolPresetLevel } from './presets/tools';
 import { createSpawnAgentTool } from './tools/spawn-agent';
+import { loadSkills, buildSkillsSystemPrompt } from './skills';
 
 // ============================================================================
 // Logger
@@ -187,6 +188,18 @@ export function createAgent(options: AgentOptions = {}): Agent {
   // Resolve system prompt
   const finalSystemPrompt = systemPrompt ?? roleConfig.systemPrompt;
   
+  // Load and inject skills
+  let augmentedSystemPrompt = finalSystemPrompt;
+  if (options.skills) {
+    log.debug('Loading skills', { config: options.skills });
+    const skills = loadSkills(options.skills, workspaceRoot);
+    if (skills.length > 0) {
+      const skillsPrompt = buildSkillsSystemPrompt(skills);
+      augmentedSystemPrompt += skillsPrompt;
+      log.info('Skills injected', { count: skills.length, names: skills.map(s => s.name) });
+    }
+  }
+
   // Resolve model
   log.debug('Resolving model', {
     tier: roleConfig.recommendedModel,
@@ -253,13 +266,13 @@ export function createAgent(options: AgentOptions = {}): Agent {
 
   // Create the ToolLoopAgent
   log.debug('Creating ToolLoopAgent', {
-    promptLength: finalSystemPrompt.length,
+    promptLength: augmentedSystemPrompt.length,
     toolCount: Object.keys(tools).length,
   });
 
   const toolLoopAgent = new ToolLoopAgent({
     model,
-    instructions: finalSystemPrompt,
+    instructions: augmentedSystemPrompt,
     tools,
     stopWhen: stepCountIs(maxSteps),
   });
@@ -273,7 +286,7 @@ export function createAgent(options: AgentOptions = {}): Agent {
     role,
     
     getToolLoopAgent: () => toolLoopAgent,
-    getSystemPrompt: () => finalSystemPrompt,
+    getSystemPrompt: () => augmentedSystemPrompt,
     
     stream: (input) => {
       agentLog.info('stream() called', { promptLength: input.prompt.length });
