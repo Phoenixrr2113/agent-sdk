@@ -210,7 +210,7 @@ Always maintain a helpful, friendly tone even when things go wrong.`;
 /**
  * Build complete system prompt with all sections
  */
-export function buildCompleteSystemPrompt(contextString?: string): string {
+export function buildCompleteSystemPrompt(contextString?: string, catalogPrompt?: string): string {
   let prompt = MAIN_SYSTEM_PROMPT;
 
   if (contextString) {
@@ -219,5 +219,18 @@ export function buildCompleteSystemPrompt(contextString?: string): string {
 
   prompt += `\n\n${TOOL_USAGE_PROMPT}\n\n${ERROR_HANDLING_PROMPT}`;
 
+   // Append json-render catalog prompt for generative UI
+   if (catalogPrompt) {
+      prompt += `\n\n## Generative UI (render_ui tool)
+
+When the user asks for dashboards, widgets, data visualizations, or any visual data presentation,
+use the \`render_ui\` tool. You generate a JSON spec constrained to the component catalog below.
+The spec uses an element tree format with a \`root\` key pointing to the root element, and an
+\`elements\` map containing all elements keyed by unique IDs.
+
+${catalogPrompt}`;
+   }
+
   return prompt;
 }
+

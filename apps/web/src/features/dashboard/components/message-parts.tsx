@@ -1,7 +1,10 @@
 "use client"
 
+import { useMemo } from "react"
 import type { ToolUIPart, DynamicToolUIPart } from "ai"
 import { getToolName as getToolNameFromSdk } from "ai"
+import { Renderer } from "@json-render/react"
+import type { Spec } from "@json-render/react"
 import {
   CheckCircle2Icon,
   CircleIcon,
@@ -45,6 +48,7 @@ import {
 } from "@/components/ai-elements/confirmation"
 import { CodeBlock } from "@/components/ai-elements/code-block"
 import { cn } from "@/libs/utils"
+import { registry } from "@/lib/chat/registry"
 
 // ---------------------------------------------------------------------------
 // Type helpers
@@ -558,6 +562,104 @@ export function ShellToolPart({ toolPart }: ShellToolPartProps) {
 }
 
 // ---------------------------------------------------------------------------
+// Generative UI tool part — renders json-render specs inline
+// ---------------------------------------------------------------------------
+
+interface RenderUISpec {
+  root: string
+  elements: Record<string, {
+    type: string
+    props: Record<string, unknown>
+    children?: string[]
+  }>
+}
+
+function parseRenderUIOutput(output: unknown): RenderUISpec | null {
+  if (!output) return null
+  try {
+    const parsed = typeof output === "string" ? JSON.parse(output) : output
+    if (parsed && typeof parsed === "object" && "spec" in parsed) {
+      const spec = (parsed as { spec: unknown }).spec
+      if (spec && typeof spec === "object" && "root" in spec && "elements" in spec) {
+        return spec as RenderUISpec
+      }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+interface GenerativeUIToolPartProps {
+  toolPart: AnyToolPart
+  isStreaming: boolean
+}
+
+export function GenerativeUIToolPart({ toolPart, isStreaming: _isStreaming }: GenerativeUIToolPartProps) {
+  const uiSpec = toolPart.state === "output-available" ? parseRenderUIOutput(toolPart.output) : null
+
+  // Convert our flat elements map to the Spec format that json-render expects
+  const spec = useMemo<Spec | null>(() => {
+    if (!uiSpec) return null
+    return {
+      root: uiSpec.root,
+      elements: Object.fromEntries(
+        Object.entries(uiSpec.elements).map(([key, el]) => [
+          key,
+          {
+            type: el.type,
+            props: el.props,
+            children: el.children,
+          },
+        ]),
+      ),
+    } as Spec
+  }, [uiSpec])
+
+  // While the tool is still running, show a loading state
+  if (toolPart.state !== "output-available" || !spec) {
+    return (
+      <Tool defaultOpen>
+        <ToolHeader
+          title="render_ui"
+          type={toolPart.type as ToolUIPart["type"]}
+          state={toolPart.state}
+        />
+        <ToolContent>
+          {toolPart.state === "input-available" && (
+            <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+              <div className="flex gap-1">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-0.3s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-0.15s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" />
+              </div>
+              Generating UI...
+            </div>
+          )}
+          {toolPart.state === "output-error" && (
+            <ToolOutput
+              output={toolPart.output}
+              errorText={(toolPart as ToolUIPart).errorText}
+            />
+          )}
+        </ToolContent>
+      </Tool>
+    )
+  }
+
+  // Render the generative UI spec
+  return (
+    <div className="rounded-lg border border-border/50 bg-card/50 p-1">
+      <Renderer
+        spec={spec}
+        registry={registry}
+        loading={false}
+      />
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Confirmation wrapper for approval-requested state
 // ---------------------------------------------------------------------------
 
@@ -676,6 +778,8 @@ export function ToolPartRenderer({ toolPart, isStreaming, onApprove, onDeny }: T
         return <GlobToolPart toolPart={toolPart} />
       case "shell":
         return <ShellToolPart toolPart={toolPart} />
+      case "render_ui":
+        return <GenerativeUIToolPart toolPart={toolPart} isStreaming={isStreaming} />
       default:
         return <GenericToolPart toolPart={toolPart} toolName={toolName} />
     }

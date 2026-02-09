@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { getChatModel } from '@/lib/ai/client';
 import { buildChatContext, formatContextForPrompt } from '@/lib/chat/context';
 import { buildCompleteSystemPrompt } from '@/lib/chat/system-prompts';
-import { createChatTools } from '@/lib/chat/tools';
+import { createChatTools, getCatalogSystemPrompt } from '@/lib/chat/tools';
 
 export const maxDuration = 60;
 
@@ -40,7 +40,8 @@ export async function POST(request: Request) {
 
     const context = await buildChatContext();
     const contextString = formatContextForPrompt(context);
-    const systemPrompt = buildCompleteSystemPrompt(contextString);
+    const catalogPrompt = getCatalogSystemPrompt();
+    const systemPrompt = buildCompleteSystemPrompt(contextString, catalogPrompt);
 
     const tools = createChatTools({ userId });
 

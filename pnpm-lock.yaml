@@ -54,6 +54,12 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.71.1(react@19.2.3))
+      '@json-render/core':
+        specifier: ^0.4.4
+        version: 0.4.4(zod@4.3.6)
+      '@json-render/react':
+        specifier: ^0.4.4
+        version: 0.4.4(react@19.2.3)(zod@4.3.6)
       '@logtape/logtape':
         specifier: ^1.2.2
         version: 1.3.7
@@ -406,6 +412,9 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+      vite:
+        specifier: ^7.3.1
+        version: 7.3.1(@types/node@24.10.12)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
       vite-tsconfig-paths:
         specifier: ^5.1.4
         version: 5.1.4(typescript@5.9.3)(vite@7.3.1(@types/node@24.10.12)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
@@ -2468,6 +2477,16 @@ packages:
   '@js-temporal/polyfill@0.5.1':
     resolution: {integrity: sha512-hloP58zRVCRSpgDxmqCWJNlizAlUgJFqG2ypq79DCvyv9tHjRYMDOcPFjzfl/A1/YxDvRCZz8wvZvmapQnKwFQ==}
     engines: {node: '>=12'}
+
+  '@json-render/core@0.4.4':
+    resolution: {integrity: sha512-/n8ugNnd8ROhojk566w6qpjJ+jlRcUM56v6CSf/lTgV1QqoQUwOt5pxCotosc55ljt1ihT5SGGNyqdVjIpMaUQ==}
+    peerDependencies:
+      zod: ^4.0.0
+
+  '@json-render/react@0.4.4':
+    resolution: {integrity: sha512-nDAxzvQMbCeb5KHIbcycFTRXcetkmdFSiWp21nj/pVLkbh/Dxx6RJr6TYk8kpQndKza9t/BN/vTF01iuMRZvZg==}
+    peerDependencies:
+      react: ^19.0.0
 
   '@lingual/i18n-check@0.8.19':
     resolution: {integrity: sha512-/bqpQWo6m77ig2kqgvlEqstLeaNibopA1hekjkdj9v+2BR+/Ys1GgmqEvMGtSfC1DNTJlaOOEt29t0bvX0y48w==}
@@ -15155,6 +15174,17 @@ snapshots:
   '@js-temporal/polyfill@0.5.1':
     dependencies:
       jsbi: 4.3.2
+
+  '@json-render/core@0.4.4(zod@4.3.6)':
+    dependencies:
+      zod: 4.3.6
+
+  '@json-render/react@0.4.4(react@19.2.3)(zod@4.3.6)':
+    dependencies:
+      '@json-render/core': 0.4.4(zod@4.3.6)
+      react: 19.2.3
+    transitivePeerDependencies:
+      - zod
 
   '@lingual/i18n-check@0.8.19(@vue/compiler-core@3.5.27)':
     dependencies:

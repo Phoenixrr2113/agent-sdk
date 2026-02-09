@@ -4,6 +4,34 @@ import { createToolPreset } from '@agent/sdk';
 import { db } from '@/libs/DB';
 import { missionsSchema, automationsSchema, devicesSchema, approvalsSchema } from '@/models/Schema';
 import { eq, desc } from 'drizzle-orm';
+import { getCatalogSystemPrompt } from './catalog';
+
+// ── Generative UI tool schema ──────────────────────────────────────
+const renderUISchema = z.object({
+  spec: z.object({
+    root: z.string().describe('Key of the root element'),
+    elements: z.record(z.string(), z.object({
+      type: z.string().describe('Component type from catalog (Card, Metric, Row, etc.)'),
+      props: z.record(z.string(), z.unknown()).describe('Component props'),
+      children: z.array(z.string()).optional().describe('Child element keys'),
+    })),
+  }).describe('UI element tree spec. See system prompt for available components.'),
+});
+
+/**
+ * render_ui tool — lets the AI generate interactive dashboards, widgets,
+ * and data visualisations from JSON specs constrained to our catalog.
+ */
+const renderUITool = tool({
+  description:
+    'Render an interactive UI widget inline in chat. Use this when the user asks for dashboards, metrics, data tables, status displays, or any visual data presentation. Generate a JSON spec using the available catalog components.',
+  inputSchema: renderUISchema,
+  execute: async ({ spec }) => {
+    // Pass-through: the client-side ToolPartRenderer picks up the spec
+    // from tool output and renders it with json-render <Renderer />.
+    return { spec, rendered: true };
+  },
+});
 
 const createMissionSchema = z.object({
   goal: z.string().min(1).max(2000).describe('The goal or objective for the mission'),
@@ -172,5 +200,10 @@ export function createChatTools(options: ChatToolsOptions) {
   return {
     ...sdkTools,
     ...appTools,
+    render_ui: renderUITool,
   };
 }
+
+// Re-export catalog prompt for the chat route's system prompt
+export { getCatalogSystemPrompt };
+
