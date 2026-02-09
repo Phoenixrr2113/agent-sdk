@@ -1,4 +1,5 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -7,7 +8,17 @@ import { routing } from '@/libs/I18nRouting';
 import { Providers } from './providers';
 import '@/styles/global.css';
 
+export const viewport: Viewport = {
+  themeColor: '#00ff88',
+};
+
 export const metadata: Metadata = {
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'ControlAI',
+  },
   icons: [
     {
       rel: 'apple-touch-icon',
@@ -58,6 +69,19 @@ export default async function RootLayout(props: {
             </Providers>
           </PostHogProvider>
         </NextIntlClientProvider>
+        <Script
+          id="sw-register"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js');
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );
