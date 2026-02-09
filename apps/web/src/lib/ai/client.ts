@@ -1,38 +1,27 @@
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { resolveModel, type ModelTier } from '@agent/sdk';
 
-const openrouter = createOpenRouter();
-
-export type ModelTier = 'fast' | 'standard' | 'reasoning' | 'powerful';
-
-const DEFAULT_MODELS: Record<ModelTier, string> = {
-  fast: 'deepseek/deepseek-chat-v3-0324:free',
-  standard: 'google/gemini-2.0-flash-001',
-  reasoning: 'deepseek/deepseek-r1:free',
-  powerful: 'anthropic/claude-sonnet-4',
-};
+export type { ModelTier } from '@agent/sdk';
 
 export function getModel(tier: ModelTier = 'standard') {
-  const envKey = `MODEL_${tier.toUpperCase()}`;
-  const modelName = process.env[envKey] ?? DEFAULT_MODELS[tier];
-  return openrouter.chat(modelName);
+  return resolveModel({ tier });
 }
 
 export function getPlanningModel() {
-  return getModel('powerful');
+  return resolveModel({ tier: 'powerful' });
 }
 
 export function getExecutionModel() {
-  return getModel('standard');
+  return resolveModel({ tier: 'standard' });
 }
 
 export function getFastModel() {
-  return getModel('fast');
+  return resolveModel({ tier: 'fast' });
 }
 
 export function getReasoningModel() {
-  return getModel('reasoning');
+  return resolveModel({ tier: 'reasoning' });
 }
 
 export function getChatModel() {
-  return getModel('standard');
+  return resolveModel({ tier: 'standard' });
 }

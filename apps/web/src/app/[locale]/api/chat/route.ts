@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const contextString = formatContextForPrompt(context);
     const systemPrompt = buildCompleteSystemPrompt(contextString);
 
-    const tools = createChatTools(userId);
+    const tools = createChatTools({ userId });
 
     const result = streamText({
       model: getChatModel(),

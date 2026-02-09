@@ -35,6 +35,7 @@
     "build-storybook": "storybook build"
   },
   "dependencies": {
+    "@agent/sdk": "workspace:*",
     "@ai-sdk/react": "^3.0.5",
     "@arcjet/next": "^1.0.0-beta.15",
     "@clerk/localizations": "^3.29.0",

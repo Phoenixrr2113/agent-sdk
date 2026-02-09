@@ -45,7 +45,8 @@ export { buildSystemContext, formatSystemContextBlock, buildDynamicSystemPrompt 
 export type { SystemContext } from './prompts/context';
 
 // Presets
-export { toolPresets } from './presets/tools';
+export { toolPresets, createToolPreset } from './presets/tools';
+export type { ToolPresetLevel, ToolPresetOptions } from './presets/tools';
 export { roleConfigs } from './presets/roles';
 export { subAgentConfigs, getSubAgentConfig, subAgentRoles } from './presets/sub-agent-configs';
 export type { SubAgentRole } from './presets/sub-agent-configs';

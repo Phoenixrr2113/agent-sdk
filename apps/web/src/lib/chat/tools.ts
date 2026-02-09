@@ -1,5 +1,6 @@
-import { tool } from 'ai';
+import { tool, type Tool } from 'ai';
 import { z } from 'zod';
+import { createToolPreset } from '@agent/sdk';
 import { db } from '@/libs/DB';
 import { missionsSchema, automationsSchema, devicesSchema, approvalsSchema } from '@/models/Schema';
 import { eq, desc } from 'drizzle-orm';
@@ -45,7 +46,7 @@ const listDevicesSchema = z.object({
 
 const listApprovalsSchema = z.object({});
 
-export function createChatTools(userId: string) {
+function createAppTools(userId: string) {
   const createMissionTool = tool({
     description: 'Create a new background mission to accomplish a complex goal.',
     inputSchema: createMissionSchema,
@@ -151,5 +152,25 @@ export function createChatTools(userId: string) {
     create_automation: createAutomationTool,
     list_devices: listDevicesTool,
     list_approvals: listApprovalsTool,
+  };
+}
+
+export interface ChatToolsOptions {
+  userId: string;
+  workspaceRoot?: string;
+}
+
+export function createChatTools(options: ChatToolsOptions) {
+  const { userId, workspaceRoot = process.cwd() } = options;
+
+  // SDK tools use zod v3 schemas internally. The web app's ai package uses
+  // zod v4. At runtime these are compatible — the cast bridges the TS types.
+  const sdkTools = createToolPreset('standard', { workspaceRoot }) as Record<string, Tool>;
+
+  const appTools = createAppTools(userId);
+
+  return {
+    ...sdkTools,
+    ...appTools,
   };
 }
