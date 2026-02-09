@@ -1,13 +1,11 @@
 # @agent/sdk
 
-Opinionated AI agent SDK built on [Vercel AI SDK](https://sdk.vercel.ai/) with tool presets, sub-agents, transient streaming, and workflow durability.
+Core agent factory for the Agent SDK. Built on [Vercel AI SDK](https://ai-sdk.dev).
 
 ## Installation
 
 ```bash
 pnpm add @agent/sdk
-# or
-npm install @agent/sdk
 ```
 
 ## Quick Start
@@ -15,131 +13,256 @@ npm install @agent/sdk
 ```typescript
 import { createAgent } from '@agent/sdk';
 
-// Create an agent with default tools
 const agent = createAgent({
   role: 'coder',
   toolPreset: 'standard',
   workspaceRoot: process.cwd(),
 });
 
-// Generate a response
+// Generate (waits for full response)
 const result = await agent.generate({
-  prompt: 'Read the package.json and summarize the dependencies',
+  prompt: 'Read package.json and summarize the dependencies',
 });
-
 console.log(result.text);
+console.log(result.steps);  // Array of tool calls and results
+
+// Stream (real-time chunks)
+const stream = await agent.stream({ prompt: 'Explain this codebase' });
+for await (const chunk of stream.fullStream) {
+  if (chunk.type === 'text-delta') process.stdout.write(chunk.textDelta);
+}
+// Or just get the text after the stream finishes:
+const text = await stream.text;
 ```
 
-## createAgent API
+## Agent Interface
 
 ```typescript
-interface AgentOptions {
-  // Identity
-  systemPrompt?: string;
-  role?: 'generic' | 'coder' | 'researcher' | 'analyst';
-  
-  // Execution
-  maxSteps?: number;           // Default: 50
-  stopWhen?: StopFunction;     // Custom stop condition
-  
-  // Model
-  model?: LanguageModel;       // AI SDK model instance
-  modelProvider?: 'openrouter' | 'ollama' | 'openai' | 'anthropic';
-  modelName?: string;
-  
-  // Tools
-  toolPreset?: 'none' | 'minimal' | 'standard' | 'full';
-  tools?: Record<string, Tool>;
-  enableTools?: string[];
-  disableTools?: string[];
-  
-  // Sub-Agents
-  enableSubAgents?: boolean;
-  maxSpawnDepth?: number;      // Default: 3
-  
-  // Features
-  enableTransientStreaming?: boolean;  // Default: true
-  durable?: boolean;                   // Workflow durability
-  enableMemory?: boolean;              // Semantic memory
-  
-  // Environment
-  workspaceRoot?: string;
+interface Agent {
+  agentId: string;
+  role: string;
+
+  generate(input: { prompt: string }): Promise<GenerateResult>;
+  stream(input: { prompt: string }): Promise<StreamResult>;
+
+  getSystemPrompt(): string;
+  getToolLoopAgent(): ToolLoopAgent;
+}
+
+interface GenerateResult {
+  text: string;
+  steps: StepResult[];  // Each step contains toolCalls and toolResults
+}
+
+interface StreamResult {
+  fullStream: AsyncIterable<StreamChunk>;  // All event types
+  text: Promise<string>;                   // Final accumulated text
 }
 ```
 
+## `createAgent(options)`
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `role` | `'generic' \| 'coder' \| 'researcher' \| 'analyst'` | `'generic'` | Predefined role with system prompt |
+| `systemPrompt` | `string` | Role default | Override system prompt |
+| `agentId` | `string` | Auto-generated | Unique identifier |
+| `maxSteps` | `number` | `10` | Max tool-loop iterations |
+| `model` | `LanguageModel` | Auto-resolved | AI SDK model instance |
+| `modelProvider` | `string` | Config default | `'openrouter' \| 'openai' \| 'anthropic' \| 'google' \| 'ollama'` |
+| `modelName` | `string` | Tier default | Specific model name |
+| `toolPreset` | `string` | `'standard'` | `'none' \| 'minimal' \| 'standard' \| 'full'` |
+| `tools` | `Record<string, Tool>` | `{}` | Custom tools (merged with preset) |
+| `enableTools` | `string[]` | All | Whitelist — only these tools active |
+| `disableTools` | `string[]` | None | Blacklist — remove from preset |
+| `enableSubAgents` | `boolean` | `false` | Adds `spawn_agent` tool |
+| `maxSpawnDepth` | `number` | `2` | Max sub-agent nesting |
+| `durable` | `boolean` | `false` | Wrap as DurableAgent |
+| `enableMemory` | `boolean` | `false` | Vectra vector memory |
+| `brain` | `BrainInstance` | None | Knowledge graph (auto-injects tools) |
+| `skills` | `SkillsConfig` | None | Auto-discover SKILL.md files |
+| `workspaceRoot` | `string` | `process.cwd()` | Root for file operations |
+| `enableTransientStreaming` | `boolean` | `true` | Stream tool data without context |
+| `onStepFinish` | `(step, index) => void` | None | After each step |
+| `askUserHandler` | `(question) => Promise<string>` | None | Human-in-the-loop input |
+
 ## Tool Presets
 
-| Preset | Tools Included |
-|--------|----------------|
+| Preset | Tools |
+|--------|-------|
 | `none` | No tools |
-| `minimal` | `read_text_file`, `list_directory`, `get_file_info` |
-| `standard` | Filesystem, shell, plan, reasoning |
-| `full` | Standard + memory + spawn_agent |
+| `minimal` | `glob` |
+| `standard` | `glob`, `grep`, `shell`, `plan`, `deep_reasoning` |
+| `full` | `glob`, `grep`, `shell`, `plan`, `deep_reasoning`, `ast_grep_search`, `ast_grep_replace`, `browser` |
 
 ```typescript
 import { createToolPreset } from '@agent/sdk';
 
-const tools = createToolPreset('standard', {
-  workspaceRoot: '/my/project',
-});
+// Get tools without creating an agent
+const tools = createToolPreset('standard', { workspaceRoot: '/my/project' });
 ```
 
-## Sub-Agents
+## Configuration
 
-Spawn specialized sub-agents for complex tasks:
+### YAML Config File
 
-```typescript
-const agent = createAgent({
-  enableSubAgents: true,
-  maxSpawnDepth: 3,
-});
+Place `agent-sdk.config.yaml` in your project root:
 
-// Agent can now use spawn_agent tool to delegate work
+```yaml
+models:
+  defaultProvider: openrouter
+  tiers:
+    fast: google/gemini-2.0-flash-001
+    standard: google/gemini-2.0-flash-001
+    reasoning: anthropic/claude-sonnet-4
+    powerful: anthropic/claude-opus-4
+
+roles:
+  debugger:
+    systemPrompt: You are a debugging specialist.
+    recommendedModel: reasoning
+    defaultTools: [shell, grep, glob]
+
+tools:
+  shell:
+    timeout: 30000
+  glob:
+    maxFiles: 100
 ```
 
-## Transient Streaming
-
-Large outputs (file contents, shell output, reasoning steps) are streamed transiently - visible in UI but not added to context window.
+### Programmatic
 
 ```typescript
-const agent = createAgent({
-  enableTransientStreaming: true,  // Default
-});
+import { loadConfig, configure, getConfig, defineConfig, resolveModel } from '@agent/sdk';
 
-// Subscribe to transient events
-const stream = agent.stream({ prompt: '...' });
-for await (const chunk of stream.fullStream) {
-  if (chunk.type === 'data-file-content') {
-    console.log('File:', chunk.data.path);
-  }
-}
+loadConfig('./agent-sdk.config.yaml');
+configure({ models: { defaultProvider: 'anthropic' } });
+
+const model = resolveModel({ tier: 'powerful' });
+const config = getConfig();
 ```
 
-## Data Part Types
+## Model Tiers
 
-Custom streaming data parts:
-- `sub-agent-stream` - Sub-agent progress
-- `file-content` - File contents (transient)
-- `shell-output` - Command output (transient)
-- `tool-progress` - Tool execution progress
-- `reasoning-step` - Thought chain steps
-- `search-result` - Search results
-- `memory-result` - Memory retrieval
+| Tier | Purpose |
+|------|---------|
+| `fast` | Quick responses, low cost |
+| `standard` | Balanced quality/cost |
+| `reasoning` | Complex logic, chain-of-thought |
+| `powerful` | Best quality, highest cost |
 
-## Workflow Integration
-
-For durable, resumable agent execution:
+## Durable Agents
 
 ```typescript
-import { createAgent } from '@agent/sdk';
-import { createDurableAgent } from '@agent/sdk/workflow';
+const agent = createAgent({ durable: true, toolPreset: 'standard' });
 
-const agent = createDurableAgent({
-  durable: true,
-  workflowOptions: {
-    taskQueue: 'agent-tasks',
-  },
+// Standard methods still work
+const result = await agent.generate({ prompt: 'Refactor utils.ts' });
+
+// Durable methods (crash recovery, checkpointing)
+const durableResult = await (agent as DurableAgent).durableGenerate('Complex task');
+```
+
+## Workflow Hooks
+
+```typescript
+import { defineHook, getHookRegistry } from '@agent/sdk';
+
+const hook = defineHook<{ amount: number }, boolean>({
+  name: 'purchase-approval',
+  timeout: '30m',
+  defaultValue: false,
 });
+
+const approved = await hook.wait({ amount: 5000 });
+```
+
+## Scheduled Workflows
+
+```typescript
+import { createScheduledWorkflow, parseDuration, formatDuration } from '@agent/sdk';
+
+const schedule = createScheduledWorkflow({
+  name: 'hourly-check',
+  interval: '1h',
+  task: async (i) => `Check #${i}`,
+  maxIterations: 24,
+});
+await schedule.start();
+
+parseDuration('2h');      // 7200000
+formatDuration(7200000);  // "2h"
+```
+
+## Brain Integration
+
+```typescript
+import { createBrain } from '@agent/brain';
+
+const brain = await createBrain({
+  graph: { host: 'localhost', port: 6379, graphName: 'my_graph' },
+});
+
+const agent = createAgent({ brain, toolPreset: 'none' });
+// Agent now has: queryKnowledge, remember, recall, extractEntities
+
+await brain.close();
+```
+
+## Skills
+
+```typescript
+import { createAgent, discoverSkills, buildSkillsSystemPrompt } from '@agent/sdk';
+
+// Auto-discover:
+const agent = createAgent({ skills: { directories: ['.agents/skills'] } });
+
+// Manual:
+const skills = await discoverSkills('./.agents/skills');
+const prompt = buildSkillsSystemPrompt(skills);
+```
+
+## System Prompts
+
+```typescript
+import { systemPrompt, rolePrompts, buildSystemContext } from '@agent/sdk';
+
+console.log(systemPrompt);        // Default system prompt
+console.log(rolePrompts.coder);   // Coder-specific prompt
+
+const ctx = buildSystemContext({ workspaceRoot: '/my/project', role: 'coder' });
+```
+
+## Exports
+
+```typescript
+// Core
+export { createAgent } from '@agent/sdk';
+
+// Config
+export { loadConfig, configure, getConfig, defineConfig, resolveModel } from '@agent/sdk';
+
+// Presets
+export { createToolPreset, toolPresets, roleConfigs } from '@agent/sdk';
+
+// Prompts
+export { systemPrompt, rolePrompts, buildSystemContext } from '@agent/sdk';
+
+// Skills
+export { discoverSkills, buildSkillsSystemPrompt } from '@agent/sdk';
+
+// Workflow
+export { createDurableAgent, defineHook, getHookRegistry, createScheduledWorkflow } from '@agent/sdk';
+export { parseDuration, formatDuration, wrapToolsAsDurable } from '@agent/sdk';
+
+// Memory
+export { createMemoryStore, createMemoryTools } from '@agent/sdk';
+
+// Observability
+export { initObservability, isObservabilityEnabled, createTelemetrySettings } from '@agent/sdk';
+
+// Streaming
+export { streamTransient, withTransientStreaming } from '@agent/sdk';
 ```
 
 ## License

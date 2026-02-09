@@ -13,10 +13,10 @@ export const DEFAULT_PROVIDER: Provider = 'openrouter';
 
 export const DEFAULT_MODELS: Record<Provider, Record<ModelTier, string>> = {
   openrouter: {
-    fast: 'deepseek/deepseek-chat-v3-0324:free',
-    standard: 'google/gemini-2.0-flash-001',
-    reasoning: 'deepseek/deepseek-r1:free',
-    powerful: 'anthropic/claude-sonnet-4',
+    fast: 'openai/gpt-oss-120b',
+    standard: 'google/gemini-3-flash-preview',
+    reasoning: 'deepseek/deepseek-v3.2',
+    powerful: 'moonshotai/kimi-k2.5',
   },
   ollama: {
     fast: 'qwen3:4b',
@@ -31,10 +31,10 @@ export const DEFAULT_MODELS: Record<Provider, Record<ModelTier, string>> = {
     powerful: 'gpt-4o',
   },
   anthropic: {
-    fast: 'claude-3-haiku-20240307',
-    standard: 'claude-sonnet-4-20250514',
-    reasoning: 'claude-sonnet-4-20250514',
-    powerful: 'claude-sonnet-4-20250514',
+    fast: 'anthropic/claude-haiku-4.5',
+    standard: 'anthropic/claude-sonnet-4.5',
+    reasoning: 'anthropic/claude-opus-4.6',
+    powerful: 'anthropic/claude-opus-4.6',
   },
 };
 

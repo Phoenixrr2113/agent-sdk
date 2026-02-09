@@ -11,7 +11,10 @@
     "typecheck": "turbo typecheck",
     "dev": "turbo dev",
     "clean": "turbo clean && rm -rf .turbo",
-    "inspect": "npx workflow inspect runs --web"
+    "inspect": "npx workflow inspect runs --web",
+    "demo": "pnpm --filter demo run cli",
+    "demo:server": "pnpm --filter demo run server",
+    "demo:full": "pnpm --filter demo run full"
   },
   "devDependencies": {
     "@agent/config-eslint": "workspace:*",

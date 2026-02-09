@@ -34,6 +34,40 @@ importers:
         specifier: ^8.0.0
         version: 8.53.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
 
+  apps/demo:
+    dependencies:
+      '@agent/brain':
+        specifier: workspace:*
+        version: link:../../packages/brain
+      '@agent/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
+      '@agent/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@agent/sdk-client':
+        specifier: workspace:*
+        version: link:../../packages/sdk-client
+      '@agent/sdk-server':
+        specifier: workspace:*
+        version: link:../../packages/sdk-server
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
+    devDependencies:
+      '@agent/config-typescript':
+        specifier: workspace:*
+        version: link:../../packages/config-typescript
+      '@types/node':
+        specifier: ^20.17.19
+        version: 20.19.29
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   apps/web:
     dependencies:
       '@agent/sdk':
@@ -18753,7 +18787,7 @@ snapshots:
 
   '@types/connect@3.4.38':
     dependencies:
-      '@types/node': 20.19.29
+      '@types/node': 25.2.0
 
   '@types/d3-array@3.2.2': {}
 
@@ -18901,7 +18935,7 @@ snapshots:
   '@types/fs-extra@11.0.4':
     dependencies:
       '@types/jsonfile': 6.1.4
-      '@types/node': 20.19.29
+      '@types/node': 25.2.0
 
   '@types/geojson@7946.0.16': {}
 
@@ -18923,7 +18957,7 @@ snapshots:
 
   '@types/jsonfile@6.1.4':
     dependencies:
-      '@types/node': 20.19.29
+      '@types/node': 25.2.0
 
   '@types/katex@0.16.8': {}
 
@@ -18939,7 +18973,7 @@ snapshots:
 
   '@types/mysql@2.15.27':
     dependencies:
-      '@types/node': 20.19.29
+      '@types/node': 25.2.0
 
   '@types/node@20.19.29':
     dependencies:
@@ -18967,13 +19001,13 @@ snapshots:
 
   '@types/pg@8.15.6':
     dependencies:
-      '@types/node': 20.19.29
+      '@types/node': 25.2.0
       pg-protocol: 1.11.0
       pg-types: 2.2.0
 
   '@types/pg@8.16.0':
     dependencies:
-      '@types/node': 20.19.29
+      '@types/node': 25.2.0
       pg-protocol: 1.11.0
       pg-types: 2.2.0
 
@@ -18994,7 +19028,7 @@ snapshots:
 
   '@types/readable-stream@4.0.23':
     dependencies:
-      '@types/node': 20.19.29
+      '@types/node': 25.2.0
 
   '@types/resolve@1.20.6': {}
 
@@ -19006,7 +19040,7 @@ snapshots:
 
   '@types/tedious@4.0.14':
     dependencies:
-      '@types/node': 20.19.29
+      '@types/node': 25.2.0
 
   '@types/tinycolor2@1.4.6': {}
 
@@ -19023,7 +19057,7 @@ snapshots:
 
   '@types/ws@8.18.1':
     dependencies:
-      '@types/node': 20.19.29
+      '@types/node': 25.2.0
 
   '@types/yauzl@2.10.3':
     dependencies:
@@ -25762,7 +25796,7 @@ snapshots:
       '@protobufjs/path': 1.1.2
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.0
-      '@types/node': 20.19.29
+      '@types/node': 25.2.0
       long: 5.3.2
 
   proxy-addr@2.0.7:
@@ -27266,7 +27300,6 @@ snapshots:
       get-tsconfig: 4.13.0
     optionalDependencies:
       fsevents: 2.3.3
-    optional: true
 
   tunnel-agent@0.6.0:
     dependencies:
