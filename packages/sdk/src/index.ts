@@ -116,3 +116,18 @@ export type {
   WebhookResult,
   SleepOptions,
 } from './workflow';
+
+// Scheduled Workflows
+export {
+  createScheduledWorkflow,
+  createDailyBriefing,
+  createWeeklyReport,
+} from './workflow';
+export type {
+  ScheduledWorkflowConfig,
+  ScheduledWorkflow,
+  ScheduleTickResult,
+  ScheduleResult,
+  DailyBriefingOptions,
+  WeeklyReportOptions,
+} from './workflow';

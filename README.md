@@ -71,7 +71,72 @@ const result = await client.generate({ prompt: 'Hello!' });
 - **Durable Workflows** - Crash recovery, auto-retry, and step-level checkpointing
 - **Workflow Hooks** - Human-in-the-loop approval with `defineHook()`
 - **Resumable Streams** - Survive page refreshes and network disconnects
+- **Scheduled Workflows** - Recurring tasks via `createScheduledWorkflow()` with zero-compute sleep
 
+## Scheduled Workflows
+
+Run recurring agent tasks (daily briefings, weekly reports) using durable `sleep()`. Zero compute cost while sleeping — the workflow runtime suspends the process and resumes it after the interval.
+
+### Custom Schedule
+
+```typescript
+import { createScheduledWorkflow } from '@agent/sdk';
+
+const schedule = createScheduledWorkflow({
+  name: 'health-check',
+  interval: '1h',
+  task: async (iteration) => {
+    // Run your agent, call APIs, etc.
+    return `Check #${iteration} passed`;
+  },
+  onTick: (result, i) => console.log(result),
+  onError: (err, i) => {
+    console.error(`Iteration ${i} failed:`, err.message);
+    return true; // continue despite error
+  },
+  maxIterations: 24, // stop after 24 hours
+});
+
+await schedule.start();
+```
+
+### Daily Briefing
+
+```typescript
+import { createDailyBriefing, createAgent } from '@agent/sdk';
+
+const briefing = createDailyBriefing({
+  generateBriefing: async () => {
+    const agent = createAgent({ role: 'analyst' });
+    const result = await agent.generate({
+      prompt: 'Summarize today\'s calendar, emails, and tasks.',
+    });
+    return await result.text;
+  },
+  deliver: (text) => sendSlackMessage('#daily', text),
+});
+
+await briefing.start(); // Runs forever, 1 briefing per day
+```
+
+### Weekly Report
+
+```typescript
+import { createWeeklyReport, createAgent } from '@agent/sdk';
+
+const report = createWeeklyReport({
+  generateReport: async (week) => {
+    const agent = createAgent({ role: 'analyst' });
+    const result = await agent.generate({
+      prompt: `Generate weekly report #${week + 1}.`,
+    });
+    return await result.text;
+  },
+  deliver: (text) => sendEmail('team@company.com', 'Weekly Report', text),
+});
+
+await report.start(); // Runs forever, 1 report per week
+```
 ## Workflow Observability
 
 Durable agents record every LLM call, tool execution, and webhook suspension as discrete workflow steps. Use the built-in inspector to debug agent runs step-by-step.
