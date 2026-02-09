@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useChat } from "@ai-sdk/react"
-import { DefaultChatTransport, isTextUIPart, isToolUIPart, isReasoningUIPart, isFileUIPart, type ToolUIPart, type DynamicToolUIPart } from "ai"
-import { Bot, MessageSquare, CopyIcon, RefreshCcwIcon, AlertCircle, CheckCircle, Target, List, Activity, Settings, Users, Zap } from "lucide-react"
+import { DefaultChatTransport, isTextUIPart, isToolUIPart, isReasoningUIPart, isFileUIPart, getToolName } from "ai"
+import { Bot, MessageSquare, CopyIcon, RefreshCcwIcon, AlertCircle } from "lucide-react"
 import { cn } from "@/libs/utils"
 import { useMissions } from "@/hooks/use-missions"
 import { useConversation } from "@/hooks/use-conversations"
@@ -45,6 +45,7 @@ import {
 } from "@/components/ai-elements/reasoning"
 import { Loader } from "@/components/ai-elements/loader"
 import { Suggestions, Suggestion } from "@/components/ai-elements/suggestion"
+import { ToolPartRenderer } from "./message-parts"
 
 const suggestionPrompts = [
   "Find rental properties in Austin under $300K",
@@ -66,52 +67,7 @@ interface ChatContext {
   frequency?: string
 }
 
-function getToolName(toolPart: ToolUIPart | DynamicToolUIPart): string {
-  if ('toolName' in toolPart) {
-    return toolPart.toolName
-  }
-  return toolPart.type.replace('tool-', '')
-}
 
-function getToolIcon(toolName: string) {
-  const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-    'create_mission': Target,
-    'list_missions': List,
-    'get_mission_status': Activity,
-    'approve_action': CheckCircle,
-    'create_automation': Zap,
-    'list_devices': Settings,
-    'list_approvals': Users,
-  }
-  return iconMap[toolName] || Settings
-}
-
-function formatToolParameter(_key: string, value: unknown): string {
-  if (value === null || value === undefined) return ''
-  if (typeof value === 'string') return value
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
-  if (Array.isArray(value)) return value.join(', ')
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
-}
-
-function getToolParameterLabel(key: string): string {
-  const labelMap: Record<string, string> = {
-    goal: 'Goal',
-    missionId: 'Mission ID',
-    status: 'Status',
-    requireApprovalFor: 'Require Approval',
-    approvalId: 'Approval ID',
-    approved: 'Approved',
-    comment: 'Comment',
-    name: 'Name',
-    description: 'Description',
-    trigger: 'Trigger',
-    actions: 'Actions',
-    platform: 'Platform',
-  }
-  return labelMap[key] || key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())
-}
 
 const MAIN_CONVERSATION_ID = "main"
 
@@ -124,7 +80,7 @@ export function AgentChat({ className: _className, initialContext }: AgentChatPr
   // Track if we've saved messages to avoid duplicates
   const savedMessageIds = useRef(new Set<string>())
 
-  const { messages, sendMessage, status, regenerate } = useChat({
+  const { messages, sendMessage, status, regenerate, addToolApprovalResponse } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
     }),
@@ -267,96 +223,14 @@ export function AgentChat({ className: _className, initialContext }: AgentChatPr
                       )
                     }
                     if (isToolUIPart(part)) {
-                      const toolName = getToolName(part)
-                      const ToolIcon = getToolIcon(toolName)
-                      const isCompleted = part.state === "output-available"
-                      const isError = part.state === "output-error"
-                      const isRunning = part.state === "input-available"
-
                       return (
-                        <div key={part.toolCallId} className="mb-2">
-                          <div className={cn(
-                            "rounded-lg border transition-all",
-                            isCompleted && "border-primary/20 bg-primary/5",
-                            isError && "border-destructive/20 bg-destructive/5",
-                            isRunning && "border-info/20 bg-info/5"
-                          )}>
-                            <div className="flex items-start gap-2 p-2 sm:gap-3 sm:p-3">
-                              <div className={cn(
-                                "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg sm:h-8 sm:w-8",
-                                isCompleted && "bg-primary/10",
-                                isError && "bg-destructive/10",
-                                isRunning && "bg-info/10"
-                              )}>
-                                <ToolIcon className={cn(
-                                  "h-3.5 w-3.5 sm:h-4 sm:w-4",
-                                  isCompleted && "text-primary",
-                                  isError && "text-destructive",
-                                  isRunning && "text-info"
-                                )} />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="mb-1.5 flex flex-wrap items-center gap-1.5 sm:mb-2 sm:gap-2">
-                                  <h4 className="text-xs font-medium sm:text-sm">
-                                    {toolName.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                                  </h4>
-                                  {isRunning && (
-                                    <span className="flex items-center gap-1 text-xs text-info sm:gap-1.5">
-                                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-info" />
-                                      Running
-                                    </span>
-                                  )}
-                                  {isCompleted && (
-                                    <span className="flex items-center gap-1 text-xs text-primary">
-                                      <CheckCircle className="h-3 w-3" />
-                                      Completed
-                                    </span>
-                                  )}
-                                  {isError && (
-                                    <span className="flex items-center gap-1 text-xs text-destructive">
-                                      <AlertCircle className="h-3 w-3" />
-                                      Error
-                                    </span>
-                                  )}
-                                </div>
-                                
-                                {part.input && typeof part.input === 'object' && Object.keys(part.input).length > 0 ? (
-                                  <div className="space-y-1 sm:space-y-1.5">
-                                    {Object.entries(part.input as Record<string, unknown>).map(([key, value]) => {
-                                      const displayValue = formatToolParameter(key, value)
-                                      if (!displayValue) return null
-                                      return (
-                                        <div key={key} className="flex flex-col gap-0.5 text-xs sm:flex-row sm:gap-2 sm:text-sm">
-                                          <span className="font-medium text-muted-foreground">{getToolParameterLabel(key)}:</span>
-                                          <span className="break-words text-foreground">{displayValue}</span>
-                                        </div>
-                                      )
-                                    })}
-                                  </div>
-                                ) : null}
-
-                                {isCompleted && part.output ? (
-                                  <div className="mt-2 rounded-md border border-primary/20 bg-primary/5 p-2">
-                                    <div className="break-words text-xs text-primary">
-                                      {typeof part.output === 'object' && part.output !== null && 'success' in part.output
-                                        ? ((part.output as { message?: string }).message || 'Success')
-                                        : typeof part.output === 'string'
-                                        ? part.output
-                                        : JSON.stringify(part.output, null, 2)
-                                      }
-                                    </div>
-                                  </div>
-                                ) : null}
-
-                                {isError && part.errorText && (
-                                  <div className="mt-2 rounded-md border border-destructive/20 bg-destructive/5 p-2">
-                                    <div className="break-words text-xs text-destructive">{part.errorText}</div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                        <ToolPartRenderer
+                          key={part.toolCallId}
+                          toolPart={part}
+                          isStreaming={isStreaming}
+                          onApprove={(approvalId) => addToolApprovalResponse({ id: approvalId, approved: true })}
+                          onDeny={(approvalId) => addToolApprovalResponse({ id: approvalId, approved: false })}
+                        />
                       )
                     }
                     if (isTextUIPart(part)) {
