@@ -111,6 +111,7 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@ai-sdk-tools/devtools": "^1.2.0",
     "@antfu/eslint-config": "^6.3.0",
     "@chromatic-com/playwright": "^0.12.7",
     "@commitlint/cli": "^20.1.0",
