@@ -12,11 +12,24 @@ const baseConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   reactCompiler: true,
+  serverExternalPackages: ['playwright', 'playwright-core'],
   outputFileTracingIncludes: {
     '/': ['./migrations/**/*'],
   },
   experimental: {
     turbopackFileSystemCacheForDev: true,
+  },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push({
+        'playwright': 'commonjs playwright',
+        'playwright-core': 'commonjs playwright-core',
+        '@nut-tree-fork/nut-js': 'commonjs @nut-tree-fork/nut-js',
+        '@agent/mobile-accessibility': 'commonjs @agent/mobile-accessibility',
+      });
+    }
+    return config;
   },
 };
 

@@ -7,8 +7,8 @@
   "scripts": {
     "dev:spotlight": "npx @spotlightjs/spotlight",
     "dev:next": "next dev",
-    "dev": "npm-run-all --parallel dev:*",
-    "dev:local": "npm-run-all db-server:file --parallel dev:*",
+    "dev": "npm-run-all --parallel dev:next dev:spotlight",
+    "pglite": "npm-run-all db-server:file --parallel dev:next dev:spotlight",
     "build:next": "next build --webpack",
     "build-local": "run-p db-server:memory build:next --race",
     "build": "run-s db:migrate build:next",
@@ -28,7 +28,7 @@
     "db-server:file": "pglite-server --db=local.db --run 'npm run db:migrate'",
     "db-server:memory": "pglite-server --run 'npm run db:migrate'",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "dotenv -c -- drizzle-kit migrate",
+    "db:migrate": "node scripts/db-migrate.mjs",
     "db:studio": "drizzle-kit studio",
     "storybook": "storybook dev -p 6006",
     "storybook:test": "vitest run --config .storybook/vitest.config.mts",
@@ -36,6 +36,7 @@
   },
   "dependencies": {
     "@agent/sdk": "workspace:*",
+    "@ai-sdk-tools/store": "^1.2.0",
     "@ai-sdk/react": "^3.0.5",
     "@arcjet/next": "^1.0.0-beta.15",
     "@clerk/localizations": "^3.29.0",
@@ -108,7 +109,8 @@
     "tokenlens": "^1.3.1",
     "use-stick-to-bottom": "^1.1.1",
     "vaul": "^1.1.2",
-    "zod": "^4.1.13"
+    "zod": "^4.1.13",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@ai-sdk-tools/devtools": "^1.2.0",

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import dynamic from "next/dynamic"
+// import dynamic from "next/dynamic"
 import { Sidebar } from "@/features/dashboard/components/sidebar"
 import { TopBar } from "@/features/dashboard/components/top-bar"
 import { CommandPalette } from "@/features/dashboard/components/command-palette"
@@ -11,12 +11,12 @@ import { useAutomations } from "@/hooks/use-automations"
 import { useNavigationShortcuts } from "@/hooks/use-keyboard-shortcuts"
 import { useStatusNotifications } from "@/hooks/use-status-notifications"
 
-const AIDevTools = process.env.NODE_ENV === "development"
-  ? dynamic(
-    () => import("@ai-sdk-tools/devtools").then((mod) => mod.AIDevTools),
-    { ssr: false }
-  )
-  : () => null
+// const AIDevTools = process.env.NODE_ENV === "development"
+//   ? dynamic(
+//     () => import("@ai-sdk-tools/devtools").then((mod) => mod.AIDevTools),
+//     { ssr: false }
+//   )
+//   : () => null
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -87,7 +87,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         onOpenChange={setKeyboardShortcutsOpen}
       />
 
-      <AIDevTools position="bottom-right" theme="dark" />
+      {/* <AIDevTools position="bottom-right" theme="dark" /> */}
     </div>
   )
 }

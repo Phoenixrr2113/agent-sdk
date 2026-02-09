@@ -39,6 +39,9 @@ importers:
       '@agent/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
+      '@ai-sdk-tools/store':
+        specifier: ^1.2.0
+        version: 1.2.0(@ai-sdk/react@3.0.79(react@19.2.3)(zod@4.3.6))(react@19.2.3)(zod@4.3.6)(zustand@5.0.11(@types/react@19.2.8)(react@19.2.3)(use-sync-external-store@1.6.0(react@19.2.3)))
       '@ai-sdk/react':
         specifier: ^3.0.5
         version: 3.0.79(react@19.2.3)(zod@4.3.6)
@@ -258,10 +261,13 @@ importers:
       zod:
         specifier: ^4.1.13
         version: 4.3.6
+      zustand:
+        specifier: ^5.0.11
+        version: 5.0.11(@types/react@19.2.8)(react@19.2.3)(use-sync-external-store@1.6.0(react@19.2.3))
     devDependencies:
       '@ai-sdk-tools/devtools':
         specifier: ^1.2.0
-        version: 1.2.0(@ai-sdk/react@3.0.79(react@19.2.3)(zod@4.3.6))(@types/react@19.2.8)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(zod@4.3.6)
+        version: 1.2.0(@ai-sdk-tools/store@1.2.0(@ai-sdk/react@3.0.79(react@19.2.3)(zod@4.3.6))(react@19.2.3)(zod@4.3.6)(zustand@5.0.11(@types/react@19.2.8)(react@19.2.3)(use-sync-external-store@1.6.0(react@19.2.3))))(@ai-sdk/react@3.0.79(react@19.2.3)(zod@4.3.6))(@types/react@19.2.8)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(zod@4.3.6)
       '@antfu/eslint-config':
         specifier: ^6.3.0
         version: 6.7.3(@eslint-react/eslint-plugin@2.12.2(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(@next/eslint-plugin-next@16.1.1)(@vue/compiler-sfc@3.5.27)(eslint-plugin-format@1.4.0(eslint@9.39.2(jiti@2.6.1)))(eslint-plugin-jsx-a11y@6.10.2(eslint@9.39.2(jiti@2.6.1)))(eslint-plugin-react-hooks@7.0.1(eslint@9.39.2(jiti@2.6.1)))(eslint-plugin-react-refresh@0.4.26(eslint@9.39.2(jiti@2.6.1)))(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)(vitest@4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.10.12)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
@@ -644,6 +650,13 @@ packages:
     peerDependenciesMeta:
       '@ai-sdk-tools/store':
         optional: true
+
+  '@ai-sdk-tools/store@1.2.0':
+    resolution: {integrity: sha512-/R01/2KA3fOyjDGDDaRSgYn6TPsGS1gO7dTYlmdC36QrCTVkN4Aqx4T3PcwUnnp4i4/nhEZb0Ar2/mpYEsQvfw==}
+    peerDependencies:
+      '@ai-sdk/react': '>=2.0.0'
+      react: '>=18.0.0'
+      zustand: '>=5.0.0'
 
   '@ai-sdk/anthropic@1.2.12':
     resolution: {integrity: sha512-YSzjlko7JvuiyQFmI9RN1tNZdEiZxc+6xld/0tq/VkJaHpEzGAb1yiNxxvmYVcjvfu/PcvCxAAYXmTYQQ63IHQ==}
@@ -13389,6 +13402,24 @@ packages:
       react:
         optional: true
 
+  zustand@5.0.11:
+    resolution: {integrity: sha512-fdZY+dk7zn/vbWNCYmzZULHRrss0jx5pPFiOuMZ/5HJN6Yv3u+1Wswy/4MpZEkEGhtNH+pwxZB8OKgUBPzYAGg==}
+    engines: {node: '>=12.20.0'}
+    peerDependencies:
+      '@types/react': '>=18.0.0'
+      immer: '>=9.0.6'
+      react: '>=18.0.0'
+      use-sync-external-store: '>=1.2.0'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      immer:
+        optional: true
+      react:
+        optional: true
+      use-sync-external-store:
+        optional: true
+
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
@@ -13412,7 +13443,7 @@ snapshots:
 
   '@adobe/css-tools@4.4.4': {}
 
-  '@ai-sdk-tools/devtools@1.2.0(@ai-sdk/react@3.0.79(react@19.2.3)(zod@4.3.6))(@types/react@19.2.8)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(zod@4.3.6)':
+  '@ai-sdk-tools/devtools@1.2.0(@ai-sdk-tools/store@1.2.0(@ai-sdk/react@3.0.79(react@19.2.3)(zod@4.3.6))(react@19.2.3)(zod@4.3.6)(zustand@5.0.11(@types/react@19.2.8)(react@19.2.3)(use-sync-external-store@1.6.0(react@19.2.3))))(@ai-sdk/react@3.0.79(react@19.2.3)(zod@4.3.6))(@types/react@19.2.8)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(zod@4.3.6)':
     dependencies:
       '@ai-sdk/react': 3.0.79(react@19.2.3)(zod@4.3.6)
       '@emotion/react': 11.14.0(@types/react@19.2.8)(react@19.2.3)
@@ -13426,11 +13457,23 @@ snapshots:
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
       react-json-view-lite: 2.5.0(react@19.2.3)
+    optionalDependencies:
+      '@ai-sdk-tools/store': 1.2.0(@ai-sdk/react@3.0.79(react@19.2.3)(zod@4.3.6))(react@19.2.3)(zod@4.3.6)(zustand@5.0.11(@types/react@19.2.8)(react@19.2.3)(use-sync-external-store@1.6.0(react@19.2.3)))
     transitivePeerDependencies:
       - '@mui/material-pigment-css'
       - '@types/react'
       - immer
       - supports-color
+      - zod
+
+  '@ai-sdk-tools/store@1.2.0(@ai-sdk/react@3.0.79(react@19.2.3)(zod@4.3.6))(react@19.2.3)(zod@4.3.6)(zustand@5.0.11(@types/react@19.2.8)(react@19.2.3)(use-sync-external-store@1.6.0(react@19.2.3)))':
+    dependencies:
+      '@ai-sdk/react': 3.0.79(react@19.2.3)(zod@4.3.6)
+      '@types/node': 24.10.12
+      ai: 5.0.129(zod@4.3.6)
+      react: 19.2.3
+      zustand: 5.0.11(@types/react@19.2.8)(react@19.2.3)(use-sync-external-store@1.6.0(react@19.2.3))
+    transitivePeerDependencies:
       - zod
 
   '@ai-sdk/anthropic@1.2.12(zod@3.25.76)':
@@ -28340,5 +28383,11 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.8
       react: 19.2.3
+
+  zustand@5.0.11(@types/react@19.2.8)(react@19.2.3)(use-sync-external-store@1.6.0(react@19.2.3)):
+    optionalDependencies:
+      '@types/react': 19.2.8
+      react: 19.2.3
+      use-sync-external-store: 1.6.0(react@19.2.3)
 
   zwitch@2.0.4: {}
