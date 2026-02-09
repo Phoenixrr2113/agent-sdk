@@ -21,6 +21,7 @@ export type {
   GenerateResult,
   StreamResult,
   StreamChunk,
+  UpgradeWebSocketFn,
 } from './types';
 
 export { ConcurrencyQueue, QueueFullError, QueueTimeoutError } from './queue';

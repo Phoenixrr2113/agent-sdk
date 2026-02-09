@@ -11,6 +11,14 @@ export {
   type ConnectionState,
   type WebSocketCallbacks,
 } from './websocket-client';
+export {
+  BrowserStreamClient,
+  type BrowserStreamClientOptions,
+  type BrowserFrame,
+  type BrowserStreamConfig,
+  type BrowserStreamState,
+  type BrowserStreamCallbacks,
+} from './browser-stream';
 export { ApiClientError, WebSocketError } from './errors';
 export type {
   ChatMessage,
@@ -25,3 +33,4 @@ export type {
   ReconnectOptions,
   StreamMetadata,
 } from './types';
+

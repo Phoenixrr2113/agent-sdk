@@ -36,6 +36,19 @@ export interface AgentServerOptions {
 
   /** Stream buffer configuration for resumable streams. */
   streamBuffer?: StreamBufferOptions;
+
+  /** WebSocket upgrade function (injected by server factory). */
+  upgradeWebSocket?: UpgradeWebSocketFn;
+
+  /** Browser stream configuration */
+  browserStream?: {
+    /** Enable browser viewport streaming (default: false) */
+    enabled?: boolean;
+    /** Default FPS for stream (default: 2) */
+    fps?: number;
+    /** Default JPEG quality (default: 60) */
+    quality?: number;
+  };
 }
 
 /**
@@ -84,3 +97,11 @@ export interface StreamChunk {
   type: string;
   [key: string]: unknown;
 }
+
+/**
+ * WebSocket upgrade function type.
+ * Provided by @hono/node-ws createNodeWebSocket().
+ * Using `any` to avoid type conflicts with Hono's internal WSContext types.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type UpgradeWebSocketFn = (...args: any[]) => any;

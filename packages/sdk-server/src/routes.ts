@@ -522,5 +522,183 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
     }
   });
 
+  // ============================================================================
+  // Browser Viewport Streaming (WebSocket)
+  // ============================================================================
+
+  const upgradeWebSocket = serverOptions.upgradeWebSocket;
+
+  if (upgradeWebSocket) {
+    app.get(
+      '/ws/browser-stream',
+      upgradeWebSocket((_c: unknown) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let streamEmitter: any = null;
+
+        return {
+          onOpen: (_evt: unknown, ws: any) => {
+            log.info('Browser stream WebSocket connected');
+
+            // Dynamically import to avoid hard dependency if browser tool isn't used
+            import('@agent/sdk').then(({ createBrowserStream }) => {
+              const streamConfig = {
+                fps: serverOptions.browserStream?.fps ?? 2,
+                quality: serverOptions.browserStream?.quality ?? 60,
+              };
+
+              streamEmitter = createBrowserStream(streamConfig);
+
+              // Forward frames to WebSocket client
+              streamEmitter.on('frame', (frame: any) => {
+                if (ws.readyState === 1) {
+                  ws.send(JSON.stringify({
+                    type: 'frame',
+                    data: frame.data,
+                    timestamp: frame.timestamp,
+                    sequence: frame.sequence,
+                  }));
+                }
+              });
+
+              // Forward errors
+              streamEmitter.on('error', (errorMsg: string) => {
+                if (ws.readyState === 1) {
+                  ws.send(JSON.stringify({ type: 'error', error: errorMsg }));
+                }
+              });
+
+              // Notify started
+              streamEmitter.on('started', (config: any) => {
+                if (ws.readyState === 1) {
+                  ws.send(JSON.stringify({ type: 'started', config }));
+                }
+              });
+
+              // Notify stopped
+              streamEmitter.on('stopped', () => {
+                if (ws.readyState === 1) {
+                  ws.send(JSON.stringify({ type: 'stopped' }));
+                }
+              });
+
+              // Input acknowledgments
+              streamEmitter.on('input-ack', (inputType: string, success: boolean, error?: string) => {
+                if (ws.readyState === 1) {
+                  ws.send(JSON.stringify({ type: 'input-ack', inputType, success, error }));
+                }
+              });
+
+              // Auto-start the stream
+              streamEmitter.start().catch((err: Error) => {
+                log.error('Failed to start browser stream', { error: err.message });
+                if (ws.readyState === 1) {
+                  ws.send(JSON.stringify({ type: 'error', error: `Failed to start: ${err.message}` }));
+                }
+              });
+            }).catch((err: Error) => {
+              log.error('Failed to load browser stream module', { error: err.message });
+              if (ws.readyState === 1) {
+                ws.send(JSON.stringify({ type: 'error', error: 'Browser stream module unavailable' }));
+              }
+            });
+          },
+
+          onMessage: (evt: { data: unknown }, ws: any) => {
+            if (!streamEmitter) return;
+
+            try {
+              const raw = typeof evt.data === 'string' ? evt.data : String(evt.data);
+              const msg = JSON.parse(raw) as Record<string, unknown>;
+
+              switch (msg.type) {
+                case 'click':
+                  streamEmitter.injectInput({
+                    type: 'click',
+                    x: msg.x as number,
+                    y: msg.y as number,
+                  });
+                  break;
+
+                case 'type':
+                  streamEmitter.injectInput({
+                    type: 'type',
+                    text: msg.text as string,
+                    selector: msg.selector as string | undefined,
+                  });
+                  break;
+
+                case 'press':
+                  streamEmitter.injectInput({
+                    type: 'press',
+                    key: msg.key as string,
+                  });
+                  break;
+
+                case 'scroll':
+                  streamEmitter.injectInput({
+                    type: 'scroll',
+                    direction: msg.direction as 'up' | 'down' | 'left' | 'right',
+                    pixels: msg.pixels as number | undefined,
+                  });
+                  break;
+
+                case 'fill':
+                  streamEmitter.injectInput({
+                    type: 'fill',
+                    selector: msg.selector as string,
+                    text: msg.text as string,
+                  });
+                  break;
+
+                case 'config':
+                  streamEmitter.setConfig({
+                    fps: msg.fps as number | undefined,
+                    quality: msg.quality as number | undefined,
+                    width: msg.width as number | undefined,
+                    height: msg.height as number | undefined,
+                  });
+                  if (ws.readyState === 1) {
+                    ws.send(JSON.stringify({ type: 'config-ack', config: streamEmitter.getConfig() }));
+                  }
+                  break;
+
+                case 'stop':
+                  streamEmitter.stop();
+                  break;
+
+                case 'start':
+                  streamEmitter.start();
+                  break;
+
+                default:
+                  log.warn('Unknown browser stream message type', { type: msg.type });
+              }
+            } catch (err) {
+              log.error('Failed to parse browser stream message', { error: String(err) });
+            }
+          },
+
+          onClose: (_evt: unknown, _ws: any) => {
+            log.info('Browser stream WebSocket disconnected');
+            if (streamEmitter) {
+              streamEmitter.stop();
+              streamEmitter.removeAllListeners();
+              streamEmitter = null;
+            }
+          },
+
+          onError: (evt: unknown, _ws: any) => {
+            log.error('Browser stream WebSocket error', { error: String(evt) });
+            if (streamEmitter) {
+              streamEmitter.stop();
+              streamEmitter.removeAllListeners();
+              streamEmitter = null;
+            }
+          },
+        };
+      }),
+    );
+  }
+
   return app;
 }

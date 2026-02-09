@@ -57,6 +57,10 @@ export { withTransientStreaming, streamTransient } from './streaming/transient';
 // Tools
 export { createSpawnAgentTool } from './tools/spawn-agent/index';
 
+// Browser Streaming
+export { createBrowserStream, BrowserStreamEmitter } from './tools/browser/stream';
+export type { BrowserStreamConfig, FrameData, InputEvent, BrowserStreamEvent } from './tools/browser/stream';
+
 // Memory
 export { createMemoryStore } from './memory/vectra-store';
 export { createMemoryTools } from './memory/tools';

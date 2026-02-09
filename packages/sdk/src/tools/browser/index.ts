@@ -19,3 +19,16 @@ export {
   BROWSER_ACTIONS,
   BROWSER_TOOL_DESCRIPTION,
 } from './types';
+
+// Streaming
+export {
+  BrowserStreamEmitter,
+  createBrowserStream,
+} from './stream';
+
+export type {
+  BrowserStreamConfig,
+  FrameData,
+  InputEvent,
+  BrowserStreamEvent,
+} from './stream';
