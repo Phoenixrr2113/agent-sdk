@@ -39,7 +39,7 @@ echo ""
 
 # Require pull request before merging
 echo "Setting: Require pull request before merging..."
-gh api repos/$REPO/branches/main/protection \
+gh api --method PUT repos/$REPO/branches/main/protection \
   --input - <<EOF
 {
   "required_pull_request_reviews": {
