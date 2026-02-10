@@ -7,3 +7,9 @@ pre-commit:
 
     - name: typecheck
       run: pnpm typecheck
+
+commit-msg:
+  commands:
+    commitlint:
+      glob: ""
+      run: pnpm commitlint --edit {1}
