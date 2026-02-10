@@ -21,8 +21,9 @@ export {
   type DurabilityConfig,
 } from './durable-tool';
 
-// Durable agent factory
+// Durable agent factory (createDurableAgent is deprecated — use durable: true on createAgent)
 export {
+  /** @deprecated Use `createAgent({ durable: true })` instead. */
   createDurableAgent,
   checkWorkflowAvailability,
   parseDuration,
@@ -34,18 +35,33 @@ export {
   type WebhookResponse,
 } from './durable-agent';
 
+// Standalone workflow templates
+export {
+  withApproval,
+  withSchedule,
+  type WorkflowTemplateResult,
+  type ApprovalResponse,
+  type WithApprovalOptions,
+  type WithScheduleOptions,
+} from './templates';
+
 // Workflow hooks & human-in-the-loop
 export {
   defineHook,
   createWebhook,
+  resumeHook,
   sleep,
   getHookRegistry,
+  getWdkErrors,
   _resetHookRegistry,
   _resetHookCounter,
+  _resetWdkCache,
   HookRegistry,
   HookNotFoundError,
   HookNotPendingError,
   HookRejectedError,
+  FatalError,
+  RetryableError,
   type Hook,
   type HookDefinition,
   type HookInstance,
@@ -54,6 +70,20 @@ export {
   type WebhookResult,
   type SleepOptions,
 } from './hooks';
+
+// Workflow builders (Pipeline, Parallel)
+export {
+  createPipeline,
+  createParallel,
+  asStep,
+  type Workflow,
+  type WorkflowStep,
+  type WorkflowInput,
+  type WorkflowOutput,
+  type SynthesizeFn,
+  type PipelineConfig,
+  type ParallelConfig,
+} from './builders';
 
 // Scheduled workflows
 export {
@@ -67,3 +97,22 @@ export {
   type DailyBriefingOptions,
   type WeeklyReportOptions,
 } from './schedulers';
+
+// Team coordination
+export {
+  createTeam,
+  TaskBoard,
+  createTeamTools,
+  teamCoordinationMachine,
+  teammateMachine,
+  type TeamConfig,
+  type TeamMemberConfig,
+  type Team,
+  type TeamPhase,
+  type TeammatePhase,
+  type TeamMessage,
+  type TeamOutput,
+  type TaskDefinition,
+  type TaskState,
+  type TeamSnapshot,
+} from './team';

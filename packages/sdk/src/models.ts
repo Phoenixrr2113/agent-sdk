@@ -2,13 +2,10 @@
  * @agent/sdk - Model Configuration
  *
  * Model tier definitions supporting multiple providers.
- * Now uses config system for customizable model mappings.
+ * All providers use @ai-sdk/openai-compatible for unified access.
  */
 
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { createOllama } from 'ollama-ai-provider-v2';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createAnthropic } from '@ai-sdk/anthropic';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createLogger } from '@agent/logger';
 import { getModelForTier, getConfig, DEFAULT_MODELS, DEFAULT_PROVIDER } from './config';
 import type { LanguageModel } from 'ai';
@@ -19,49 +16,82 @@ const log = createLogger('@agent/sdk:models');
 export { DEFAULT_MODELS as defaultModels };
 
 // ============================================================================
+// Provider Configuration
+// ============================================================================
+
+interface ProviderConfig {
+  name: string;
+  baseURL: string;
+  apiKeyEnv: string;
+  headers?: Record<string, string>;
+}
+
+const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
+  openrouter: {
+    name: 'openrouter',
+    baseURL: 'https://openrouter.ai/api/v1',
+    apiKeyEnv: 'OPENROUTER_API_KEY',
+  },
+  ollama: {
+    name: 'ollama',
+    baseURL: process.env['OLLAMA_BASE_URL'] || 'http://localhost:11434/v1',
+    apiKeyEnv: 'OLLAMA_API_KEY', // Ollama typically doesn't need a key, but support it
+  },
+  openai: {
+    name: 'openai',
+    baseURL: 'https://api.openai.com/v1',
+    apiKeyEnv: 'OPENAI_API_KEY',
+  },
+  anthropic: {
+    name: 'anthropic',
+    baseURL: 'https://api.anthropic.com/v1',
+    apiKeyEnv: 'ANTHROPIC_API_KEY',
+  },
+};
+
+// ============================================================================
 // Provider Instances (Lazy Initialization)
 // ============================================================================
 
-let _openrouter: ReturnType<typeof createOpenRouter> | null = null;
-let _ollama: ReturnType<typeof createOllama> | null = null;
-let _openai: ReturnType<typeof createOpenAI> | null = null;
-let _anthropic: ReturnType<typeof createAnthropic> | null = null;
+const providerInstances = new Map<string, ReturnType<typeof createOpenAICompatible>>();
 
-function getOpenRouter() {
-  if (!_openrouter) {
-    log.debug('Initializing OpenRouter provider');
-    _openrouter = createOpenRouter();
-  }
-  return _openrouter;
-}
+function getProvider(providerName: string): ReturnType<typeof createOpenAICompatible> {
+  let instance = providerInstances.get(providerName);
+  if (instance) return instance;
 
-function getOllama() {
-  if (!_ollama) {
-    const baseURL = process.env['OLLAMA_BASE_URL'] || 'http://localhost:11434/api';
-    log.debug('Initializing Ollama provider', { baseURL });
-    _ollama = createOllama({ baseURL });
-  }
-  return _ollama;
-}
+  // Check for custom providers in config
+  const config = getConfig();
+  const customProviders = config.models?.customProviders;
+  const customConfig = customProviders?.[providerName];
 
-function getOpenAI() {
-  if (!_openai) {
-    log.debug('Initializing OpenAI provider');
-    _openai = createOpenAI({
-      apiKey: process.env['OPENAI_API_KEY'],
-    });
-  }
-  return _openai;
-}
+  let providerConfig: ProviderConfig;
 
-function getAnthropic() {
-  if (!_anthropic) {
-    log.debug('Initializing Anthropic provider');
-    _anthropic = createAnthropic({
-      apiKey: process.env['ANTHROPIC_API_KEY'],
-    });
+  if (customConfig) {
+    providerConfig = {
+      name: providerName,
+      baseURL: customConfig.baseURL,
+      apiKeyEnv: customConfig.apiKeyEnv,
+      headers: customConfig.headers,
+    };
+  } else if (PROVIDER_CONFIGS[providerName]) {
+    providerConfig = PROVIDER_CONFIGS[providerName];
+  } else {
+    throw new Error(`Unknown provider: ${providerName}. Configure it in models.customProviders.`);
   }
-  return _anthropic;
+
+  const apiKey = process.env[providerConfig.apiKeyEnv] || '';
+
+  log.debug('Initializing provider', { name: providerConfig.name, baseURL: providerConfig.baseURL });
+
+  instance = createOpenAICompatible({
+    name: providerConfig.name,
+    baseURL: providerConfig.baseURL,
+    apiKey,
+    headers: providerConfig.headers,
+  });
+
+  providerInstances.set(providerName, instance);
+  return instance;
 }
 
 // ============================================================================
@@ -69,15 +99,12 @@ function getAnthropic() {
 // ============================================================================
 
 export type ModelTier = 'fast' | 'standard' | 'reasoning' | 'powerful';
-export type ModelProvider = 'openrouter' | 'ollama' | 'openai' | 'anthropic';
+export type ModelProvider = 'openrouter' | 'ollama' | 'openai' | 'anthropic' | (string & {});
 
 export interface ModelConfig {
   provider: ModelProvider;
   name: string;
 }
-
-// NOTE: Default model mappings are now in config/defaults.ts
-// Re-exported as 'defaultModels' above for backward compatibility
 
 // ============================================================================
 // Environment Variable Model Overrides
@@ -97,25 +124,12 @@ function getOllamaEnvModel(tier: ModelTier): string | undefined {
 // Model Creation Functions
 // ============================================================================
 
-// Note: Type assertion needed due to version mismatch between stable providers
-// and AI SDK 6.0.0-beta. Provider packages use @ai-sdk/provider@3.0.2 while
-// beta uses @ai-sdk/provider@3.0.0-beta.20. The runtime behavior is compatible.
 function createModelForProvider(
-  provider: ModelProvider,
+  provider: string,
   modelName: string
 ): LanguageModel {
-  switch (provider) {
-    case 'openrouter':
-      return getOpenRouter().chat(modelName) as unknown as LanguageModel;
-    case 'ollama':
-      return getOllama()(modelName) as unknown as LanguageModel;
-    case 'openai':
-      return getOpenAI()(modelName) as unknown as LanguageModel;
-    case 'anthropic':
-      return getAnthropic()(modelName) as unknown as LanguageModel;
-    default:
-      throw new Error(`Unknown provider: ${provider}`);
-  }
+  const providerInstance = getProvider(provider);
+  return providerInstance(modelName);
 }
 
 // ============================================================================
@@ -126,37 +140,37 @@ export const models = {
   fast: (): LanguageModel => {
     if (process.env['OLLAMA_ENABLED'] === 'true') {
       const modelName = getOllamaEnvModel('fast') || DEFAULT_MODELS.ollama.fast;
-      return getOllama()(modelName) as unknown as LanguageModel;
+      return createModelForProvider('ollama', modelName);
     }
     const modelName = getEnvModel('fast') || DEFAULT_MODELS.openrouter.fast;
-    return getOpenRouter().chat(modelName) as unknown as LanguageModel;
+    return createModelForProvider('openrouter', modelName);
   },
 
   standard: (): LanguageModel => {
     if (process.env['OLLAMA_ENABLED'] === 'true') {
       const modelName = getOllamaEnvModel('standard') || DEFAULT_MODELS.ollama.standard;
-      return getOllama()(modelName) as unknown as LanguageModel;
+      return createModelForProvider('ollama', modelName);
     }
     const modelName = getEnvModel('standard') || DEFAULT_MODELS.openrouter.standard;
-    return getOpenRouter().chat(modelName) as unknown as LanguageModel;
+    return createModelForProvider('openrouter', modelName);
   },
 
   reasoning: (): LanguageModel => {
     if (process.env['OLLAMA_ENABLED'] === 'true') {
       const modelName = getOllamaEnvModel('reasoning') || DEFAULT_MODELS.ollama.reasoning;
-      return getOllama()(modelName) as unknown as LanguageModel;
+      return createModelForProvider('ollama', modelName);
     }
     const modelName = getEnvModel('reasoning') || DEFAULT_MODELS.openrouter.reasoning;
-    return getOpenRouter().chat(modelName) as unknown as LanguageModel;
+    return createModelForProvider('openrouter', modelName);
   },
 
   powerful: (): LanguageModel => {
     if (process.env['OLLAMA_ENABLED'] === 'true') {
       const modelName = getOllamaEnvModel('powerful') || DEFAULT_MODELS.ollama.powerful;
-      return getOllama()(modelName) as unknown as LanguageModel;
+      return createModelForProvider('ollama', modelName);
     }
     const modelName = getEnvModel('powerful') || DEFAULT_MODELS.openrouter.powerful;
-    return getOpenRouter().chat(modelName) as unknown as LanguageModel;
+    return createModelForProvider('openrouter', modelName);
   },
 };
 
@@ -191,10 +205,10 @@ export function resolveModel(options: ModelResolutionOptions = {}): LanguageMode
     return createModelForProvider(provider, modelName);
   }
 
-  // If modelName looks like "provider/model"
+  // If modelName looks like "provider/model", route through OpenRouter
   if (modelName && modelName.includes('/')) {
     log.info('Resolving model (OpenRouter format)', { modelName });
-    return getOpenRouter().chat(modelName) as unknown as LanguageModel;
+    return createModelForProvider('openrouter', modelName);
   }
 
   // Use tier-based selection from config
@@ -226,6 +240,16 @@ export function listAvailableTiers(): ModelTier[] {
   return ['fast', 'standard', 'reasoning', 'powerful'];
 }
 
-export function listAvailableProviders(): ModelProvider[] {
-  return ['openrouter', 'ollama', 'openai', 'anthropic'];
+export function listAvailableProviders(): string[] {
+  const builtIn = Object.keys(PROVIDER_CONFIGS);
+  const config = getConfig();
+  const custom = Object.keys(config.models?.customProviders ?? {});
+  return [...new Set([...builtIn, ...custom])];
+}
+
+/**
+ * Reset provider instances (useful for testing).
+ */
+export function resetProviders(): void {
+  providerInstances.clear();
 }

@@ -10,6 +10,13 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { createLogger } from '@agent/logger';
 import { getConfig } from '../config';
+import {
+  DEFAULT_EMBEDDING_URL,
+  DEFAULT_EMBEDDING_MODEL,
+  DEFAULT_MEMORY_PATH,
+  DEFAULT_MEMORY_TOP_K,
+  DEFAULT_MEMORY_SIMILARITY_THRESHOLD,
+} from '../constants';
 import type { MemoryOptions } from '../types/agent';
 
 const log = createLogger('@agent/sdk:memory');
@@ -43,20 +50,21 @@ export interface MemoryStore {
 // Embedding - Using OpenAI directly
 // ============================================================================
 
-async function getEmbedding(text: string, modelName?: string): Promise<number[]> {
+async function getEmbedding(text: string, modelName?: string, embeddingUrl?: string): Promise<number[]> {
   const apiKey = process.env['OPENAI_API_KEY'];
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY required for memory embeddings');
   }
 
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
+  const url = embeddingUrl ?? DEFAULT_EMBEDDING_URL;
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: modelName ?? 'text-embedding-3-small',
+      model: modelName ?? DEFAULT_EMBEDDING_MODEL,
       input: text,
     }),
   });
@@ -79,10 +87,10 @@ export async function createMemoryStore(options: MemoryOptions = {}): Promise<Me
   const memoryConfig = (config.memory ?? {}) as Record<string, unknown>;
 
   const {
-    path: storagePath = (memoryConfig.path as string) ?? './.vectra-memory',
-    embedModel = (memoryConfig.embedModel as string) ?? 'text-embedding-3-small',
-    topK = (memoryConfig.topK as number) ?? 5,
-    similarityThreshold = (memoryConfig.similarityThreshold as number) ?? 0.7,
+    path: storagePath = (memoryConfig.path as string) ?? DEFAULT_MEMORY_PATH,
+    embedModel = (memoryConfig.embedModel as string) ?? DEFAULT_EMBEDDING_MODEL,
+    topK = (memoryConfig.topK as number) ?? DEFAULT_MEMORY_TOP_K,
+    similarityThreshold = (memoryConfig.similarityThreshold as number) ?? DEFAULT_MEMORY_SIMILARITY_THRESHOLD,
   } = options;
 
   log.info('Creating memory store', { path: storagePath, embedModel, topK });
@@ -134,7 +142,7 @@ export async function createMemoryStore(options: MemoryOptions = {}): Promise<Me
       try {
         await index.deleteItem(id);
         return true;
-      } catch {
+      } catch (_e: unknown) {
         return false;
       }
     },

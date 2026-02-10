@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { browserInputSchema, BROWSER_TOOL_DESCRIPTION } from './types';
 import type { BrowserInput, BrowserConfig } from './types';
 import { success, error } from '../utils/tool-result';
+import { BROWSER_DEFAULT_TIMEOUT, BROWSER_MAX_OUTPUT_LENGTH, BROWSER_MAX_BUFFER } from '../../constants';
 
 const execFileAsync = promisify(execFile);
 
@@ -20,8 +21,6 @@ const execFileAsync = promisify(execFile);
 // ============================================================================
 
 const CLI_BINARY = 'agent-browser';
-const DEFAULT_TIMEOUT = 30_000;
-const MAX_OUTPUT_LENGTH = 50_000;
 
 // ============================================================================
 // CLI Availability Check
@@ -35,7 +34,7 @@ export async function isBrowserCliAvailable(): Promise<boolean> {
   try {
     await execFileAsync('which', [CLI_BINARY]);
     cliAvailable = true;
-  } catch {
+  } catch (_e: unknown) {
     cliAvailable = false;
   }
   return cliAvailable;
@@ -168,19 +167,19 @@ export function buildCommand(input: BrowserInput, config: BrowserConfig = {}): s
 
 export async function executeBrowserCommand(
   args: string[],
-  timeout: number = DEFAULT_TIMEOUT,
+  timeout: number = BROWSER_DEFAULT_TIMEOUT,
 ): Promise<{ stdout: string; stderr: string; exitCode: number; durationMs: number }> {
   const start = performance.now();
 
   try {
     const { stdout, stderr } = await execFileAsync(CLI_BINARY, args, {
       timeout,
-      maxBuffer: 5 * 1024 * 1024,
+      maxBuffer: BROWSER_MAX_BUFFER,
     });
 
     return {
-      stdout: stdout.slice(0, MAX_OUTPUT_LENGTH),
-      stderr: stderr.slice(0, MAX_OUTPUT_LENGTH),
+      stdout: stdout.slice(0, BROWSER_MAX_OUTPUT_LENGTH),
+      stderr: stderr.slice(0, BROWSER_MAX_OUTPUT_LENGTH),
       exitCode: 0,
       durationMs: Math.round(performance.now() - start),
     };
@@ -190,7 +189,7 @@ export async function executeBrowserCommand(
 
     if (execError.killed) {
       return {
-        stdout: (execError.stdout ?? '').slice(0, MAX_OUTPUT_LENGTH),
+        stdout: (execError.stdout ?? '').slice(0, BROWSER_MAX_OUTPUT_LENGTH),
         stderr: `Command timed out after ${timeout}ms`,
         exitCode: 124,
         durationMs,
@@ -198,8 +197,8 @@ export async function executeBrowserCommand(
     }
 
     return {
-      stdout: (execError.stdout ?? '').slice(0, MAX_OUTPUT_LENGTH),
-      stderr: (execError.stderr ?? String(err)).slice(0, MAX_OUTPUT_LENGTH),
+      stdout: (execError.stdout ?? '').slice(0, BROWSER_MAX_OUTPUT_LENGTH),
+      stderr: (execError.stderr ?? String(err)).slice(0, BROWSER_MAX_OUTPUT_LENGTH),
       exitCode: typeof execError.code === 'number' ? execError.code : 1,
       durationMs,
     };
@@ -211,7 +210,7 @@ export async function executeBrowserCommand(
 // ============================================================================
 
 export function createBrowserTool(config: BrowserConfig = {}) {
-  const timeout = config.timeout ?? DEFAULT_TIMEOUT;
+  const timeout = config.timeout ?? BROWSER_DEFAULT_TIMEOUT;
 
   return tool({
     description: BROWSER_TOOL_DESCRIPTION,

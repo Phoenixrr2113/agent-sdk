@@ -103,8 +103,9 @@ let _workflowAvailable: boolean | null = null;
 let _workflowModule: WorkflowModule | null = null;
 
 interface WorkflowModule {
-  sleep: (duration: string) => Promise<void>;
+  sleep: (duration: string | number) => Promise<void>;
   FatalError: new (message: string) => Error;
+  RetryableError: new (message: string, options?: { retryAfter?: number | string | Date }) => Error;
 }
 
 /**
@@ -119,7 +120,7 @@ export async function checkWorkflowAvailability(): Promise<boolean> {
     _workflowAvailable = true;
     log.info('Workflow runtime detected');
     return true;
-  } catch {
+  } catch (_e: unknown) {
     _workflowAvailable = false;
     log.debug('Workflow runtime not available — durable features disabled');
     return false;
@@ -284,7 +285,7 @@ async function durableScheduledWorkflow(
     try {
       const wf = getWorkflowModule();
       await wf.sleep(delay);
-    } catch {
+    } catch (_e: unknown) {
       // If workflow not available, use regular setTimeout as fallback
       const ms = parseDuration(delay);
       log.warn('Workflow sleep unavailable, using setTimeout fallback', { ms });

@@ -5,12 +5,13 @@
  * When a hook fires, the workflow pauses (zero compute) and waits for
  * external input — typically a human approval via the `/hooks/:id/resume` endpoint.
  *
- * Features:
- * - `defineHook<TPayload, TResult>()` — Creates a typed hook factory
- * - `HookRegistry` — Tracks active, pending, and resolved hooks
- * - `createWebhook()` — Creates webhook-backed suspension points
- * - `sleep()` — Zero-compute durable delay wrapper
- * - Hook timeouts with configurable defaults
+ * Uses Vercel's Workflow DevKit (WDK) primitives when available:
+ * - `defineHook` → WDK defineHook with Standard Schema validation
+ * - `createWebhook` → WDK createWebhook with auto-generated URLs
+ * - `sleep` → WDK sleep with zero-compute durable delay
+ * - `FatalError` / `RetryableError` → WDK error classes
+ *
+ * Falls back to in-memory implementation when WDK is not installed.
  *
  * @see SDK-HOOKS-008
  * @see https://useworkflow.dev
@@ -20,6 +21,48 @@ import { createLogger } from '@agent/logger';
 import { parseDuration } from './durable-agent';
 
 const log = createLogger('@agent/sdk:workflow:hooks');
+
+// ============================================================================
+// WDK Runtime Detection
+// ============================================================================
+
+/** Cached WDK module reference */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _wdk: any = null;
+let _wdkChecked = false;
+
+/**
+ * Attempt to load the WDK module. Returns null if not available.
+ * Result is cached after first check.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getWdk(): Promise<any> {
+  if (_wdkChecked) return _wdk;
+  _wdkChecked = true;
+
+  try {
+    _wdk = await import('workflow');
+    log.info('WDK runtime detected for hooks');
+  } catch (_e: unknown) {
+    _wdk = null;
+    log.debug('WDK runtime not available — using in-memory hook registry');
+  }
+  return _wdk;
+}
+
+/** Synchronous check for WDK availability (only valid after first async check). */
+function isWdkAvailable(): boolean {
+  return _wdk !== null;
+}
+
+/**
+ * Reset WDK cache (for testing).
+ * @internal
+ */
+export function _resetWdkCache(): void {
+  _wdk = null;
+  _wdkChecked = false;
+}
 
 // ============================================================================
 // Types
@@ -58,7 +101,7 @@ export interface HookDefinition<TPayload = unknown, TResult = unknown> {
 
 /** A live hook instance that is waiting for resolution. */
 export interface HookInstance<TPayload = unknown, TResult = unknown> {
-  /** Unique ID for this hook instance. */
+  /** Unique ID for this hook instance (maps to WDK token when available). */
   id: string;
 
   /** Name from the hook definition. */
@@ -96,7 +139,9 @@ export interface Hook<TPayload = unknown, TResult = unknown> {
 
   /**
    * Create a suspension point in the workflow.
-   * Suspends execution and waits for external input via `/hooks/:id/resume`.
+   * Suspends execution and waits for external input.
+   * Under WDK: uses createHook with auto-generated token.
+   * Without WDK: uses in-memory HookRegistry.
    *
    * @param payload - Context sent to the human (what they're approving/deciding)
    * @returns The result from the human (or default value on timeout)
@@ -104,7 +149,7 @@ export interface Hook<TPayload = unknown, TResult = unknown> {
   wait: (payload: TPayload) => Promise<TResult>;
 
   /**
-   * Create a suspension point with an explicit hook ID.
+   * Create a suspension point with an explicit hook ID/token.
    * Useful for deterministic testing or resuming by known ID.
    */
   waitWithId: (id: string, payload: TPayload) => Promise<TResult>;
@@ -112,10 +157,10 @@ export interface Hook<TPayload = unknown, TResult = unknown> {
 
 /** Options for creating a webhook suspension point. */
 export interface WebhookOptions {
-  /** Unique webhook ID. Auto-generated if not provided. */
+  /** Unique webhook ID/token. Auto-generated if not provided. */
   id?: string;
 
-  /** URL path for the webhook callback (informational, not enforced). */
+  /** URL path for the webhook callback (informational without WDK, auto-generated with WDK). */
   callbackPath?: string;
 
   /** Timeout for the webhook response. */
@@ -132,6 +177,9 @@ export interface WebhookResult<T = unknown> {
 
   /** Whether this was a timeout (data = defaultValue). */
   timedOut: boolean;
+
+  /** The webhook URL (only available when WDK is active). */
+  url?: string;
 }
 
 /** Options for the sleep() function. */
@@ -141,15 +189,13 @@ export interface SleepOptions {
 }
 
 // ============================================================================
-// Hook Registry (Singleton)
+// Hook Registry (Fallback for non-WDK environments)
 // ============================================================================
 
 /**
- * Registry that tracks all active hook instances.
- * The server's `/hooks/:id/resume` endpoint uses this to find and resolve hooks.
- *
- * Exported as a singleton. In production, this would be backed by
- * a durable store (e.g., workflow runtime state). For now, it's in-memory.
+ * In-memory registry that tracks active hook instances.
+ * Used when WDK is not available. When WDK is active, hooks are managed
+ * by the WDK runtime and this registry is only used for tracking metadata.
  */
 export class HookRegistry {
   private hooks = new Map<string, HookInstance>();
@@ -183,7 +229,7 @@ export class HookRegistry {
 
   /**
    * Register a new hook instance and return a promise that resolves
-   * when the hook is resumed via `/hooks/:id/resume`.
+   * when the hook is resumed.
    */
   register<TPayload, TResult>(
     id: string,
@@ -251,7 +297,9 @@ export class HookRegistry {
 
   /**
    * Resume a suspended hook with a payload.
-   * Called by the `/hooks/:id/resume` endpoint.
+   *
+   * Uses a status guard to prevent double resolution (race between
+   * resume and timeout). Only the first to transition from 'pending' wins.
    *
    * @throws If hook not found, not pending, or validation fails
    */
@@ -261,17 +309,24 @@ export class HookRegistry {
       throw new HookNotFoundError(id);
     }
 
+    // Status guard: atomically check-and-set to prevent race with timeout
     if (hook.status !== 'pending') {
       throw new HookNotPendingError(id, hook.status);
     }
+    hook.status = 'resolved'; // Claim the transition immediately
 
     // Run validation if defined
     const validator = this.validators.get(id);
     if (validator) {
-      await validator(result);
+      try {
+        await validator(result);
+      } catch (validationError) {
+        // Rollback status on validation failure
+        hook.status = 'pending';
+        throw validationError;
+      }
     }
 
-    hook.status = 'resolved';
     hook.resolvedAt = new Date();
     hook.result = result;
 
@@ -375,6 +430,73 @@ export class HookRejectedError extends Error {
 }
 
 // ============================================================================
+// WDK Error Re-exports
+// ============================================================================
+
+/**
+ * FatalError — a non-retryable error that permanently fails a workflow step.
+ * When WDK is available, this is the real WDK FatalError class.
+ * Without WDK, falls back to a simple Error subclass.
+ */
+export class FatalError extends Error {
+  readonly fatal = true;
+  constructor(message: string) {
+    super(message);
+    this.name = 'FatalError';
+  }
+
+  static is(value: unknown): value is FatalError {
+    return value instanceof FatalError ||
+      (value instanceof Error && 'fatal' in value && (value as { fatal: unknown }).fatal === true);
+  }
+}
+
+/**
+ * RetryableError — an error that allows the WDK runtime to retry a step.
+ * When WDK is available, prefer using the WDK version directly.
+ * Without WDK, this provides the same interface.
+ */
+export class RetryableError extends Error {
+  readonly retryAfter: Date;
+
+  constructor(message: string, options?: { retryAfter?: number | string | Date }) {
+    super(message);
+    this.name = 'RetryableError';
+
+    if (options?.retryAfter instanceof Date) {
+      this.retryAfter = options.retryAfter;
+    } else if (typeof options?.retryAfter === 'string') {
+      this.retryAfter = new Date(Date.now() + parseDuration(options.retryAfter));
+    } else if (typeof options?.retryAfter === 'number') {
+      this.retryAfter = new Date(Date.now() + options.retryAfter);
+    } else {
+      this.retryAfter = new Date(Date.now() + 1000); // Default: 1 second
+    }
+  }
+
+  static is(value: unknown): value is RetryableError {
+    return value instanceof RetryableError;
+  }
+}
+
+/**
+ * Get WDK error classes if available, otherwise return our fallbacks.
+ * Use these in durable-agent.ts for step-level error handling.
+ */
+export function getWdkErrors(): {
+  FatalError: typeof FatalError;
+  RetryableError: typeof RetryableError;
+} {
+  if (isWdkAvailable() && _wdk) {
+    return {
+      FatalError: _wdk.FatalError ?? FatalError,
+      RetryableError: _wdk.RetryableError ?? RetryableError,
+    };
+  }
+  return { FatalError, RetryableError };
+}
+
+// ============================================================================
 // Singleton Registry
 // ============================================================================
 
@@ -423,9 +545,10 @@ export function _resetHookCounter(): void {
 /**
  * Define a typed hook factory.
  *
- * Creates a reusable hook definition that can produce suspension points
- * in workflow execution. Each call to `hook.wait()` creates a new
- * hook instance that pauses the workflow until resolved.
+ * When WDK is available, creates hooks using `wdk.defineHook()` and
+ * `wdk.createHook()` for durable suspension with auto-generated webhook tokens.
+ *
+ * Without WDK, falls back to in-memory HookRegistry.
  *
  * @param definition - Hook configuration
  * @returns A typed hook factory
@@ -466,14 +589,71 @@ export function defineHook<TPayload = unknown, TResult = unknown>(
 
   log.debug('Hook defined', { name, description, timeoutMs });
 
-  const wait = (payload: TPayload): Promise<TResult> => {
+  const wait = async (payload: TPayload): Promise<TResult> => {
     const id = generateHookId(name);
     return waitWithId(id, payload);
   };
 
-  const waitWithId = (id: string, payload: TPayload): Promise<TResult> => {
+  const waitWithId = async (id: string, payload: TPayload): Promise<TResult> => {
     log.info('Hook suspension created', { hookId: id, name, payload });
 
+    const wdk = await getWdk();
+
+    // WDK path: use defineHook().create() for durable hooks
+    if (wdk?.createHook) {
+      log.debug('Using WDK createHook', { hookId: id, name });
+
+      // Track in our registry for metadata access
+      const registry = getHookRegistry();
+      const instance: HookInstance<TPayload, TResult> = {
+        id,
+        name,
+        description,
+        payload,
+        status: 'pending',
+        createdAt: new Date(),
+        timeoutMs,
+      };
+      registry['hooks'].set(id, instance as HookInstance);
+
+      try {
+        // Create WDK hook with our token
+        const wdkHook = wdk.createHook({ token: id, metadata: { name, description, payload } });
+
+        // Race against timeout if configured
+        let result: TResult;
+        if (timeoutMs && timeoutMs > 0) {
+          const timeoutPromise = new Promise<TResult>((resolve) => {
+            setTimeout(() => {
+              instance.status = 'timed_out';
+              instance.resolvedAt = new Date();
+              instance.result = defaultValue;
+              resolve(defaultValue as TResult);
+            }, timeoutMs);
+          });
+          result = await Promise.race([wdkHook as Promise<TResult>, timeoutPromise]);
+        } else {
+          result = await (wdkHook as Promise<TResult>);
+        }
+
+        // Validate if needed
+        if (validate) {
+          await validate(result);
+        }
+
+        instance.status = instance.status === 'timed_out' ? 'timed_out' : 'resolved';
+        instance.resolvedAt = instance.resolvedAt ?? new Date();
+        instance.result = result;
+
+        return result;
+      } catch (err) {
+        instance.status = 'rejected';
+        instance.resolvedAt = new Date();
+        throw err;
+      }
+    }
+
+    // Fallback: in-memory registry
     const registry = getHookRegistry();
     return registry.register<TPayload, TResult>(id, name, payload, {
       description,
@@ -498,12 +678,13 @@ export function defineHook<TPayload = unknown, TResult = unknown>(
 /**
  * Create a webhook-backed suspension point.
  *
- * Similar to `defineHook`, but designed for external webhook integrations.
- * The webhook URL and callback path are informational — the actual resumption
- * happens via the `/hooks/:id/resume` endpoint.
+ * When WDK is available, uses `wdk.createWebhook()` for auto-generated
+ * webhook URLs (pattern: /.well-known/workflow/v1/webhook/:token).
+ *
+ * Without WDK, falls back to in-memory HookRegistry.
  *
  * @param options - Webhook configuration
- * @returns Promise that resolves when the webhook fires
+ * @returns Object with id, promise, and url (if WDK is available)
  *
  * @example
  * ```typescript
@@ -520,7 +701,7 @@ export function defineHook<TPayload = unknown, TResult = unknown>(
  */
 export function createWebhook<T = unknown>(
   options: WebhookOptions = {},
-): { id: string; promise: Promise<WebhookResult<T>> } {
+): { id: string; promise: Promise<WebhookResult<T>>; url?: string } {
   const id = options.id ?? generateHookId('webhook');
   const timeoutMs = options.timeout ? parseDuration(options.timeout) : undefined;
 
@@ -530,6 +711,57 @@ export function createWebhook<T = unknown>(
     timeoutMs,
   });
 
+  // Try WDK path synchronously (only works if WDK was already loaded)
+  if (isWdkAvailable() && _wdk?.createWebhook) {
+    log.debug('Using WDK createWebhook', { webhookId: id });
+
+    const wdkWebhook = _wdk.createWebhook({ token: id });
+    const url: string = wdkWebhook.url;
+
+    // Track in registry for metadata
+    const registry = getHookRegistry();
+    const instance: HookInstance = {
+      id,
+      name: 'webhook',
+      description: `Webhook callback: ${url}`,
+      payload: { callbackPath: options.callbackPath, url },
+      status: 'pending',
+      createdAt: new Date(),
+      timeoutMs,
+    };
+    registry['hooks'].set(id, instance);
+
+    const promise: Promise<WebhookResult<T>> = (async () => {
+      let data: T;
+      let timedOut = false;
+
+      if (timeoutMs && timeoutMs > 0) {
+        const timeoutPromise = new Promise<T>((resolve) => {
+          setTimeout(() => {
+            instance.status = 'timed_out';
+            instance.resolvedAt = new Date();
+            timedOut = true;
+            resolve(options.defaultValue as T);
+          }, timeoutMs);
+        });
+        data = await Promise.race([wdkWebhook as Promise<T>, timeoutPromise]);
+      } else {
+        data = await (wdkWebhook as Promise<T>);
+      }
+
+      if (!timedOut) {
+        instance.status = 'resolved';
+        instance.resolvedAt = new Date();
+      }
+      instance.result = data;
+
+      return { data, timedOut, url };
+    })();
+
+    return { id, promise, url };
+  }
+
+  // Fallback: in-memory registry
   const registry = getHookRegistry();
 
   const promise = registry.register<{ callbackPath?: string }, T>(
@@ -552,6 +784,38 @@ export function createWebhook<T = unknown>(
   return { id, promise };
 }
 
+/**
+ * Resume a hook by its token/ID.
+ *
+ * When WDK is available, delegates to `wdk.resumeHook()`.
+ * Without WDK, uses the in-memory HookRegistry.
+ *
+ * @param tokenOrId - The hook token or ID
+ * @param payload - The payload to send to the hook
+ */
+export async function resumeHook<T = unknown>(tokenOrId: string, payload: T): Promise<void> {
+  const wdk = await getWdk();
+
+  if (wdk?.resumeHook) {
+    log.info('Resuming hook via WDK', { token: tokenOrId });
+    await wdk.resumeHook(tokenOrId, payload);
+
+    // Also update our registry metadata
+    const registry = getHookRegistry();
+    const instance = registry.get(tokenOrId);
+    if (instance) {
+      instance.status = 'resolved';
+      instance.resolvedAt = new Date();
+      instance.result = payload;
+    }
+    return;
+  }
+
+  // Fallback: in-memory registry
+  const registry = getHookRegistry();
+  await registry.resume(tokenOrId, payload);
+}
+
 // ============================================================================
 // Sleep (Durable Delay)
 // ============================================================================
@@ -559,16 +823,16 @@ export function createWebhook<T = unknown>(
 /**
  * Pause workflow execution with zero compute cost.
  *
- * Under the Workflow runtime, this uses durable sleep — the process is
- * suspended and resumed by the runtime after the delay. Without the
- * runtime, falls back to `setTimeout`.
+ * Under WDK, this uses durable sleep — the process is suspended and
+ * resumed by the runtime after the delay. Without WDK, falls back to
+ * `setTimeout`.
  *
  * @param duration - Duration string (e.g., "30s", "5m", "1h")
  * @param options - Optional configuration
  *
  * @example
  * ```typescript
- * // Pause for 5 minutes (zero compute under workflow runtime)
+ * // Pause for 5 minutes (zero compute under WDK runtime)
  * await sleep('5m', { reason: 'Rate limit cooldown' });
  * ```
  */
@@ -582,15 +846,14 @@ export async function sleep(duration: string, options: SleepOptions = {}): Promi
   });
 
   try {
-    // Try to use workflow runtime's durable sleep
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const workflowModule = await import('workflow').catch(() => null) as any;
-    if (workflowModule?.sleep) {
-      await workflowModule.sleep(ms);
-      log.info('Workflow sleep completed', { duration });
+    const wdk = await getWdk();
+    if (wdk?.sleep) {
+      // WDK sleep accepts ms, string duration, or Date
+      await wdk.sleep(ms);
+      log.info('WDK sleep completed', { duration });
       return;
     }
-  } catch {
+  } catch (_e: unknown) {
     // Fall through to setTimeout fallback
   }
 

@@ -9,13 +9,21 @@ import { basename, extname } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import fastGlob from 'fast-glob';
 import type Parser from 'tree-sitter';
-import type { FileEntity, ProjectEntity, FunctionEntity, ExtractedEntities } from '../types';
+import type { FileEntity, ProjectEntity, FunctionEntity, ExtractedEntities, SyntaxNode } from '../types';
 import { initParser, parseFile, parseFiles } from './parser';
 import { extractAllEntities, extractCalls, extractRenders, extractInheritance } from './extractors';
 import { calculateComplexity } from './analysis';
 import { createClient, createOperations, type GraphOperations, type ParsedFileEntities } from '../graph';
 import * as pythonPlugin from '../plugins/python';
 import * as csharpPlugin from '../plugins/csharp';
+
+/**
+ * Cast tree-sitter's Parser.SyntaxNode to our structural SyntaxNode interface.
+ * Both types are structurally compatible but nominally different.
+ */
+function asSyntaxNode(node: Parser.SyntaxNode): SyntaxNode {
+  return node as unknown as SyntaxNode;
+}
 
 const logger = createLogger('@agent/brain:parseProject');
 
@@ -105,10 +113,10 @@ async function createFileEntity(filePath: string): Promise<FileEntity> {
 function extractEntitiesForFile(rootNode: Parser.SyntaxNode, filePath: string): ExtractedEntities {
   if (isPythonFile(filePath)) {
     return {
-      functions: pythonPlugin.extractFunctions(rootNode as unknown as import('../types').SyntaxNode, filePath),
-      classes: pythonPlugin.extractClasses(rootNode as unknown as import('../types').SyntaxNode, filePath),
-      variables: pythonPlugin.extractVariables(rootNode as unknown as import('../types').SyntaxNode, filePath),
-      imports: pythonPlugin.extractImports(rootNode as unknown as import('../types').SyntaxNode, filePath),
+      functions: pythonPlugin.extractFunctions(asSyntaxNode(rootNode), filePath),
+      classes: pythonPlugin.extractClasses(asSyntaxNode(rootNode), filePath),
+      variables: pythonPlugin.extractVariables(asSyntaxNode(rootNode), filePath),
+      imports: pythonPlugin.extractImports(asSyntaxNode(rootNode), filePath),
       interfaces: [],
       types: [],
       components: [],
@@ -117,12 +125,12 @@ function extractEntitiesForFile(rootNode: Parser.SyntaxNode, filePath: string): 
 
   if (isCSharpFile(filePath)) {
     return {
-      functions: csharpPlugin.extractFunctions(rootNode as unknown as import('../types').SyntaxNode, filePath),
-      classes: csharpPlugin.extractClasses(rootNode as unknown as import('../types').SyntaxNode, filePath),
-      interfaces: csharpPlugin.extractInterfaces(rootNode as unknown as import('../types').SyntaxNode, filePath),
-      variables: csharpPlugin.extractVariables(rootNode as unknown as import('../types').SyntaxNode, filePath),
-      imports: csharpPlugin.extractImports(rootNode as unknown as import('../types').SyntaxNode, filePath),
-      types: csharpPlugin.extractTypes(rootNode as unknown as import('../types').SyntaxNode, filePath),
+      functions: csharpPlugin.extractFunctions(asSyntaxNode(rootNode), filePath),
+      classes: csharpPlugin.extractClasses(asSyntaxNode(rootNode), filePath),
+      interfaces: csharpPlugin.extractInterfaces(asSyntaxNode(rootNode), filePath),
+      variables: csharpPlugin.extractVariables(asSyntaxNode(rootNode), filePath),
+      imports: csharpPlugin.extractImports(asSyntaxNode(rootNode), filePath),
+      types: csharpPlugin.extractTypes(asSyntaxNode(rootNode), filePath),
       components: [],
     };
   }
@@ -213,9 +221,9 @@ function buildParsedFileEntities(
   let extendsEdges: { childId: string; parentId: string }[] = [];
   let implementsEdges: { classId: string; interfaceId: string }[] = [];
 
-  if (isPythonFile(file.path)) {
+  if (isPythonFile(file.path) && rootNode) {
     const inheritanceRefs = pythonPlugin.extractInheritance(
-      rootNode as unknown as import('../types').SyntaxNode,
+      asSyntaxNode(rootNode),
       file.path
     );
     for (const ref of inheritanceRefs) {
@@ -227,9 +235,9 @@ function buildParsedFileEntities(
         });
       }
     }
-  } else if (isCSharpFile(file.path)) {
+  } else if (isCSharpFile(file.path) && rootNode) {
     const inheritanceRefs = csharpPlugin.extractInheritance(
-      rootNode as unknown as import('../types').SyntaxNode,
+      asSyntaxNode(rootNode),
       file.path
     );
     for (const ref of inheritanceRefs) {
@@ -283,7 +291,7 @@ function buildParsedFileEntities(
   if (deepAnalysis && rootNode) {
     if (isPythonFile(file.path)) {
       const pythonCalls = pythonPlugin.extractCalls(
-        rootNode as unknown as import('../types').SyntaxNode,
+        asSyntaxNode(rootNode),
         file.path
       );
       callEdges = pythonCalls.map((call) => ({
@@ -293,7 +301,7 @@ function buildParsedFileEntities(
       }));
     } else if (isCSharpFile(file.path)) {
       const csharpCalls = csharpPlugin.extractCalls(
-        rootNode as unknown as import('../types').SyntaxNode,
+        asSyntaxNode(rootNode),
         file.path
       );
       callEdges = csharpCalls.map((call) => ({

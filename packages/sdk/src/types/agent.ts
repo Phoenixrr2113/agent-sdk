@@ -5,6 +5,11 @@
 
 import type { LanguageModel, Tool, StepResult, ToolSet } from 'ai';
 import type { SkillsConfig } from '../skills/types';
+import type { MemoryEngine } from '../memory/engine';
+import type { UsageLimits } from '../usage-limits';
+import type { ReflectionConfig } from '../reflection';
+import type { ApprovalConfig } from '../tools/approval';
+import type { GuardrailsConfig } from '../guardrails/types';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Main AgentOptions Interface
@@ -34,8 +39,31 @@ export interface AgentOptions {
   /** Maximum number of tool execution steps. Default: 10 */
   maxSteps?: number;
 
+  /** Token and request caps. Throws UsageLimitExceeded when exceeded.
+   * @example
+   * ```typescript
+   * const agent = createAgent({
+   *   usageLimits: { maxRequests: 20, maxTotalTokens: 100_000 },
+   * });
+   * ```
+   */
+  usageLimits?: UsageLimits;
+
   /** Condition to stop agent execution. */
   stopWhen?: 'task_complete' | 'max_steps' | StopFunction;
+
+  /** Reflection strategy injected between tool steps.
+   * 'reflact' injects goal-state reflection after every step.
+   * 'periodic' injects reflection every N steps (configurable via frequency).
+   * 'none' preserves default behavior (no reflection).
+   * @example
+   * ```typescript
+   * const agent = createAgent({
+   *   reflection: { strategy: 'reflact' },
+   * });
+   * ```
+   */
+  reflection?: ReflectionConfig;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Model
@@ -65,6 +93,40 @@ export interface AgentOptions {
 
   /** Specific tools to disable (blacklist). Removed from preset/custom tools. */
   disableTools?: string[];
+
+  /** Maximum retries per tool when a ModelRetry error is thrown. Default: 3 */
+  maxToolRetries?: number;
+
+  /** Require human approval before executing dangerous tools.
+   * `true` enables approval for default dangerous tools (shell, browser, file_write, file_edit).
+   * Provide an ApprovalConfig object for fine-grained control.
+   * @example
+   * ```typescript
+   * const agent = createAgent({
+   *   approval: true, // enable for default dangerous tools
+   * });
+   * // or
+   * const agent = createAgent({
+   *   approval: { enabled: true, tools: ['shell'], timeout: 30000 },
+   * });
+   * ```
+   */
+  approval?: boolean | ApprovalConfig;
+
+  /** Guardrails for input/output validation.
+   * Input guardrails run before the agent; output guardrails run after.
+   * Both phases execute their guardrails in parallel with fast-fail.
+   * @example
+   * ```typescript
+   * const agent = createAgent({
+   *   guardrails: {
+   *     output: [contentFilter(), lengthLimit({ maxChars: 5000 })],
+   *     onBlock: 'retry',
+   *   },
+   * });
+   * ```
+   */
+  guardrails?: GuardrailsConfig;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Sub-Agents
@@ -100,6 +162,16 @@ export interface AgentOptions {
   // Memory
   // ─────────────────────────────────────────────────────────────────────────────
 
+  /** Unified memory engine (preferred). Provides remember, recall, forget, query_knowledge tools.
+   * When provided, automatically injects memory tools into the agent.
+   * @example
+   * ```typescript
+   * const engine = createMemoryEngine({ vectorStore, graphStore, extractionModel });
+   * const agent = createAgent({ memoryEngine: engine });
+   * ```
+   */
+  memoryEngine?: MemoryEngine;
+
   /** Enable vector memory for the agent. Default: false */
   enableMemory?: boolean;
 
@@ -122,18 +194,10 @@ export interface AgentOptions {
   skills?: SkillsConfig;
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // Brain (Knowledge Graph + Memory)
+  // Brain (Knowledge Graph + Memory) — DEPRECATED
   // ─────────────────────────────────────────────────────────────────────────────
 
-  /** Brain instance for knowledge graph and persistent memory.
-   * When provided, automatically injects queryKnowledge, remember, recall, extractEntities tools.
-   * @example
-   * ```typescript
-   * import { createBrain } from '@agent/brain';
-   * const brain = await createBrain({ graph: { host: 'localhost' } });
-   * const agent = createAgent({ brain });
-   * ```
-   */
+  /** @deprecated Use `memoryEngine` instead. Brain instance for knowledge graph and persistent memory. */
   brain?: BrainInstance;
 
   // ─────────────────────────────────────────────────────────────────────────────

@@ -136,7 +136,7 @@ export class AgentWebSocketClient {
       try {
         const data = JSON.parse(event.data) as StreamEvent;
         this.dispatch(data, callbacks);
-      } catch (e) {
+      } catch (_err: unknown) {
         callbacks.onError?.('Failed to parse message');
       }
     };

@@ -19,6 +19,12 @@ export { createOperations, type GraphOperations, type EpisodeRow } from './opera
 // Query exports
 export { createQueries, type GraphQueries } from './queries';
 
+// QueryPort (backend abstraction)
+export { type QueryPort } from './ports';
+
+// Graphology in-process backend
+export { GraphologyAdapter } from './graphology';
+
 // File tree exports
 export { buildFileTree, getIndexSummary, type FileTreeOptions } from './fileTree';
 

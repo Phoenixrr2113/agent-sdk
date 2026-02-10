@@ -1,18 +1,14 @@
 // Tool exports
-export { 
-  createPlanTool, 
-  planTool, 
-  validationTool, 
-  executePlan,
-  executeValidation,
-  toolGroups,
+export {
+  createPlanTool,
+  createValidationTool,
 } from './tools';
 
 // Utility exports
 export { runTypeCheck, runTestCommand } from './utils';
 
 // Type exports
-export type { 
+export type {
   Plan,
   PlanStep,
   PlanToolConfig,

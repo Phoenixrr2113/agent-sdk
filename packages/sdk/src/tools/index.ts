@@ -92,11 +92,7 @@ export {
 // Plan Tool
 export {
   createPlanTool,
-  planTool,
-  validationTool,
-  executePlan,
-  executeValidation,
-  toolGroups,
+  createValidationTool,
   runTypeCheck,
   runTestCommand,
   MAX_PLAN_STEPS,
@@ -117,7 +113,7 @@ export {
 // Deep Reasoning Tool
 export {
   createDeepReasoningTool,
-  deepReasoningTool,
+  createSequentialThinkingTool,
   DeepReasoningEngine,
   configureDeepReasoning,
   isDeepReasoningEnabled,
@@ -133,8 +129,24 @@ export {
   type DeepReasoningInput,
 } from './deep-reasoning';
 
+// File Tools
+export {
+  createFileReadTool,
+  createFileWriteTool,
+  createFileEditTool,
+  createFileCreateTool,
+  createFileTools,
+} from './file';
+
 // Spawn Agent Tool
 export { createSpawnAgentTool } from './spawn-agent';
+
+// Model Retry
+export {
+  ModelRetry,
+  wrapToolWithRetry,
+  wrapAllToolsWithRetry,
+} from './model-retry';
 
 // Browser Tool
 export {

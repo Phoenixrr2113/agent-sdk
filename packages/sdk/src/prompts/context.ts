@@ -4,6 +4,7 @@
  */
 
 import { createLogger } from '@agent/logger';
+import { GEOLOCATION_API_URL, GEOLOCATION_ENABLED_DEFAULT } from '../constants';
 import type { MemoryStore } from '../memory/vectra-store';
 
 const log = createLogger('@agent/sdk:context');
@@ -104,8 +105,7 @@ function getLocale(): string {
 
 async function fetchUserLocation(): Promise<UserLocation | undefined> {
   try {
-    // Use ip-api.com (free, no API key required)
-    const response = await fetch('http://ip-api.com/json/?fields=city,regionName,country,countryCode,timezone');
+    const response = await fetch(GEOLOCATION_API_URL);
     if (!response.ok) return undefined;
     
     const data = await response.json() as {
@@ -266,7 +266,7 @@ export async function buildSystemContext(options: ContextOptions = {}): Promise<
     includeWorkspaceMap = false,
     userLocation,
     userPreferences,
-    fetchLocation = false,
+    fetchLocation = GEOLOCATION_ENABLED_DEFAULT,
     memoryStore,
     autoLoadPreferences = false,
     preferenceTags,

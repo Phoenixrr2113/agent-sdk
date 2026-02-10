@@ -10,11 +10,13 @@ export {
   type RoleConfig,
   type ModelTier,
   type Provider,
+  type CustomProvider,
   AgentConfigSchema,
   PartialAgentConfigSchema,
   ModelsConfigSchema,
   ModelTierSchema,
   ProviderSchema,
+  CustomProviderSchema,
 } from './schema';
 
 export {

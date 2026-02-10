@@ -113,7 +113,7 @@ class GraphClientImpl implements GraphClient {
       const queryOptions = options?.params 
         ? { params: options.params, TIMEOUT: options.timeout }
         : options?.timeout ? { TIMEOUT: options.timeout } : undefined;
-      const result = await this.graph.query<T>(cypher, queryOptions as unknown as FalkorQueryOptions);
+      const result = await this.graph.query<T>(cypher, queryOptions as FalkorQueryOptions /* FalkorDB internal type mismatch */);
       return {
         data: result.data ?? [],
         metadata: result.metadata ?? [],
@@ -132,7 +132,7 @@ class GraphClientImpl implements GraphClient {
       const queryOptions = options?.params 
         ? { params: options.params, TIMEOUT: options.timeout }
         : options?.timeout ? { TIMEOUT: options.timeout } : undefined;
-      const result = await this.graph.roQuery<T>(cypher, queryOptions as unknown as FalkorQueryOptions);
+      const result = await this.graph.roQuery<T>(cypher, queryOptions as FalkorQueryOptions /* FalkorDB internal type mismatch */);
       return {
         data: result.data ?? [],
         metadata: result.metadata ?? [],

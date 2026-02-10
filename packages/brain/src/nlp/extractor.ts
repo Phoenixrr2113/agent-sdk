@@ -112,21 +112,24 @@ export type ExtractorConfig = {
   model: string | undefined;
   temperature: number | undefined;
   languageModel: LanguageModel | undefined;
+  /** Max retries on parse failure (default: 2) */
+  maxRetries?: number;
 };
 
 const DEFAULT_MODEL = 'google/gemini-2.0-flash-001';
 
 export class EntityExtractor {
-  private config: { model: string; temperature: number };
+  private config: { model: string; temperature: number; maxRetries: number };
   private model: LanguageModel;
 
   constructor(config: Partial<ExtractorConfig> = {}) {
     this.config = {
       model: config.model ?? DEFAULT_MODEL,
       temperature: config.temperature ?? 0.1,
+      maxRetries: config.maxRetries ?? 2,
     };
     this.model =
-      config.languageModel ?? (getOpenRouter().chat(this.config.model) as unknown as LanguageModel);
+      config.languageModel ?? (getOpenRouter().chat(this.config.model) as LanguageModel); // Provider type mismatch — safe cast
     logger.debug(`EntityExtractor created with model: ${this.config.model}`);
   }
 
@@ -134,30 +137,43 @@ export class EntityExtractor {
     logger.debug(`extract: sample=${sample.id}`);
 
     const prompt = this.buildPrompt(sample.text);
+    let lastError: unknown;
 
-    try {
-      const { text } = await generateText({
-        model: this.model,
-        prompt,
-        temperature: this.config.temperature,
-      });
+    for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
+      try {
+        const { text } = await generateText({
+          model: this.model,
+          prompt,
+          temperature: this.config.temperature,
+        });
 
-      logger.debug(`LLM response: ${text.slice(0, 500)}`);
+        logger.debug(`LLM response (attempt ${attempt + 1}): ${text.slice(0, 500)}`);
 
-      const { entities, relationships } = this.parseResponse(text, sample.text);
+        const { entities, relationships } = this.parseResponse(text, sample.text);
 
-      return {
-        ...sample,
-        entities,
-        relationships,
-        annotatedBy: 'auto',
-        annotatedAt: new Date().toISOString(),
-        modelVersion: this.config.model,
-      };
-    } catch (error) {
-      logger.error('extract failed', { error: String(error) });
-      throw error;
+        // If parse returned empty on first attempt and we have retries left, retry
+        if (entities.length === 0 && relationships.length === 0 && attempt < this.config.maxRetries) {
+          logger.warn(`Empty extraction on attempt ${attempt + 1}, retrying`);
+          continue;
+        }
+
+        return {
+          ...sample,
+          entities,
+          relationships,
+          annotatedBy: 'auto',
+          annotatedAt: new Date().toISOString(),
+          modelVersion: this.config.model,
+        };
+      } catch (error) {
+        lastError = error;
+        logger.warn(`extract attempt ${attempt + 1} failed`, { error: String(error) });
+        if (attempt < this.config.maxRetries) continue;
+      }
     }
+
+    logger.error('extract failed after retries', { error: String(lastError) });
+    throw lastError;
   }
 
   async extractBatch(samples: Sample[]): Promise<AnnotatedSample[]> {
@@ -281,7 +297,7 @@ Respond with valid JSON only, no explanation.`;
             end: start + e.text.length,
             text: e.text,
             type: e.type as EntityType,
-            confidence: 0.9,
+            confidence: computeEntityConfidence(e.text, sampleText),
           };
         })
         .filter((e): e is EntityAnnotation => e !== null);
@@ -300,7 +316,7 @@ Respond with valid JSON only, no explanation.`;
             headEntityId: head.id,
             tailEntityId: tail.id,
             type: r.type as RelationshipType,
-            confidence: 0.9,
+            confidence: Math.min(head.confidence, tail.confidence),
           };
         })
         .filter((r): r is RelationshipAnnotation => r !== null);
@@ -355,6 +371,36 @@ Respond with valid JSON only, no explanation.`;
       return [];
     }
   }
+}
+
+/**
+ * Compute confidence for an extracted entity based on quality heuristics.
+ * - Exact text match in source: high confidence
+ * - Longer entity text: slightly higher confidence (less ambiguous)
+ * - Very short entities (1-2 chars): penalized
+ */
+function computeEntityConfidence(entityText: string, sourceText: string): number {
+  let confidence = 0.8; // base
+
+  // Exact match bonus
+  if (sourceText.includes(entityText)) {
+    confidence += 0.1;
+  }
+
+  // Length-based: longer entities tend to be more precise
+  if (entityText.length >= 5) {
+    confidence += 0.05;
+  } else if (entityText.length <= 2) {
+    confidence -= 0.2;
+  }
+
+  // Multiple occurrences in source text increase confidence
+  const occurrences = sourceText.split(entityText).length - 1;
+  if (occurrences > 1) {
+    confidence += 0.05;
+  }
+
+  return Math.max(0.1, Math.min(1.0, confidence));
 }
 
 export { ENTITY_TYPES, RELATIONSHIP_TYPES, VALID_ENTITY_TYPES, VALID_RELATIONSHIP_TYPES };

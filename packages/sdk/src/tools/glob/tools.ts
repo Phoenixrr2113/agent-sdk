@@ -74,9 +74,9 @@ export const globTool = tool({
         count: result.totalFiles,
         truncated: result.truncated,
       });
-    } catch (e) {
-      log.error('glob failed', { pattern: args.pattern, error: e });
-      return error(e instanceof Error ? e.message : String(e));
+    } catch (err: unknown) {
+      log.error('glob failed', { pattern: args.pattern, error: err });
+      return error(err instanceof Error ? err.message : String(err));
     }
   },
 });

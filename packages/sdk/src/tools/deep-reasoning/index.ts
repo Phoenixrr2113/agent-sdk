@@ -1,5 +1,5 @@
 // Tool exports
-export { createDeepReasoningTool, deepReasoningTool } from './tools';
+export { createDeepReasoningTool, createSequentialThinkingTool } from './tools';
 
 // Engine exports
 export {

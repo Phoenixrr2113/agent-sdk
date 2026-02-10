@@ -35,34 +35,50 @@
   },
   "dependencies": {
     "@agent/logger": "workspace:*",
-    "falkordb": "^6.4.1",
-    "ai": "6.0.77",
     "@openrouter/ai-sdk-provider": "^1.5.4",
-    "zod": "^3.24.1",
-    "fast-glob": "^3.3.2"
+    "ai": "6.0.77",
+    "falkordb": "^6.4.1",
+    "fast-glob": "^3.3.2",
+    "graphology": "^0.26.0",
+    "graphology-traversal": "^0.3.1",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@agent/config-typescript": "workspace:*",
-    "typescript": "^5.7.3",
-    "vitest": "^1.6.1",
     "@types/node": "^20.17.19",
     "tree-sitter": "^0.22.4",
-    "tree-sitter-typescript": "^0.23.2",
+    "tree-sitter-c-sharp": "^0.23.1",
     "tree-sitter-python": "^0.23.6",
-    "tree-sitter-c-sharp": "^0.23.1"
+    "tree-sitter-typescript": "^0.23.2",
+    "typescript": "^5.7.3",
+    "vitest": "^1.6.1"
   },
   "peerDependencies": {
     "tree-sitter": "^0.22.4",
-    "tree-sitter-typescript": "^0.23.2",
+    "tree-sitter-c-sharp": "^0.23.1",
     "tree-sitter-python": "^0.23.6",
-    "tree-sitter-c-sharp": "^0.23.1"
+    "tree-sitter-typescript": "^0.23.2"
   },
   "peerDependenciesMeta": {
-    "tree-sitter": { "optional": true },
-    "tree-sitter-typescript": { "optional": true },
-    "tree-sitter-python": { "optional": true },
-    "tree-sitter-c-sharp": { "optional": true }
+    "tree-sitter": {
+      "optional": true
+    },
+    "tree-sitter-typescript": {
+      "optional": true
+    },
+    "tree-sitter-python": {
+      "optional": true
+    },
+    "tree-sitter-c-sharp": {
+      "optional": true
+    }
   },
-  "keywords": ["ai", "agent", "knowledge-graph", "memory", "nlp"],
+  "keywords": [
+    "ai",
+    "agent",
+    "knowledge-graph",
+    "memory",
+    "nlp"
+  ],
   "license": "MIT"
 }

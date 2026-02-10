@@ -3,10 +3,11 @@
  * Tool for spawning sub-agents with streaming output
  */
 
-import { generateId } from 'ai';
+import { generateId, generateText } from 'ai';
 import { z } from 'zod';
 
 import { getSubAgentConfig, subAgentRoles } from '../../presets/sub-agent-configs';
+import { resolveModel } from '../../models';
 
 export interface SpawnAgentOptions {
   /**
@@ -177,10 +178,8 @@ async function executeSpawnAgent(
       });
     }
 
-    // Return summary to parent context (not full output)
-    const summary = result.length > 500 
-      ? `${result.slice(0, 500)}...` 
-      : result;
+    // Extract semantic summary using LLM instead of blind truncation
+    const summary = await extractSummary(result, role, task);
 
     return {
       success: true,
@@ -213,8 +212,36 @@ async function executeSpawnAgent(
 }
 
 /**
+ * Extract a semantic summary from sub-agent output using a fast model.
+ * Falls back to first 500 chars if the summarization call fails.
+ */
+async function extractSummary(
+  fullOutput: string,
+  role: string,
+  originalTask: string,
+): Promise<string> {
+  // Short outputs don't need summarization
+  if (fullOutput.length <= 500) {
+    return fullOutput;
+  }
+
+  try {
+    const { text } = await generateText({
+      model: resolveModel({ tier: 'fast' }),
+      system: `You are summarizing the output of a sub-agent (role: ${role}). Write a clear, actionable summary that captures the key findings, decisions, and results. Be concise but preserve critical details.`,
+      prompt: `Original task: ${originalTask}\n\nSub-agent output:\n${fullOutput}`,
+      maxRetries: 1,
+    });
+    return text;
+  } catch (_e: unknown) {
+    // Fallback: return the beginning of the output if summarization fails
+    return `${fullOutput.slice(0, 500)}...\n[Summary extraction failed, showing first 500 chars]`;
+  }
+}
+
+/**
  * Creates a spawn agent tool definition for use with AI SDK
- * 
+ *
  * @param options - Spawn options including depth limits, agent factory, and stream callback
  * @returns Tool definition object compatible with AI SDK
  */

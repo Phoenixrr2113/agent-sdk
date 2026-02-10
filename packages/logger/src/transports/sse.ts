@@ -60,12 +60,12 @@ export function createSSETransport(options: SSETransportOptions = {}): SSETransp
       for (const client of clients) {
         try {
           client.write(sseData);
-        } catch {
+        } catch (_e: unknown) {
           clients.delete(client);
         }
       }
     },
-    
+
     addClient(client: SSEClient): void {
       clients.add(client);
       
@@ -74,7 +74,7 @@ export function createSSETransport(options: SSETransportOptions = {}): SSETransp
         for (const entry of buffer) {
           try {
             client.write(formatSSE(entry));
-          } catch {
+          } catch (_e: unknown) {
             clients.delete(client);
             break;
           }

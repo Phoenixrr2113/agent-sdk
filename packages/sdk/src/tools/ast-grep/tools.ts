@@ -90,8 +90,8 @@ export const astGrepSearchTool = tool({
         totalMatches: result.totalMatches,
         truncated: result.truncated,
       });
-    } catch (e) {
-      return error(e instanceof Error ? e.message : String(e));
+    } catch (err: unknown) {
+      return error(err instanceof Error ? err.message : String(err));
     }
   },
 });
@@ -144,8 +144,8 @@ export const astGrepReplaceTool = tool({
         totalMatches: result.totalMatches,
         applied: args.dryRun === false,
       });
-    } catch (e) {
-      return error(e instanceof Error ? e.message : String(e));
+    } catch (err: unknown) {
+      return error(err instanceof Error ? err.message : String(err));
     }
   },
 });

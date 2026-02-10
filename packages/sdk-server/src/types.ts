@@ -40,6 +40,9 @@ export interface AgentServerOptions {
   /** WebSocket upgrade function (injected by server factory). */
   upgradeWebSocket?: UpgradeWebSocketFn;
 
+  /** Max request body size in bytes (default: 1 MB) */
+  maxBodySize?: number;
+
   /** Browser stream configuration */
   browserStream?: {
     /** Enable browser viewport streaming (default: false) */

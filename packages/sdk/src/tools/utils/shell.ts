@@ -63,7 +63,7 @@ export async function executeCommand(
       setTimeout(() => {
         try {
           proc.kill('SIGKILL');
-        } catch {
+        } catch (_e: unknown) {
         }
       }, 5000);
     }, timeout);

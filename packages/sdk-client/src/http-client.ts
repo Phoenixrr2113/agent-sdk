@@ -144,8 +144,8 @@ export class AgentHttpClient {
             const event = JSON.parse(data) as StreamEvent;
             log.trace('Stream event', { type: event.type, eventId: currentEventId });
             yield event;
-          } catch {
-            log.warn('Failed to parse SSE data', { data });
+          } catch (e: unknown) {
+            log.warn('Failed to parse SSE data', { data, error: e });
           }
         }
       }
@@ -156,7 +156,7 @@ export class AgentHttpClient {
         if (data && data !== '[DONE]') {
           try {
             yield JSON.parse(data) as StreamEvent;
-          } catch {
+          } catch (_e: unknown) {
             // Ignore parse errors on final chunk
           }
         }

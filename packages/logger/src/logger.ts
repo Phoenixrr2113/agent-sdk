@@ -135,7 +135,7 @@ export function createLogger(namespace: string, options: LoggerOptions = {}): Lo
         for (const transport of config.transports) {
           try {
             transport.write(entry);
-          } catch {
+          } catch (_e: unknown) {
             // Ignore transport errors
           }
         }

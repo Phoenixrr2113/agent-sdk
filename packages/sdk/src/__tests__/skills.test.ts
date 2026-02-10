@@ -13,8 +13,11 @@ import {
   loadSkills,
   loadSkillsFromPaths,
   buildSkillsSystemPrompt,
+  searchSkills,
+  filterEligibleSkills,
+  isSkillEligible,
 } from '../skills/loader';
-import type { SkillContent } from '../skills/types';
+import type { SkillContent, SkillMeta } from '../skills/types';
 
 // ============================================================================
 // Test Fixtures
@@ -278,5 +281,298 @@ describe('buildSkillsSystemPrompt', () => {
     expect(prompt).toContain('### a');
     expect(prompt).toContain('### b');
     expect(prompt).toContain('2 skill(s) available');
+  });
+});
+
+// ============================================================================
+// Expanded Frontmatter Fields
+// ============================================================================
+
+describe('expanded frontmatter fields', () => {
+  it('should parse tags', () => {
+    const content = `---
+name: deploy
+tags: [devops, ci, docker]
+---
+Deploy instructions.`;
+    const parsed = parseSkillFrontmatter(content);
+    expect(parsed.tags).toEqual(['devops', 'ci', 'docker']);
+  });
+
+  it('should parse when_to_use', () => {
+    const content = `---
+name: review
+when_to_use: When the user asks for a code review or PR review
+---
+Review body.`;
+    const parsed = parseSkillFrontmatter(content);
+    expect(parsed.whenToUse).toBe('When the user asks for a code review or PR review');
+  });
+
+  it('should parse when-to-use (kebab-case)', () => {
+    const content = `---
+name: review
+when-to-use: When reviewing code
+---
+Body.`;
+    const parsed = parseSkillFrontmatter(content);
+    expect(parsed.whenToUse).toBe('When reviewing code');
+  });
+
+  it('should parse model tier', () => {
+    const content = `---
+name: complex-reasoning
+model: powerful
+---
+Body.`;
+    const parsed = parseSkillFrontmatter(content);
+    expect(parsed.model).toBe('powerful');
+  });
+
+  it('should ignore invalid model tier', () => {
+    const content = `---
+name: test
+model: mega-ultra
+---
+Body.`;
+    const parsed = parseSkillFrontmatter(content);
+    expect(parsed.model).toBeUndefined();
+  });
+
+  it('should parse max_steps', () => {
+    const content = `---
+name: deep-research
+max_steps: 50
+---
+Research body.`;
+    const parsed = parseSkillFrontmatter(content);
+    expect(parsed.maxSteps).toBe(50);
+  });
+
+  it('should parse max-steps (kebab-case)', () => {
+    const content = `---
+name: test
+max-steps: 25
+---
+Body.`;
+    const parsed = parseSkillFrontmatter(content);
+    expect(parsed.maxSteps).toBe(25);
+  });
+
+  it('should ignore invalid max_steps', () => {
+    const content = `---
+name: test
+max_steps: not-a-number
+---
+Body.`;
+    const parsed = parseSkillFrontmatter(content);
+    expect(parsed.maxSteps).toBeUndefined();
+  });
+
+  it('should parse requires-binaries', () => {
+    const content = `---
+name: docker-deploy
+requires-binaries: [docker, kubectl]
+---
+Deploy with Docker.`;
+    const parsed = parseSkillFrontmatter(content);
+    expect(parsed.requires?.binaries).toEqual(['docker', 'kubectl']);
+  });
+
+  it('should parse requires-env', () => {
+    const content = `---
+name: api-caller
+requires-env: [OPENAI_API_KEY, DATABASE_URL]
+---
+Call APIs.`;
+    const parsed = parseSkillFrontmatter(content);
+    expect(parsed.requires?.env).toEqual(['OPENAI_API_KEY', 'DATABASE_URL']);
+  });
+
+  it('should parse both requires-binaries and requires-env', () => {
+    const content = `---
+name: full
+requires-binaries: [git, node]
+requires-env: [API_KEY]
+---
+Body.`;
+    const parsed = parseSkillFrontmatter(content);
+    expect(parsed.requires?.binaries).toEqual(['git', 'node']);
+    expect(parsed.requires?.env).toEqual(['API_KEY']);
+  });
+
+  it('should parse all expanded fields together', () => {
+    const content = `---
+name: mega-skill
+description: Does everything
+tags: [multi, purpose]
+when_to_use: Always
+model: reasoning
+max_steps: 30
+requires-binaries: [node]
+requires-env: [TOKEN]
+license: MIT
+---
+Full skill content.`;
+    const parsed = parseSkillFrontmatter(content);
+    expect(parsed.name).toBe('mega-skill');
+    expect(parsed.description).toBe('Does everything');
+    expect(parsed.tags).toEqual(['multi', 'purpose']);
+    expect(parsed.whenToUse).toBe('Always');
+    expect(parsed.model).toBe('reasoning');
+    expect(parsed.maxSteps).toBe(30);
+    expect(parsed.requires?.binaries).toEqual(['node']);
+    expect(parsed.requires?.env).toEqual(['TOKEN']);
+    expect(parsed.license).toBe('MIT');
+  });
+});
+
+// ============================================================================
+// searchSkills
+// ============================================================================
+
+describe('searchSkills', () => {
+  const skills: SkillMeta[] = [
+    { name: 'code-review', description: 'Reviews code for quality and bugs', path: '', directory: '', tags: ['review', 'quality'], whenToUse: 'When asked to review a pull request' },
+    { name: 'docker-deploy', description: 'Deploy with Docker containers', path: '', directory: '', tags: ['devops', 'docker', 'deploy'] },
+    { name: 'api-testing', description: 'Test REST APIs', path: '', directory: '', tags: ['testing', 'api'] },
+    { name: 'refactoring', description: 'Refactor code for readability', path: '', directory: '', tags: ['code', 'quality'] },
+    { name: 'git-workflow', description: 'Git branching and merging', path: '', directory: '', tags: ['git', 'devops'] },
+  ];
+
+  it('should return empty for empty query', () => {
+    expect(searchSkills(skills, '')).toEqual([]);
+  });
+
+  it('should match by name', () => {
+    const results = searchSkills(skills, 'docker');
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].skill.name).toBe('docker-deploy');
+  });
+
+  it('should match by tag', () => {
+    const results = searchSkills(skills, 'devops');
+    expect(results.length).toBe(2); // docker-deploy and git-workflow
+    const names = results.map(r => r.skill.name);
+    expect(names).toContain('docker-deploy');
+    expect(names).toContain('git-workflow');
+  });
+
+  it('should match by description', () => {
+    const results = searchSkills(skills, 'REST');
+    expect(results.length).toBe(1);
+    expect(results[0].skill.name).toBe('api-testing');
+  });
+
+  it('should match by whenToUse', () => {
+    const results = searchSkills(skills, 'pull request');
+    expect(results.length).toBe(1);
+    expect(results[0].skill.name).toBe('code-review');
+  });
+
+  it('should rank results by relevance', () => {
+    // 'quality' appears in both code-review (tag) and refactoring (tag)
+    const results = searchSkills(skills, 'quality');
+    expect(results.length).toBe(2);
+    // Both have tag match, so both score equally
+    const names = results.map(r => r.skill.name);
+    expect(names).toContain('code-review');
+    expect(names).toContain('refactoring');
+  });
+
+  it('should respect limit', () => {
+    const results = searchSkills(skills, 'code', 1);
+    expect(results.length).toBe(1);
+  });
+
+  it('should return empty for no matches', () => {
+    const results = searchSkills(skills, 'quantum-computing');
+    expect(results).toEqual([]);
+  });
+});
+
+// ============================================================================
+// filterEligibleSkills / isSkillEligible
+// ============================================================================
+
+describe('filterEligibleSkills', () => {
+  it('should keep skills with no requirements', () => {
+    const skills: SkillMeta[] = [
+      { name: 'simple', description: 'No requirements', path: '', directory: '' },
+    ];
+    expect(filterEligibleSkills(skills)).toHaveLength(1);
+  });
+
+  it('should keep skills when binary exists on PATH', () => {
+    // 'node' should exist on PATH in test environment
+    const skills: SkillMeta[] = [
+      { name: 'needs-node', description: 'Needs node', path: '', directory: '', requires: { binaries: ['node'] } },
+    ];
+    const eligible = filterEligibleSkills(skills);
+    expect(eligible).toHaveLength(1);
+  });
+
+  it('should filter out skills with missing binary', () => {
+    const skills: SkillMeta[] = [
+      { name: 'needs-imaginary', description: 'Missing', path: '', directory: '', requires: { binaries: ['__nonexistent_binary_12345__'] } },
+    ];
+    const eligible = filterEligibleSkills(skills);
+    expect(eligible).toHaveLength(0);
+  });
+
+  it('should keep skills when env var exists', () => {
+    // Set a test env var
+    process.env.__SKILL_TEST_VAR__ = 'true';
+    try {
+      const skills: SkillMeta[] = [
+        { name: 'needs-env', description: 'Needs env', path: '', directory: '', requires: { env: ['__SKILL_TEST_VAR__'] } },
+      ];
+      expect(filterEligibleSkills(skills)).toHaveLength(1);
+    } finally {
+      delete process.env.__SKILL_TEST_VAR__;
+    }
+  });
+
+  it('should filter out skills with missing env var', () => {
+    const skills: SkillMeta[] = [
+      { name: 'needs-env', description: 'Missing', path: '', directory: '', requires: { env: ['__NONEXISTENT_ENV_VAR_12345__'] } },
+    ];
+    expect(filterEligibleSkills(skills)).toHaveLength(0);
+  });
+
+  it('should filter mixed requirements', () => {
+    process.env.__SKILL_TEST_VAR2__ = 'yes';
+    try {
+      const skills: SkillMeta[] = [
+        { name: 'all-good', description: 'Has everything', path: '', directory: '', requires: { binaries: ['node'], env: ['__SKILL_TEST_VAR2__'] } },
+        { name: 'missing-binary', description: 'Missing binary', path: '', directory: '', requires: { binaries: ['__fake__'] } },
+        { name: 'no-reqs', description: 'No requirements', path: '', directory: '' },
+      ];
+      const eligible = filterEligibleSkills(skills);
+      expect(eligible).toHaveLength(2);
+      expect(eligible.map(s => s.name).sort()).toEqual(['all-good', 'no-reqs']);
+    } finally {
+      delete process.env.__SKILL_TEST_VAR2__;
+    }
+  });
+});
+
+describe('isSkillEligible', () => {
+  it('should return true for skills with no requirements', () => {
+    expect(isSkillEligible({ name: 'test', description: '', path: '', directory: '' })).toBe(true);
+  });
+
+  it('should return false for missing binary', () => {
+    expect(isSkillEligible({
+      name: 'test', description: '', path: '', directory: '',
+      requires: { binaries: ['__definitely_not_installed__'] },
+    })).toBe(false);
+  });
+
+  it('should return false for missing env var', () => {
+    expect(isSkillEligible({
+      name: 'test', description: '', path: '', directory: '',
+      requires: { env: ['__NOT_SET_12345__'] },
+    })).toBe(false);
   });
 });

@@ -1,13 +1,14 @@
 /**
  * @agent/sdk - Memory Tools
- * 
- * AI SDK tools for memory operations (remember, recall, forget).
+ *
+ * Unified memory tools: remember, recall, forget, query_knowledge.
+ * Uses the unified MemoryEngine for LLM extraction + parallel writes.
  */
 
 import { tool } from 'ai';
-import type { Tool } from 'ai';
 import { z } from 'zod';
 import { createLogger } from '@agent/logger';
+import type { MemoryEngine } from './engine';
 import type { MemoryStore } from './vectra-store';
 
 const log = createLogger('@agent/sdk:memory');
@@ -17,12 +18,15 @@ const log = createLogger('@agent/sdk:memory');
 // ============================================================================
 
 export interface MemoryToolsOptions {
-  /** Memory store instance */
-  store: MemoryStore;
-  
+  /** Unified memory engine (preferred — supports extraction + graph) */
+  engine?: MemoryEngine;
+
+  /** Legacy: plain vector store (used when engine is not provided) */
+  store?: MemoryStore;
+
   /** Default number of results to return */
   defaultTopK?: number;
-  
+
   /** Default similarity threshold */
   defaultThreshold?: number;
 }
@@ -33,22 +37,27 @@ export interface MemoryToolsOptions {
 
 /**
  * Create memory tools for an agent.
- * 
+ *
  * @example
  * ```typescript
- * const memoryStore = await createMemoryStore({ path: './.memory' });
- * const memoryTools = createMemoryTools({ store: memoryStore });
- * 
- * const agent = createAgent({
- *   tools: memoryTools,
- * });
+ * // With unified engine (recommended)
+ * const engine = createMemoryEngine({ vectorStore, graphStore, extractionModel });
+ * const tools = createMemoryTools({ engine });
+ *
+ * // Legacy: with plain vector store
+ * const store = await createMemoryStore({ path: './.memory' });
+ * const tools = createMemoryTools({ store });
  * ```
  */
 export function createMemoryTools(options: MemoryToolsOptions) {
-  const { store, defaultTopK = 5, defaultThreshold = 0.7 } = options;
+  const { engine, store, defaultTopK = 5, defaultThreshold = 0.7 } = options;
+
+  if (!engine && !store) {
+    throw new Error('createMemoryTools requires either `engine` or `store`');
+  }
 
   const remember = tool({
-    description: `Store information in long-term memory for later recall.`,
+    description: `Store information in long-term memory. Extracts structured facts, detects contradictions, and writes to both semantic and structural stores.`,
     inputSchema: z.object({
       text: z.string().min(1).max(10000).describe('Information to remember'),
       tags: z.array(z.string()).optional().describe('Optional tags for categorization'),
@@ -58,10 +67,31 @@ export function createMemoryTools(options: MemoryToolsOptions) {
       log.debug('remember() called', { textLength: text.length, tags, importance });
       try {
         const done = log.time('remember');
-        const id = await store.remember(text, { tags, importance });
+
+        if (engine) {
+          const result = await engine.remember(text, { tags, importance });
+          done();
+          log.info('Memory stored (unified)', { id: result.id, facts: result.facts.length, operation: result.operation });
+          return JSON.stringify({
+            success: true,
+            id: result.id,
+            operation: result.operation,
+            factCount: result.facts.length,
+            networks: [...new Set(result.facts.map((f) => f.network))],
+            contradiction: result.contradiction
+              ? { id: result.contradiction.id, existingFact: result.contradiction.existingFact }
+              : undefined,
+            message: result.contradiction
+              ? `Memory stored (UPDATE — contradiction detected with existing fact)`
+              : `Memory stored (${result.facts.length} facts extracted)`,
+          });
+        }
+
+        // Legacy path: plain vector store
+        const id = await store!.remember(text, { tags, importance });
         done();
-        log.info('Memory stored', { id, textLength: text.length });
-        return JSON.stringify({ success: true, id, message: 'Memory stored' });
+        log.info('Memory stored (legacy)', { id });
+        return JSON.stringify({ success: true, id, operation: 'ADD', message: 'Memory stored' });
       } catch (error) {
         log.error('remember() failed', { error: error instanceof Error ? error.message : 'Unknown' });
         return JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Failed' });
@@ -70,7 +100,7 @@ export function createMemoryTools(options: MemoryToolsOptions) {
   });
 
   const recall = tool({
-    description: `Search long-term memory for relevant information.`,
+    description: `Search long-term memory for relevant information by semantic similarity.`,
     inputSchema: z.object({
       query: z.string().min(1).max(1000).describe('What to search for'),
       limit: z.number().min(1).max(20).optional().describe('Max results (default 5)'),
@@ -80,15 +110,18 @@ export function createMemoryTools(options: MemoryToolsOptions) {
       log.debug('recall() called', { query: query.slice(0, 50), limit, threshold });
       try {
         const done = log.time('recall');
-        const results = await store.recall(query, {
+        const recallOpts = {
           topK: limit ?? defaultTopK,
           threshold: threshold ?? defaultThreshold,
-        });
+        };
+        const results = engine
+          ? await engine.recall(query, recallOpts)
+          : await store!.recall(query, recallOpts);
         done();
         log.info('Memory recalled', { query: query.slice(0, 30), resultsCount: results.length });
         return JSON.stringify({
           success: true,
-          memories: results.map(r => ({
+          memories: results.map((r) => ({
             id: r.item.id,
             text: r.item.text,
             score: Math.round(r.score * 100) / 100,
@@ -112,7 +145,7 @@ export function createMemoryTools(options: MemoryToolsOptions) {
     execute: async ({ id }) => {
       log.debug('forget() called', { id });
       try {
-        const success = await store.forget(id);
+        const success = engine ? await engine.forget(id) : await store!.forget(id);
         log.info('Memory deleted', { id, success });
         return JSON.stringify({ success, message: success ? 'Memory deleted' : 'Not found' });
       } catch (error) {
@@ -122,11 +155,43 @@ export function createMemoryTools(options: MemoryToolsOptions) {
     },
   });
 
-  return { remember, recall, forget };
+  // Only expose query_knowledge when engine with graph store is available
+  const queryKnowledge = engine
+    ? tool({
+        description: `Query the knowledge graph for structural relationships and episodes. Use this for questions about entities, relationships, and past experiences rather than raw text similarity.`,
+        inputSchema: z.object({
+          query: z.string().min(1).max(1000).describe('What to search for in the knowledge graph'),
+          limit: z.number().min(1).max(50).optional().describe('Max results (default 10)'),
+        }),
+        execute: async ({ query, limit }) => {
+          log.debug('queryKnowledge() called', { query: query.slice(0, 50) });
+          try {
+            const results = await engine.queryKnowledge(query, limit ?? 10);
+            return JSON.stringify({
+              success: true,
+              results,
+              count: results.length,
+            });
+          } catch (error) {
+            log.error('queryKnowledge() failed', { error: error instanceof Error ? error.message : 'Unknown' });
+            return JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Failed' });
+          }
+        },
+      })
+    : undefined;
+
+  return {
+    remember,
+    recall,
+    forget,
+    ...(queryKnowledge ? { query_knowledge: queryKnowledge } : {}),
+  };
 }
 
 // ============================================================================
-// Convenience Export
+// Re-exports
 // ============================================================================
 
 export { createMemoryStore, type MemoryStore, type MemoryItem, type MemorySearchResult } from './vectra-store';
+export { createMemoryEngine, type MemoryEngine, type MemoryEngineConfig, type MemoryWriteResult } from './engine';
+export { type MemoryNetworkType, type MemoryOperation, type ExtractedFact, type ExtractionResult } from './extraction';

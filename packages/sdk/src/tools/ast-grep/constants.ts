@@ -71,7 +71,7 @@ export const DEFAULT_MAX_MATCHES = 500;
 function isValidBinary(filePath: string): boolean {
   try {
     return statSync(filePath).size > 10000;
-  } catch {
+  } catch (_e: unknown) {
     return false;
   }
 }
@@ -136,7 +136,7 @@ export function findSgCliPath(): string | null {
       cachedCliPath = sgPath;
       return sgPath;
     }
-  } catch {
+  } catch (_e: unknown) {
     // @ast-grep/cli not installed
   }
 
@@ -154,7 +154,7 @@ export function findSgCliPath(): string | null {
         cachedCliPath = binaryPath;
         return binaryPath;
       }
-    } catch {
+    } catch (_e: unknown) {
       // Platform-specific package not installed
     }
   }
@@ -182,7 +182,7 @@ export function findSgCliPath(): string | null {
         return path;
       }
     }
-  } catch {
+  } catch (_e: unknown) {
     // sg not in PATH
   }
 
@@ -247,9 +247,9 @@ export function checkEnvironment(): EnvironmentCheckResult {
   try {
     createRequire(import.meta.url)('@ast-grep/napi');
     result.napi.available = true;
-  } catch (e) {
+  } catch (err: unknown) {
     result.napi.available = false;
-    result.napi.error = `@ast-grep/napi not installed: ${e instanceof Error ? e.message : String(e)}`;
+    result.napi.error = `@ast-grep/napi not installed: ${err instanceof Error ? err.message : String(err)}`;
   }
 
   return result;

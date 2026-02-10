@@ -1,6 +1,6 @@
 /**
  * Entity Resolution Module
- * 
+ *
  * Handles deduplication of entities using fuzzy matching and alias detection.
  */
 
@@ -28,8 +28,8 @@ export class EntityResolver {
     return name
       .toLowerCase()
       .trim()
-      .replace(/\s+/g, ' ') // Collapse whitespace
-      .replace(/[^\w\s]/g, ''); // Remove punctuation
+      .replace(/\s+/g, ' ')
+      .replace(/[^\w\s]/g, '');
   }
 
   /**
@@ -38,7 +38,7 @@ export class EntityResolver {
   calculateSimilarity(s1: string, s2: string): number {
     const len1 = s1.length;
     const len2 = s2.length;
-    
+
     if (len1 === 0 || len2 === 0) return 0;
 
     const matchWindow = Math.floor(Math.max(len1, len2) / 2) - 1;
@@ -73,8 +73,9 @@ export class EntityResolver {
       }
     }
 
-    const jaro = ((matches / len1) + (matches / len2) + ((matches - transpositions / 2) / matches)) / 3;
-    
+    const jaro =
+      (matches / len1 + matches / len2 + (matches - transpositions / 2) / matches) / 3;
+
     // Winkler modification
     let prefix = 0;
     for (let i = 0; i < Math.min(len1, len2, 4); i++) {
@@ -82,44 +83,49 @@ export class EntityResolver {
       else break;
     }
 
-    return jaro + (prefix * 0.1 * (1 - jaro));
+    return jaro + prefix * 0.1 * (1 - jaro);
   }
 
   /**
-   * Find potentially duplicate entities in the graph
+   * Find potentially duplicate entities by checking existing aliases.
+   * Returns alias names that match above the similarity threshold.
    */
   async findDuplicates(entityName: string): Promise<string[]> {
     const normalized = this.normalize(entityName);
-    
-    // In a real implementation with a large graph, we wouldn't scan everything.
-    // We might rely on an index or vector search.
-    // For now, we'll query entities with similar normalized names if possible,
-    // or just fetch recent entities to check against.
-    
-    // Simplified: Find entities that 'contain' part of the name to reduce search space
-    // Then apply strict Jaro-Winkler locally
-    
-    // This part depends on what graph operations are available.
-    // Assuming we can get a list of entities (maybe by type or recent).
-    // Let's assume we are checking against a set of candidates provided or fetched.
-    
-    return []; // Placeholder until we wire up specific graph queries
+
+    // Query existing aliases for this entity to find close matches
+    const aliases = await this.operations.getEntityAliases(entityName);
+    const duplicates: string[] = [];
+
+    for (const alias of aliases) {
+      const aliasRecord = alias as { name?: string; properties?: { name?: string } };
+      const aliasName =
+        aliasRecord.name ?? aliasRecord.properties?.name;
+      if (!aliasName) continue;
+
+      const similarity = this.calculateSimilarity(normalized, this.normalize(aliasName));
+      if (similarity >= this.config.similarityThreshold) {
+        duplicates.push(aliasName);
+      }
+    }
+
+    return duplicates;
   }
 
   /**
-   * Resolve an entity name to its canonical form or create a new alias
+   * Resolve an entity name to its canonical form.
+   * If an alias exists that maps to a canonical entity, return that.
+   * Otherwise return the original name.
    */
-  async resolveEntity(name: string, type: string): Promise<string> {
-    // 1. Check if exact match exists
-    // 2. Check if alias exists
-    // 3. Find candidates with high similarity
-    // 4. If match > threshold, link as alias and return canonical
-    // 5. Else return original name
-    
-    // This logic requires graph read/write access.
-    // For this implementation plan, we are adding the logic class.
-    // Integration into `brain.ts` comes next.
-    
+  async resolveEntity(name: string): Promise<string> {
+    // Check if this name is a known alias
+    const canonical = await this.operations.findCanonicalEntity(name);
+    if (canonical.length > 0) {
+      const entity = canonical[0] as { name?: string; properties?: { name?: string } };
+      const resolved = entity.name ?? entity.properties?.name;
+      if (resolved) return resolved;
+    }
+
     return name;
   }
 }

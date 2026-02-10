@@ -221,58 +221,34 @@ export function createPlanTool(config: PlanToolConfig = {}) {
   });
 }
 
-export const planTool = createPlanTool();
+export function createValidationTool() {
+  return tool({
+    description: VALIDATION_DESCRIPTION,
+    inputSchema: validationInputSchema,
+    execute: async ({ checkTypes = true, runTests = false, filesChanged = [] }) => {
+      const results: ValidationResult[] = [];
+      let allPassed = true;
 
-export const validationTool = tool({
-  description: VALIDATION_DESCRIPTION,
-  inputSchema: validationInputSchema,
-  execute: async ({ checkTypes = true, runTests = false, filesChanged = [] }) => {
-    const results: ValidationResult[] = [];
-    let allPassed = true;
+      if (checkTypes) {
+        const typeCheck = await runTypeCheck();
+        if (!typeCheck.passed) allPassed = false;
+        results.push({ check: 'TypeScript type check', ...typeCheck });
+      }
 
-    if (checkTypes) {
-      const typeCheck = await runTypeCheck();
-      if (!typeCheck.passed) allPassed = false;
-      results.push({ check: 'TypeScript type check', ...typeCheck });
-    }
+      if (runTests) {
+        const testRun = await runTestCommand();
+        if (!testRun.passed) allPassed = false;
+        results.push({ check: 'Test suite', ...testRun });
+      }
 
-    if (runTests) {
-      const testRun = await runTestCommand();
-      if (!testRun.passed) allPassed = false;
-      results.push({ check: 'Test suite', ...testRun });
-    }
-
-    return success({
-      allPassed,
-      results,
-      filesChanged,
-      recommendation: allPassed
-        ? 'All checks passed. Safe to proceed.'
-        : 'Some checks failed. Fix errors before continuing.',
-    });
-  },
-});
-
-// Direct exports for testing
-export const executePlan = planTool.execute!;
-export const executeValidation = validationTool.execute!;
-
-export const toolGroups = {
-  planning: {
-    plan_tool: planTool,
-  },
-
-  implementation: {
-    plan_tool: planTool,
-    validation_tool: validationTool,
-  },
-
-  evaluation: {
-    validation_tool: validationTool,
-  },
-
-  all: {
-    plan_tool: planTool,
-    validation_tool: validationTool,
-  },
-};
+      return success({
+        allPassed,
+        results,
+        filesChanged,
+        recommendation: allPassed
+          ? 'All checks passed. Safe to proceed.'
+          : 'Some checks failed. Fix errors before continuing.',
+      });
+    },
+  });
+}

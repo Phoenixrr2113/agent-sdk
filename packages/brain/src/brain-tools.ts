@@ -1,12 +1,18 @@
 /**
  * @agent/brain - Brain Tools
- * Tools that agents can use to interact with the brain
+ *
+ * Tools that agents can use to interact with the brain.
+ * Shell tools have been consolidated into @agent/sdk.
  */
 
 import { tool } from 'ai';
 import { z } from 'zod';
 import type { Brain } from './brain';
-import { createShellTools, createCodeAnalysisTools } from './tools/index';
+import { createCodeAnalysisTools } from './tools/index';
+
+// ============================================================================
+// Schemas
+// ============================================================================
 
 const queryKnowledgeSchema = z.object({
   query: z.string().describe('Search term - function name, class name, concept, or keyword'),
@@ -32,14 +38,16 @@ const extractEntitiesSchema = z.object({
   source: z.string().optional().describe('Where this text came from (e.g., "user message", "document")'),
 });
 
-export function createBrainTools(brain: Brain) {
-  const shellTools = createShellTools();
-  const codeAnalysisTools = createCodeAnalysisTools({ client: brain.client });
+// ============================================================================
+// Knowledge Tools (queryKnowledge, remember, recall)
+// ============================================================================
 
+/**
+ * Create brain knowledge tools (queryKnowledge, remember, recall).
+ * These handle knowledge graph and memory operations.
+ */
+export function createBrainKnowledgeTools(brain: Brain) {
   return {
-    ...shellTools,
-    ...codeAnalysisTools,
-
     queryKnowledge: tool({
       description: `Search the knowledge graph for code entities (functions, classes, files) or facts.
 Use this to find information about the codebase or recalled facts.
@@ -97,6 +105,22 @@ Returns episodes with their content and extracted entities.`,
         });
       },
     }),
+  };
+}
+
+// ============================================================================
+// Analysis Tools (extractEntities, code analysis)
+// ============================================================================
+
+/**
+ * Create brain analysis tools (extractEntities + code analysis).
+ * These handle text analysis and code understanding.
+ */
+export function createBrainAnalysisTools(brain: Brain) {
+  const codeAnalysisTools = createCodeAnalysisTools({ client: brain.client });
+
+  return {
+    ...codeAnalysisTools,
 
     extractEntities: tool({
       description: `Extract entities and relationships from a piece of text.
@@ -130,4 +154,22 @@ Returns entities (people, projects, goals, problems, etc.) and their relationshi
   };
 }
 
+// ============================================================================
+// Combined (backwards-compatible)
+// ============================================================================
+
+/**
+ * Create all brain tools. Shell tools are now in @agent/sdk.
+ *
+ * @deprecated Use `createBrainKnowledgeTools` and `createBrainAnalysisTools` separately.
+ */
+export function createBrainTools(brain: Brain) {
+  return {
+    ...createBrainKnowledgeTools(brain),
+    ...createBrainAnalysisTools(brain),
+  };
+}
+
+export type BrainKnowledgeTools = ReturnType<typeof createBrainKnowledgeTools>;
+export type BrainAnalysisTools = ReturnType<typeof createBrainAnalysisTools>;
 export type BrainTools = ReturnType<typeof createBrainTools>;

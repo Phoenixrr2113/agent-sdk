@@ -5,18 +5,23 @@
  * Provides opinionated defaults for tools, roles, and streaming.
  */
 
-import { generateId, ToolLoopAgent, stepCountIs, tool } from 'ai';
+import { generateId, ToolLoopAgent, stepCountIs } from 'ai';
 import type { Tool, ToolSet } from 'ai';
-import { z } from 'zod';
 import { createLogger } from '@agent/logger';
-import type { AgentOptions, AgentRole, ToolPreset, BrainInstance } from './types/agent';
+import type { AgentOptions, AgentRole, ToolPreset } from './types/agent';
+import { createMemoryTools } from './memory/tools';
+import { usageLimitStop } from './usage-limits';
 import { resolveModel } from './models';
 import { getRole } from './presets/role-registry';
 import { createToolPreset, type ToolPresetLevel } from './presets/tools';
 import { createSpawnAgentTool } from './tools/spawn-agent';
+import { wrapAllToolsWithRetry } from './tools/model-retry';
 import { loadSkills, buildSkillsSystemPrompt } from './skills';
-import { createDurableAgent, checkWorkflowAvailability } from './workflow/durable-agent';
-import type { DurableAgent } from './workflow/durable-agent';
+import { checkWorkflowAvailability } from './workflow/durable-agent';
+import { wrapToolsAsDurable } from './workflow/durable-tool';
+import { createReflectionPrepareStep } from './reflection';
+import { applyApproval, resolveApprovalConfig } from './tools/approval';
+import { wrapWithGuardrails } from './guardrails/runner';
 
 // ============================================================================
 // Logger
@@ -83,74 +88,6 @@ function buildTools(options: AgentOptions, workspaceRoot: string): ToolSet {
   log.debug('Tools ready', { tools: Object.keys(allTools) });
 
   return allTools;
-}
-
-// ============================================================================
-// Brain Tools (inline to avoid hard dependency on @agent/brain)
-// ============================================================================
-
-function createBrainToolsFromInstance(brain: BrainInstance): ToolSet {
-  const querySchema = z.object({
-    query: z.string().describe('Search term'),
-    limit: z.number().optional().default(10).describe('Max results'),
-  });
-
-  const rememberSchema = z.object({
-    fact: z.string().describe('Fact to remember'),
-    context: z.record(z.unknown()).optional().describe('Optional context'),
-  });
-
-  const recallSchema = z.object({
-    query: z.string().describe('What to search for'),
-    limit: z.number().optional().default(5).describe('Max results'),
-  });
-
-  const extractSchema = z.object({
-    text: z.string().describe('Text to analyze'),
-    source: z.string().optional().describe('Source of the text'),
-  });
-
-  return {
-    queryKnowledge: tool({
-      description: 'Search the knowledge graph for code entities or facts',
-      inputSchema: querySchema,
-      execute: async ({ query, limit }) => {
-        const results = await brain.query(query, limit ?? 10);
-        return JSON.stringify({ found: results.length > 0, count: results.length, results });
-      },
-    }),
-
-    remember: tool({
-      description: 'Store a fact in memory for later recall',
-      inputSchema: rememberSchema,
-      execute: async ({ fact, context }) => {
-        await brain.remember(fact, context);
-        return JSON.stringify({ stored: true });
-      },
-    }),
-
-    recall: tool({
-      description: 'Retrieve past memories related to a query',
-      inputSchema: recallSchema,
-      execute: async ({ query, limit }) => {
-        const memories = await brain.recall(query, limit ?? 5);
-        return JSON.stringify({ found: memories.length > 0, count: memories.length, memories });
-      },
-    }),
-
-    extractEntities: tool({
-      description: 'Extract entities and relationships from text',
-      inputSchema: extractSchema,
-      execute: async ({ text, source }) => {
-        try {
-          const result = await brain.extract(text, source);
-          return JSON.stringify({ success: true, result });
-        } catch (error) {
-          return JSON.stringify({ success: false, error: String(error) });
-        }
-      },
-    }),
-  } as ToolSet;
 }
 
 // ============================================================================
@@ -257,13 +194,69 @@ export function createAgent(options: AgentOptions = {}): Agent {
     tools = { ...tools, spawn_agent: spawnTool };
   }
 
-  // Add brain tools if brain is provided
-  if (options.brain) {
-    log.debug('Adding brain tools');
-    
-    // Create brain tools inline (avoids importing @agent/brain as hard dependency)
-    const brainTools = createBrainToolsFromInstance(options.brain);
-    tools = { ...tools, ...brainTools };
+  // Add unified memory tools if memoryEngine is provided
+  if (options.memoryEngine) {
+    log.debug('Adding unified memory tools');
+    const memoryTools = createMemoryTools({ engine: options.memoryEngine });
+    tools = { ...tools, ...memoryTools } as ToolSet;
+  } else if (options.brain) {
+    log.warn('options.brain is deprecated — use options.memoryEngine instead');
+  }
+
+  // Apply approval to dangerous tools if configured
+  const approvalConfig = resolveApprovalConfig(options.approval);
+  if (approvalConfig?.enabled) {
+    log.debug('Applying tool approval', { tools: approvalConfig.tools ?? 'default dangerous set' });
+    tools = applyApproval(tools, approvalConfig);
+  }
+
+  // Wrap tools as durable steps if configured
+  if (options.durable) {
+    log.debug('Wrapping tools as durable steps', {
+      toolCount: Object.keys(tools).length,
+      workflowOptions: options.workflowOptions,
+    });
+    const durableConfig = {
+      retryCount: options.workflowOptions?.defaultRetryCount ?? 3,
+    };
+    tools = wrapToolsAsDurable(tools, durableConfig) as ToolSet;
+
+    // Eagerly check workflow availability
+    checkWorkflowAvailability().then((available) => {
+      if (!available) {
+        log.warn(
+          'Workflow package not installed. Durable tool wrapping is inert without the runtime. ' +
+          'Install with: npm install workflow',
+        );
+      }
+    }).catch(() => { /* swallow */ });
+  }
+
+  // Wrap tools with ModelRetry handling
+  const maxToolRetries = options.maxToolRetries;
+  if (maxToolRetries !== 0) {
+    tools = wrapAllToolsWithRetry(tools, maxToolRetries) as ToolSet;
+    log.debug('Tools wrapped with ModelRetry handling', { maxToolRetries: maxToolRetries ?? 3 });
+  }
+
+  // Build stop conditions
+  const stopConditions: Array<(opts: { steps: Array<import('ai').StepResult<ToolSet>> }) => PromiseLike<boolean> | boolean> = [
+    stepCountIs(maxSteps),
+  ];
+
+  if (options.usageLimits) {
+    log.debug('Usage limits configured', { limits: options.usageLimits });
+    stopConditions.push(usageLimitStop(options.usageLimits));
+  }
+
+  // Build reflection prepareStep if configured
+  const reflectionConfig = options.reflection;
+  const prepareStep = reflectionConfig && reflectionConfig.strategy !== 'none'
+    ? createReflectionPrepareStep(augmentedSystemPrompt, reflectionConfig)
+    : undefined;
+
+  if (prepareStep) {
+    log.debug('Reflection enabled', { strategy: reflectionConfig!.strategy });
   }
 
   // Create the ToolLoopAgent
@@ -276,7 +269,8 @@ export function createAgent(options: AgentOptions = {}): Agent {
     model,
     instructions: augmentedSystemPrompt,
     tools,
-    stopWhen: stepCountIs(maxSteps),
+    stopWhen: stopConditions,
+    ...(prepareStep ? { prepareStep } : {}),
   });
 
   // Create a child logger for this agent instance
@@ -373,35 +367,18 @@ export function createAgent(options: AgentOptions = {}): Agent {
     },
   };
 
-  // Wrap with durability if requested
-  if (options.durable) {
-    log.info('Durable mode requested — wrapping agent with workflow', { agentId });
-
-    // Eagerly verify workflow availability. Schedule the async check and attach
-    // a deferred throw: the DurableAgent is created, but its durable methods
-    // (`durableGenerate`, `withApproval`, `scheduled`) need the runtime.
-    // We fire the check immediately so subsequent calls see the cached result.
-    checkWorkflowAvailability().then(available => {
-      if (!available) {
-        log.error(
-          'Workflow package not installed. Durable features will not function. ' +
-          'Install with: npm install workflow'
-        );
-      }
-    }).catch(() => {
-      // Swallow — already logged in checkWorkflowAvailability
+  // Wrap with guardrails if configured
+  if (options.guardrails && (options.guardrails.input?.length || options.guardrails.output?.length)) {
+    log.debug('Applying guardrails', {
+      inputCount: options.guardrails.input?.length ?? 0,
+      outputCount: options.guardrails.output?.length ?? 0,
+      onBlock: options.guardrails.onBlock ?? 'throw',
     });
-
-    const durable = createDurableAgent(agent, {
-      ...options,
-      workflowOptions: options.workflowOptions,
-    });
-
-    log.info('Durable agent created', { agentId, role });
-    return durable;
+    const originalGenerate = agent.generate.bind(agent);
+    agent.generate = wrapWithGuardrails(originalGenerate, options.guardrails);
   }
 
-  log.info('Agent created', { agentId, role });
+  log.info('Agent created', { agentId, role, durable: !!options.durable });
 
   return agent;
 }

@@ -7,7 +7,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
 import { createLogger, getLogEmitter } from '@agent/logger';
-import { createLoggingMiddleware, createRateLimitMiddleware, createAuthMiddleware } from './middleware';
+import { createLoggingMiddleware, createRateLimitMiddleware, createAuthMiddleware, createBodyLimitMiddleware } from './middleware';
 import { ConcurrencyQueue, QueueFullError, QueueTimeoutError } from './queue';
 import { StreamEventBuffer } from './stream-buffer';
 import type { AgentServerOptions, DurableAgentInstance } from './types';
@@ -70,6 +70,7 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
 
   // Configure Middleware
   app.use('*', createLoggingMiddleware());
+  app.use('*', createBodyLimitMiddleware({ maxSize: serverOptions.maxBodySize }));
 
   // Rate limiter shared instance (avoids creating separate maps per route)
   const rateLimiter = createRateLimitMiddleware({ windowMs: 60000, max: 100 });

@@ -6,10 +6,13 @@
 import { createGlobTool } from '../tools/glob';
 import { createGrepTool } from '../tools/grep';
 import { createAstGrepTools } from '../tools/ast-grep';
-import { createShellTool } from '../tools/shell';
+import { createShellTool, createBackgroundTool } from '../tools/shell';
 import { createPlanTool, type PlanToolConfig } from '../tools/plan';
 import { createDeepReasoningTool } from '../tools/deep-reasoning';
 import { createBrowserTool } from '../tools/browser';
+import { createFileTools } from '../tools/file';
+import { createProgressTools } from '../tools/progress';
+import { createSearchSkillsTool } from '../tools/search-skills';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -94,7 +97,11 @@ function createStandardPreset(workspaceRoot: string, planConfig?: PlanToolConfig
   return {
     ...createGlobTool(),
     ...createGrepTool(),
+    ...createFileTools(workspaceRoot),
+    ...createProgressTools(workspaceRoot),
+    ...createSearchSkillsTool(),
     shell,
+    background: createBackgroundTool(),
     plan,
     deep_reasoning,
   };
@@ -129,13 +136,13 @@ export const toolPresets = {
   },
 
   standard: {
-    description: 'Glob, grep, shell, plan, deep_reasoning',
-    tools: ['glob', 'grep', 'shell', 'plan', 'deep_reasoning'],
+    description: 'Glob, grep, shell, background, file tools, progress tracking, search_skills, plan, deep_reasoning',
+    tools: ['glob', 'grep', 'shell', 'background', 'file_read', 'file_write', 'file_edit', 'file_create', 'progress_read', 'progress_update', 'search_skills', 'plan', 'deep_reasoning'],
   },
 
   full: {
     description: 'All standard tools plus AST-grep and browser automation',
-    tools: ['glob', 'grep', 'shell', 'plan', 'deep_reasoning', 'ast_grep_search', 'ast_grep_replace', 'browser'],
+    tools: ['glob', 'grep', 'shell', 'background', 'file_read', 'file_write', 'file_edit', 'file_create', 'progress_read', 'progress_update', 'search_skills', 'plan', 'deep_reasoning', 'ast_grep_search', 'ast_grep_replace', 'browser'],
   },
 } as const;
 

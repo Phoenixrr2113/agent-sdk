@@ -17,7 +17,7 @@ function getAstGrepVersion(): string {
     const require = createRequire(import.meta.url);
     const pkg = require('@ast-grep/cli/package.json') as { version: string };
     return pkg.version;
-  } catch {
+  } catch (_e: unknown) {
     return DEFAULT_VERSION;
   }
 }

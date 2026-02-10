@@ -11,6 +11,12 @@ import type { Episode, Experience, SearchResult, AnnotatedSample, Sample, Contra
 
 const logger = createLogger('@agent/brain');
 
+/** Default LLM model for entity extraction */
+const DEFAULT_EXTRACTION_MODEL = 'google/gemini-2.0-flash-001';
+
+/** Default max episodes to retain */
+const DEFAULT_MAX_EPISODES = 1000;
+
 export type BrainConfig = {
   graph?: {
     host?: string;
@@ -89,10 +95,10 @@ class BrainImpl implements Brain {
       graph: config.graph ?? {},
       extraction: {
         enabled: config.extraction?.enabled ?? true,
-        model: config.extraction?.model ?? 'google/gemini-2.0-flash-001',
+        model: config.extraction?.model ?? DEFAULT_EXTRACTION_MODEL,
       },
       memory: {
-        maxEpisodes: config.memory?.maxEpisodes ?? 1000,
+        maxEpisodes: config.memory?.maxEpisodes ?? DEFAULT_MAX_EPISODES,
         autoExtract: config.memory?.autoExtract ?? true,
       },
     };
@@ -207,7 +213,7 @@ class BrainImpl implements Brain {
   }
 
   async resolveEntity(name: string, type?: string): Promise<string> {
-    return this.resolver.resolveEntity(name, type ?? 'unknown');
+    return this.resolver.resolveEntity(name);
   }
 
   async detectContradictions(fact: string, metadata?: Record<string, unknown>): Promise<Contradiction | null> {

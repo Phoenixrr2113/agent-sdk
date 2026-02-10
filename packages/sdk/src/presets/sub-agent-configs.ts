@@ -17,7 +17,9 @@ export const subAgentConfigs: Record<string, SubAgentConfig> = {
 - Running tests to verify changes work
 
 Always read relevant code before making changes. Match the existing style.
-Be thorough but efficient. Don't over-engineer simple tasks.`,
+Be thorough but efficient. Don't over-engineer simple tasks.
+
+When you finish, write a clear summary of what you did: files changed, key decisions made, and any issues encountered.`,
     tools: ['glob', 'grep', 'shell', 'ast_grep_search'],
     model: 'anthropic/claude-opus-4.6',
   },
@@ -30,7 +32,9 @@ Be thorough but efficient. Don't over-engineer simple tasks.`,
 - Identifying key insights and patterns
 
 Be thorough but efficient. Focus on actionable information.
-Cite sources and provide confidence levels for findings.`,
+Cite sources and provide confidence levels for findings.
+
+When you finish, write a clear summary of your findings: key facts, sources, confidence levels, and recommendations.`,
     tools: ['web'],
     model: 'google/gemini-2.0-flash-001',
   },
@@ -43,7 +47,9 @@ Cite sources and provide confidence levels for findings.`,
 - Providing data-driven recommendations
 
 Be systematic and logical. Support conclusions with evidence.
-Present findings clearly with actionable insights.`,
+Present findings clearly with actionable insights.
+
+When you finish, write a clear summary of your analysis: key findings, trade-offs identified, and your recommendations.`,
     tools: ['glob', 'grep', 'reasoning'],
     model: 'anthropic/claude-opus-4.6',
   },
@@ -51,7 +57,9 @@ Present findings clearly with actionable insights.`,
   generic: {
     instructions: `You are a general-purpose assistant. Adapt your approach to the task at hand.
 Use tools fluidly as part of your reasoning process.
-Be autonomous but ask for clarification when genuinely uncertain.`,
+Be autonomous but ask for clarification when genuinely uncertain.
+
+When you finish, write a clear summary of what you accomplished and any important details.`,
     tools: ['glob', 'grep', 'shell', 'web'],
     model: 'anthropic/claude-opus-4.6',
   },

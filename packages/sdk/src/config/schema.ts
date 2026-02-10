@@ -14,6 +14,19 @@ export type ModelTier = z.infer<typeof ModelTierSchema>;
 export const ProviderSchema = z.enum(['openrouter', 'ollama', 'openai', 'anthropic']);
 export type Provider = z.infer<typeof ProviderSchema>;
 
+export const CustomProviderSchema = z.object({
+  /** Base URL for the provider's OpenAI-compatible API */
+  baseURL: z.string(),
+  /** Environment variable name containing the API key */
+  apiKeyEnv: z.string(),
+  /** Optional custom headers to include in requests */
+  headers: z.record(z.string(), z.string()).optional(),
+  /** Optional tier mappings for this provider */
+  tiers: z.record(z.string(), z.string()).optional(),
+});
+
+export type CustomProvider = z.infer<typeof CustomProviderSchema>;
+
 export const ModelsConfigSchema = z.object({
   /** Default provider when none specified */
   defaultProvider: ProviderSchema.optional(),
@@ -23,6 +36,9 @@ export const ModelsConfigSchema = z.object({
 
   /** Per-provider tier mappings */
   providers: z.record(z.string(), z.record(z.string(), z.string())).optional(),
+
+  /** Custom providers with baseURL and apiKeyEnv */
+  customProviders: z.record(z.string(), CustomProviderSchema).optional(),
 }).optional();
 
 export type ModelsConfig = z.infer<typeof ModelsConfigSchema>;

@@ -24,7 +24,7 @@ function findExecutable(name: string): string | null {
     if (result.status === 0 && result.stdout.trim()) {
       return result.stdout.trim().split('\n')[0]!;
     }
-  } catch {
+  } catch (_e: unknown) {
     // Command execution failed
   }
   return null;
@@ -114,7 +114,7 @@ export async function resolveGrepCliWithAutoInstall(): Promise<ResolvedCli> {
     const rgPath = await downloadAndInstallRipgrep();
     cachedCli = { path: rgPath, backend: 'rg' };
     return cachedCli;
-  } catch {
+  } catch (_e: unknown) {
     return current;
   }
 }

@@ -217,7 +217,7 @@ export function resetConfig(): void {
 /**
  * Get model name for a tier, respecting config overrides.
  */
-export function getModelForTier(tier: ModelTier, provider?: Provider): string {
+export function getModelForTier(tier: ModelTier, provider?: string): string {
   const config = getConfig();
   const effectiveProvider = provider ?? config.models?.defaultProvider ?? DEFAULT_PROVIDER;
 

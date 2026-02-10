@@ -36,7 +36,7 @@ function findFileRecursive(dir: string, filename: string): string | null {
         return join(entry.parentPath ?? dir, entry.name);
       }
     }
-  } catch {
+  } catch (_e: unknown) {
     return null;
   }
   return null;
@@ -178,7 +178,7 @@ export async function downloadAndInstallRipgrep(): Promise<string> {
     if (existsSync(archivePath)) {
       try {
         unlinkSync(archivePath);
-      } catch {
+      } catch (_e: unknown) {
         // Cleanup failures are non-critical
       }
     }

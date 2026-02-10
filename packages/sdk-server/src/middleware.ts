@@ -1,7 +1,11 @@
+import { timingSafeEqual } from 'node:crypto';
 import type { Context, Next } from 'hono';
 import { createLogger } from '@agent/logger';
 
 const log = createLogger('@agent/sdk-server:middleware');
+
+/** Default max request body size: 1 MB */
+const DEFAULT_MAX_BODY_SIZE = 1024 * 1024;
 
 export type RateLimitOptions = {
   windowMs: number;
@@ -12,6 +16,11 @@ export type RateLimitOptions = {
 export type AuthOptions = {
   apiKey?: string;
   headerName?: string;
+};
+
+export type BodyLimitOptions = {
+  /** Max body size in bytes. Default: 1 MB */
+  maxSize?: number;
 };
 
 /**
@@ -80,22 +89,50 @@ export function createRateLimitMiddleware(options: RateLimitOptions) {
 }
 
 /**
- * Create API key auth middleware
+ * Create API key auth middleware (timing-safe comparison)
  */
 export function createAuthMiddleware(options: AuthOptions) {
   const headerName = options.headerName || 'x-api-key';
-  
+
   return async (c: Context, next: Next) => {
     if (!options.apiKey) {
       return next();
     }
-    
+
     const apiKey = c.req.header(headerName);
-    
-    if (!apiKey || apiKey !== options.apiKey) {
+
+    if (!apiKey || !safeEqual(apiKey, options.apiKey)) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
-    
+
     return next();
   };
+}
+
+/**
+ * Create body size limit middleware
+ */
+export function createBodyLimitMiddleware(options: BodyLimitOptions = {}) {
+  const maxSize = options.maxSize ?? DEFAULT_MAX_BODY_SIZE;
+
+  return async (c: Context, next: Next) => {
+    const contentLength = c.req.header('content-length');
+    if (contentLength && parseInt(contentLength, 10) > maxSize) {
+      return c.json({ error: 'Request body too large' }, 413);
+    }
+    return next();
+  };
+}
+
+/**
+ * Timing-safe string comparison to prevent timing attacks on auth tokens.
+ */
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    // Compare against self to keep constant time regardless of length mismatch
+    const buf = Buffer.from(a);
+    timingSafeEqual(buf, buf);
+    return false;
+  }
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
 }

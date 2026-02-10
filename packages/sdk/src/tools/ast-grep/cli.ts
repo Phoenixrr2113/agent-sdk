@@ -158,7 +158,7 @@ export async function runSg(options: RunOptions): Promise<SgResult> {
       let matches: CliMatch[] = [];
       try {
         matches = JSON.parse(outputToProcess) as CliMatch[];
-      } catch {
+      } catch (_e: unknown) {
         if (outputTruncated) {
           try {
             const lastValidIndex = outputToProcess.lastIndexOf('}');
@@ -169,7 +169,7 @@ export async function runSg(options: RunOptions): Promise<SgResult> {
                 matches = JSON.parse(truncatedJson) as CliMatch[];
               }
             }
-          } catch {
+          } catch (_e: unknown) {
             resolve({
               matches: [],
               totalMatches: 0,
