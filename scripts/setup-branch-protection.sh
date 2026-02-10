@@ -51,7 +51,7 @@ gh api --method PUT repos/$REPO/branches/main/protection \
     "strict": true,
     "contexts": ["ci (18)", "ci (20)"]
   },
-  "enforce_admins": true,
+  "enforce_admins": false,
   "required_linear_history": true,
   "allow_force_pushes": false,
   "allow_deletions": false,
