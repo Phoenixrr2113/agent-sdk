@@ -3,7 +3,8 @@
  * Uses ai/test MockLanguageModelV3 per official AI SDK testing guidance.
  */
 
-import { MockLanguageModelV3, simulateReadableStream, mockValues } from 'ai/test';
+import { MockLanguageModelV3, mockValues } from 'ai/test';
+import { simulateReadableStream } from 'ai';
 import type { LanguageModel } from 'ai';
 
 /**
@@ -113,4 +114,72 @@ export function createMockToolModel(
       };
     },
   }) as unknown as LanguageModel;
+}
+
+/**
+ * Create a mock model that returns tool calls on every request until a counter is exhausted,
+ * then returns the final text. Useful for testing multi-step tool loops.
+ */
+export function createMockMultiStepToolModel(
+  toolCallsPerStep: Array<Array<{ id: string; name: string; args: Record<string, unknown> }>>,
+  finalText: string,
+): LanguageModel {
+  let callCount = 0;
+  return new MockLanguageModelV3({
+    doGenerate: async () => {
+      const step = toolCallsPerStep[callCount];
+      callCount++;
+      if (step) {
+        return {
+          content: step.map((tc) => ({
+            type: 'tool-call' as const,
+            toolCallId: tc.id,
+            toolName: tc.name,
+            args: JSON.stringify(tc.args),
+          })),
+          finishReason: { unified: 'tool-calls', raw: undefined },
+          usage: {
+            inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
+            outputTokens: { total: 20, text: 20, reasoning: undefined },
+          },
+          warnings: [],
+        };
+      }
+      return {
+        content: [{ type: 'text', text: finalText }],
+        finishReason: { unified: 'stop', raw: undefined },
+        usage: {
+          inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
+          outputTokens: { total: 20, text: 20, reasoning: undefined },
+        },
+        warnings: [],
+      };
+    },
+  }) as unknown as LanguageModel;
+}
+
+/**
+ * Create a mock model that tracks all prompts it receives.
+ * Useful for verifying what was sent to the model.
+ */
+export function createMockModelWithSpy(text: string): {
+  model: LanguageModel;
+  calls: Array<{ prompt: unknown }>;
+} {
+  const calls: Array<{ prompt: unknown }> = [];
+  const model = new MockLanguageModelV3({
+    doGenerate: async (params) => {
+      calls.push({ prompt: params.prompt });
+      return {
+        content: [{ type: 'text', text }],
+        finishReason: { unified: 'stop', raw: undefined },
+        usage: {
+          inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
+          outputTokens: { total: 20, text: 20, reasoning: undefined },
+        },
+        warnings: [],
+      };
+    },
+  }) as unknown as LanguageModel;
+  return { model, calls };
 }

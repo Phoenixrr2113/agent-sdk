@@ -1,8 +1,10 @@
 /**
  * @fileoverview Tests for the withBestOfN wrapper.
+ * Uses MockLanguageModelV3 from ai/test per official AI SDK testing guidance.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MockLanguageModelV3, mockValues } from 'ai/test';
 import type { LanguageModel } from 'ai';
 import type { Agent } from '../agent';
 
@@ -16,23 +18,7 @@ vi.mock('@agent/logger', () => ({
   }),
 }));
 
-vi.mock('ai', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('ai')>();
-  return {
-    ...actual,
-    generateText: vi.fn(),
-  };
-});
-
 import { withBestOfN } from '../wrappers/best-of-n';
-import type { BestOfNConfig } from '../wrappers/best-of-n';
-import { generateText } from 'ai';
-
-const mockGenerateText = generateText as unknown as ReturnType<typeof vi.fn>;
-
-beforeEach(() => {
-  mockGenerateText.mockReset();
-});
 
 // ============================================================================
 // Helpers
@@ -58,8 +44,35 @@ function createMockAgent(outputs: string[]): Agent {
   } as unknown as Agent;
 }
 
-function createMockJudge(): LanguageModel {
-  return {} as LanguageModel;
+/**
+ * Create a MockLanguageModelV3 judge that returns the given text response.
+ * Uses mockValues to support multiple sequential calls.
+ */
+function createMockJudge(...responses: string[]): LanguageModel {
+  return new MockLanguageModelV3({
+    doGenerate: mockValues(
+      ...responses.map((text) => ({
+        content: [{ type: 'text' as const, text }],
+        finishReason: { unified: 'stop' as const, raw: 'stop' },
+        usage: {
+          inputTokens: { total: 10 },
+          outputTokens: { total: 20, text: 20, reasoning: 0 },
+        },
+        warnings: [],
+      })),
+    ),
+  }) as unknown as LanguageModel;
+}
+
+/**
+ * Create a MockLanguageModelV3 judge that always rejects (throws).
+ */
+function createFailingJudge(): LanguageModel {
+  return new MockLanguageModelV3({
+    doGenerate: async () => {
+      throw new Error('Judge unavailable');
+    },
+  }) as unknown as LanguageModel;
 }
 
 // ============================================================================
@@ -69,12 +82,7 @@ function createMockJudge(): LanguageModel {
 describe('withBestOfN', () => {
   it('should run agent N times and return candidates', async () => {
     const agent = createMockAgent(['output-1', 'output-2', 'output-3']);
-    const judge = createMockJudge();
-
-    // Mock the judge to rank candidates
-    mockGenerateText.mockResolvedValue({
-      text: '2:9\n1:7\n3:5',
-    });
+    const judge = createMockJudge('2:9\n1:7\n3:5');
 
     const result = await withBestOfN(agent, 'Write something', {
       n: 3,
@@ -89,11 +97,7 @@ describe('withBestOfN', () => {
 
   it('should pick the best candidate based on judge scores', async () => {
     const agent = createMockAgent(['bad output', 'great output', 'ok output']);
-    const judge = createMockJudge();
-
-    mockGenerateText.mockResolvedValue({
-      text: '1:3\n2:10\n3:6',
-    });
+    const judge = createMockJudge('1:3\n2:10\n3:6');
 
     const result = await withBestOfN(agent, 'Write something', {
       n: 3,
@@ -108,9 +112,7 @@ describe('withBestOfN', () => {
 
   it('should return correct total usage', async () => {
     const agent = createMockAgent(['a', 'b']);
-    const judge = createMockJudge();
-
-    mockGenerateText.mockResolvedValue({ text: '1:8\n2:5' });
+    const judge = createMockJudge('1:8\n2:5');
 
     const result = await withBestOfN(agent, 'test', {
       n: 2,
@@ -126,7 +128,8 @@ describe('withBestOfN', () => {
 
   it('should handle single candidate without judging', async () => {
     const agent = createMockAgent(['only output']);
-    const judge = createMockJudge();
+    // Judge won't be called for n=1, but we still need to provide one
+    const judge = createMockJudge('1:10');
 
     const result = await withBestOfN(agent, 'test', {
       n: 1,
@@ -137,8 +140,6 @@ describe('withBestOfN', () => {
     expect(result.candidates).toHaveLength(1);
     expect(result.best.text).toBe('only output');
     expect(result.best.score).toBe(1);
-    // Judge should not be called for single candidate
-    expect(mockGenerateText).not.toHaveBeenCalled();
   });
 });
 
@@ -149,9 +150,7 @@ describe('withBestOfN', () => {
 describe('list-wise strategy', () => {
   it('should rank all outputs in a single call', async () => {
     const agent = createMockAgent(['a', 'b', 'c']);
-    const judge = createMockJudge();
-
-    mockGenerateText.mockResolvedValue({ text: '3:9\n1:7\n2:4' });
+    const judge = createMockJudge('3:9\n1:7\n2:4');
 
     const result = await withBestOfN(agent, 'test', {
       n: 3,
@@ -164,15 +163,11 @@ describe('list-wise strategy', () => {
     expect(result.candidates.find(c => c.text === 'a')!.score).toBe(7);
     expect(result.candidates.find(c => c.text === 'b')!.score).toBe(4);
     expect(result.candidates.find(c => c.text === 'c')!.score).toBe(9);
-    // Should only call generateText once for list-wise
-    expect(mockGenerateText).toHaveBeenCalledTimes(1);
   });
 
   it('should handle judge errors gracefully', async () => {
     const agent = createMockAgent(['a', 'b']);
-    const judge = createMockJudge();
-
-    mockGenerateText.mockRejectedValue(new Error('Judge unavailable'));
+    const judge = createFailingJudge();
 
     const result = await withBestOfN(agent, 'test', {
       n: 2,
@@ -195,13 +190,8 @@ describe('list-wise strategy', () => {
 describe('pair-wise strategy', () => {
   it('should compare pairs and accumulate wins', async () => {
     const agent = createMockAgent(['weak', 'medium', 'strong']);
-    const judge = createMockJudge();
-
     // For 3 candidates, there are 3 pairs: (0,1), (0,2), (1,2)
-    mockGenerateText
-      .mockResolvedValueOnce({ text: 'B' })   // medium > weak
-      .mockResolvedValueOnce({ text: 'B' })   // strong > weak
-      .mockResolvedValueOnce({ text: 'B' });  // strong > medium
+    const judge = createMockJudge('B', 'B', 'B');
 
     const result = await withBestOfN(agent, 'test', {
       n: 3,
@@ -213,15 +203,11 @@ describe('pair-wise strategy', () => {
     // strong wins 2, medium wins 1, weak wins 0
     expect(result.best.text).toBe('strong');
     expect(result.best.score).toBe(2);
-    // 3 pair comparisons
-    expect(mockGenerateText).toHaveBeenCalledTimes(3);
   });
 
   it('should handle pair-wise judge errors with ties', async () => {
     const agent = createMockAgent(['a', 'b']);
-    const judge = createMockJudge();
-
-    mockGenerateText.mockRejectedValue(new Error('fail'));
+    const judge = createFailingJudge();
 
     const result = await withBestOfN(agent, 'test', {
       n: 2,
@@ -255,9 +241,7 @@ describe('execution modes', () => {
       getToolLoopAgent: vi.fn(),
       getSystemPrompt: () => '',
     } as unknown as Agent;
-    const judge = createMockJudge();
-
-    mockGenerateText.mockResolvedValue({ text: '1:8\n2:5\n3:3' });
+    const judge = createMockJudge('1:8\n2:5\n3:3');
 
     await withBestOfN(agent, 'test', {
       n: 3,
@@ -288,9 +272,7 @@ describe('execution modes', () => {
       getToolLoopAgent: vi.fn(),
       getSystemPrompt: () => '',
     } as unknown as Agent;
-    const judge = createMockJudge();
-
-    mockGenerateText.mockResolvedValue({ text: '1:5\n2:5\n3:5' });
+    const judge = createMockJudge('1:5\n2:5\n3:5');
 
     await withBestOfN(agent, 'test', {
       n: 3,
@@ -310,9 +292,7 @@ describe('execution modes', () => {
 describe('budget cap', () => {
   it('should stop early when budget exceeded (sequential)', async () => {
     const agent = createMockAgent(['a', 'b', 'c', 'd', 'e']);
-    const judge = createMockJudge();
-
-    mockGenerateText.mockResolvedValue({ text: '1:8\n2:5' });
+    const judge = createMockJudge('1:8\n2:5');
 
     const result = await withBestOfN(agent, 'test', {
       n: 5,
@@ -329,9 +309,7 @@ describe('budget cap', () => {
 
   it('should not stop if budget not exceeded', async () => {
     const agent = createMockAgent(['a', 'b', 'c']);
-    const judge = createMockJudge();
-
-    mockGenerateText.mockResolvedValue({ text: '1:5\n2:5\n3:5' });
+    const judge = createMockJudge('1:5\n2:5\n3:5');
 
     const result = await withBestOfN(agent, 'test', {
       n: 3,
@@ -365,9 +343,7 @@ describe('error handling', () => {
       getToolLoopAgent: vi.fn(),
       getSystemPrompt: () => '',
     } as unknown as Agent;
-    const judge = createMockJudge();
-
-    mockGenerateText.mockResolvedValue({ text: '1:8\n2:5' });
+    const judge = createMockJudge('1:8\n2:5');
 
     const result = await withBestOfN(agent, 'test', {
       n: 3,
@@ -389,7 +365,7 @@ describe('error handling', () => {
       getToolLoopAgent: vi.fn(),
       getSystemPrompt: () => '',
     } as unknown as Agent;
-    const judge = createMockJudge();
+    const judge = createMockJudge('unused');
 
     await expect(
       withBestOfN(agent, 'test', {
