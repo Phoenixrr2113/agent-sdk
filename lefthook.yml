@@ -7,3 +7,13 @@ pre-commit:
 
     - name: typecheck
       run: pnpm typecheck
+
+    - name: prettier
+      glob: "*.{js,ts,jsx,tsx,json,md,yml,yaml}"
+      run: prettier --check {staged_files}
+
+commit-msg:
+  commands:
+    commitlint:
+      glob: ""
+      run: pnpm commitlint --edit {1}

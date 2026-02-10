@@ -12,11 +12,15 @@
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint-config-prettier": "^10.0.0",
-    "eslint-plugin-import": "^2.31.0"
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-jsdoc": "^62.5.4"
   },
   "peerDependencies": {
     "eslint": "^9.0.0",
     "typescript": "^5.0.0"
   },
-  "keywords": ["eslint", "config"]
+  "keywords": [
+    "eslint",
+    "config"
+  ]
 }

@@ -1,0 +1,54 @@
+{
+  "extends": ["config:recommended"],
+  "schedule": ["before 3am on Monday"],
+  "labels": ["dependencies"],
+  "automerge": true,
+  "automergeType": "pr",
+  "automergeStrategy": "squash",
+  "minimumReleaseAge": "3 days",
+  "pin": {
+    "enabled": true
+  },
+  "pinDigests": true,
+  "github-actions": {
+    "enabled": true,
+    "pinVersions": true
+  },
+  "packageRules": [
+    {
+      "description": "Group all @types/* updates",
+      "matchDatasources": ["npm"],
+      "matchPackagePatterns": ["^@types/"],
+      "groupName": "Type definitions",
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash"
+    },
+    {
+      "description": "Group all ESLint-related updates",
+      "matchDatasources": ["npm"],
+      "matchPackagePatterns": ["eslint", "^@typescript-eslint/", "^@eslint"],
+      "groupName": "ESLint packages",
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash"
+    },
+    {
+      "description": "Group all @agent/* internal packages with automerge",
+      "matchDatasources": ["npm"],
+      "matchPackagePatterns": ["^@agent/"],
+      "groupName": "Internal @agent packages",
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash"
+    },
+    {
+      "description": "Automerge patch updates with passing CI",
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash"
+    }
+  ]
+}
+
