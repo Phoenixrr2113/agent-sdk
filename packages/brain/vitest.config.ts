@@ -5,9 +5,6 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/**/*.test.ts'],
-    testTimeout: 30_000,
-    fileParallelism: false,
-    setupFiles: ['src/setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -20,3 +17,4 @@ export default defineConfig({
     },
   },
 });
+

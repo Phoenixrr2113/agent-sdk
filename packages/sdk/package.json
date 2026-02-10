@@ -40,7 +40,7 @@
     "@agent/config-typescript": "workspace:*",
     "@types/node": "^20.17.19",
     "typescript": "^5.7.3",
-    "vitest": "^1.6.1"
+    "vitest": "^3.2.3"
   },
   "peerDependencies": {
     "@vercel/otel": "*",
