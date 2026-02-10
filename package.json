@@ -15,6 +15,8 @@
     "demo": "pnpm --filter demo run cli",
     "demo:server": "pnpm --filter demo run server",
     "demo:full": "pnpm --filter demo run full",
+    "docs:dev": "pnpm --filter docs run dev",
+    "docs:build": "pnpm --filter docs run build",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "changeset publish"
