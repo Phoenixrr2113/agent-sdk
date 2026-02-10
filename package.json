@@ -14,7 +14,7 @@
     "inspect": "npx workflow inspect runs --web",
     "demo": "pnpm --filter demo run cli",
     "demo:server": "pnpm --filter demo run server",
-    "demo:full": "pnpm --filter demo run full",
+    "test:integration": "pnpm --filter integration-tests run test",
     "docs:dev": "pnpm --filter docs run dev",
     "docs:build": "pnpm --filter docs run build",
     "changeset": "changeset",
