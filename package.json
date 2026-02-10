@@ -14,10 +14,14 @@
     "inspect": "npx workflow inspect runs --web",
     "demo": "pnpm --filter demo run cli",
     "demo:server": "pnpm --filter demo run server",
-    "demo:full": "pnpm --filter demo run full"
+    "demo:full": "pnpm --filter demo run full",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "changeset publish"
   },
   "devDependencies": {
     "@agent/config-eslint": "workspace:*",
+    "@changesets/cli": "^2.29.8",
     "@eslint/js": "^9.0.0",
     "@types/node": "^25.2.0",
     "eslint": "^9.0.0",
