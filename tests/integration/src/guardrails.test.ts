@@ -11,7 +11,7 @@ import {
   runGuardrails,
   wrapWithGuardrails,
   GuardrailBlockedError,
-} from '@agntk/core';
+} from '@agntk/core/advanced';
 
 describe('Guardrails', () => {
   describe('contentFilter', () => {

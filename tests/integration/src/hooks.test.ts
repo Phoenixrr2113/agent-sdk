@@ -21,7 +21,7 @@ import {
   HookRejectedError,
   FatalError,
   RetryableError,
-} from '@agntk/core';
+} from '@agntk/core/workflow';
 
 describe('Hooks & Human-in-the-Loop', () => {
   describe('defineHook', () => {

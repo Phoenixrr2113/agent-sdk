@@ -8,10 +8,9 @@ import {
   createAgent,
   toolPresets,
   roleConfigs,
-  subAgentConfigs,
-  getSubAgentConfig,
   resolveModel,
 } from '@agntk/core';
+import { subAgentConfigs, getSubAgentConfig } from '@agntk/core/advanced';
 import { createMockModel } from './setup';
 
 describe('Presets & Models', () => {

@@ -6,17 +6,19 @@
 import { describe, it, expect } from 'vitest';
 import {
   createAgent,
+  UsageLimitExceeded,
+  usageLimitStop,
+} from '@agntk/core';
+import {
   withBestOfN,
   buildReflectionPrompt,
   estimateReflectionTokens,
-  UsageLimitExceeded,
-  usageLimitStop,
   applyApproval,
   resolveApprovalConfig,
   isDangerousTool,
   DANGEROUS_TOOLS,
-} from '@agntk/core';
-import type { ReflectionConfig } from '@agntk/core';
+} from '@agntk/core/advanced';
+import type { ReflectionConfig } from '@agntk/core/advanced';
 import { createMockModel, createMockMultiModel } from './setup';
 
 describe('Wrappers', () => {

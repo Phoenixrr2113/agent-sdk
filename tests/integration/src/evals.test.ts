@@ -5,14 +5,14 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { createAgent } from '@agntk/core';
 import {
-  createAgent,
   createEvalSuite,
   outputContains,
   outputMatches,
   stepCount,
   tokenUsage,
-} from '@agntk/core';
+} from '@agntk/core/evals';
 import { createMockModel, createMockMultiModel } from './setup';
 
 describe('Evaluation Framework', () => {

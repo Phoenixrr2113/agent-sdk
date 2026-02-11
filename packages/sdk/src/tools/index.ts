@@ -148,6 +148,13 @@ export {
   wrapAllToolsWithRetry,
 } from './model-retry';
 
+// Search Skills Tool
+export { createSearchSkillsTool, clearSkillsCache, type SearchSkillsToolConfig } from './search-skills';
+
+// Memory Tools
+export { createMemoryEngine, type MemoryEngine, type MemoryEngineConfig, type MemoryWriteResult } from '../memory/engine';
+export { createMemoryStore, type MemoryStore, type MemoryItem, type MemorySearchResult } from '../memory/vectra-store';
+
 // Browser Tool
 export {
   createBrowserTool,

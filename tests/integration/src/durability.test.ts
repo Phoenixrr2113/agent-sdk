@@ -7,15 +7,15 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import { tool } from 'ai';
+import { createAgent } from '@agntk/core';
 import {
-  createAgent,
   checkWorkflowAvailability,
   wrapToolAsDurableStep,
   wrapToolsAsDurable,
   wrapSelectedToolsAsDurable,
   parseDuration,
   formatDuration,
-} from '@agntk/core';
+} from '@agntk/core/workflow';
 import { createMockModel } from './setup';
 
 describe('Durability', () => {

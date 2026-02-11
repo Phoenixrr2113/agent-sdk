@@ -11,7 +11,7 @@ import { createLoggingMiddleware, createRateLimitMiddleware, createAuthMiddlewar
 import { ConcurrencyQueue, QueueFullError, QueueTimeoutError } from './queue';
 import { StreamEventBuffer } from './stream-buffer';
 import type { AgentServerOptions, DurableAgentInstance } from './types';
-import { getHookRegistry, HookNotFoundError, HookNotPendingError } from '@agntk/core';
+import { getHookRegistry, HookNotFoundError, HookNotPendingError } from '@agntk/core/workflow';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -541,7 +541,7 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
             log.info('Browser stream WebSocket connected');
 
             // Dynamically import to avoid hard dependency if browser tool isn't used
-            import('@agntk/core').then(({ createBrowserStream }) => {
+            import('@agntk/core/advanced').then(({ createBrowserStream }) => {
               const streamConfig = {
                 fps: serverOptions.browserStream?.fps ?? 2,
                 quality: serverOptions.browserStream?.quality ?? 60,

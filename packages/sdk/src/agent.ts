@@ -9,7 +9,6 @@ import { generateId, ToolLoopAgent, stepCountIs } from 'ai';
 import type { Tool, ToolSet } from 'ai';
 import { createLogger } from '@agntk/logger';
 import type { AgentOptions, AgentRole, ToolPreset } from './types/agent';
-import { createMemoryTools } from './memory/tools';
 import { usageLimitStop } from './usage-limits';
 import { resolveModel } from './models';
 import { getRole } from './presets/role-registry';
@@ -194,14 +193,9 @@ export function createAgent(options: AgentOptions = {}): Agent {
     tools = { ...tools, spawn_agent: spawnTool };
   }
 
-  // Add unified memory tools if memoryEngine is provided
-  if (options.memoryEngine) {
-    log.debug('Adding unified memory tools');
-    const memoryTools = createMemoryTools({ engine: options.memoryEngine });
-    tools = { ...tools, ...memoryTools } as ToolSet;
-  } else if (options.brain) {
-    log.warn('options.brain is deprecated — use options.memoryEngine instead');
-  }
+  // Memory tools will be wired in Phase 2 (P2-MEM-005)
+  // when enableMemory: true, the agent will load .agntk/ markdown files
+  // and add remember/recall/update_context/forget tools
 
   // Apply approval to dangerous tools if configured
   const approvalConfig = resolveApprovalConfig(options.approval);

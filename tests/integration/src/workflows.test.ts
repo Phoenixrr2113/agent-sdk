@@ -4,15 +4,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  createAgent,
-  createPipeline,
-  createParallel,
-  asStep,
-  TaskBoard,
-  SpecialistPool,
-  createPoolTools,
-} from '@agntk/core';
+import { createAgent } from '@agntk/core';
+import { createPipeline, createParallel, asStep, TaskBoard } from '@agntk/core/workflow';
+import { SpecialistPool, createPoolTools } from '@agntk/core/advanced';
 import { createMockModel } from './setup';
 
 describe('Workflows', () => {

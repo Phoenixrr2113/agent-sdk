@@ -9,7 +9,7 @@ import {
   createScheduledWorkflow,
   createDailyBriefing,
   createWeeklyReport,
-} from '@agntk/core';
+} from '@agntk/core/workflow';
 
 describe('Scheduled Workflows', () => {
   describe('createScheduledWorkflow', () => {

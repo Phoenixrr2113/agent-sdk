@@ -5,7 +5,6 @@
 
 import type { LanguageModel, Tool, StepResult, ToolSet } from 'ai';
 import type { SkillsConfig } from '../skills/types';
-import type { MemoryEngine } from '../memory/engine';
 import type { UsageLimits } from '../usage-limits';
 import type { ReflectionConfig } from '../reflection';
 import type { ApprovalConfig } from '../tools/approval';
@@ -162,20 +161,16 @@ export interface AgentOptions {
   // Memory
   // ─────────────────────────────────────────────────────────────────────────────
 
-  /** Unified memory engine (preferred). Provides remember, recall, forget, query_knowledge tools.
-   * When provided, automatically injects memory tools into the agent.
+  /** Enable persistent memory for the agent. Default: false
+   * When true, creates a MarkdownMemoryStore that reads/writes .agntk/ files.
    * @example
    * ```typescript
-   * const engine = createMemoryEngine({ vectorStore, graphStore, extractionModel });
-   * const agent = createAgent({ memoryEngine: engine });
+   * const agent = createAgent({ enableMemory: true });
    * ```
    */
-  memoryEngine?: MemoryEngine;
-
-  /** Enable vector memory for the agent. Default: false */
   enableMemory?: boolean;
 
-  /** Configuration for vector memory store. */
+  /** Configuration for memory system. */
   memoryOptions?: MemoryOptions;
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -192,13 +187,6 @@ export interface AgentOptions {
    * ```
    */
   skills?: SkillsConfig;
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Brain (Knowledge Graph + Memory) — DEPRECATED
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  /** @deprecated Use `memoryEngine` instead. Brain instance for knowledge graph and persistent memory. */
-  brain?: BrainInstance;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Environment
@@ -303,30 +291,21 @@ export interface WorkflowOptions {
 // Memory Configuration
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Configuration for vector memory store. */
+/** Configuration for memory system.
+ * Phase 2 will replace this with markdown-based memory options.
+ * @deprecated Will be simplified in Phase 2 to use markdown files.
+ */
 export interface MemoryOptions {
-  /** Path to persist memory index. If not provided, uses in-memory. */
+  /** Path to persist memory. If not provided, uses in-memory. */
   path?: string;
 
-  /** Embedding model to use. Default: 'text-embedding-3-small' */
+  /** @deprecated Will be removed in Phase 2. */
   embedModel?: string;
 
-  /** Maximum number of results to return from memory queries. Default: 5 */
+  /** @deprecated Will be removed in Phase 2. */
   topK?: number;
 
-  /** Similarity threshold for memory retrieval. Default: 0.7 */
+  /** @deprecated Will be removed in Phase 2. */
   similarityThreshold?: number;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Brain Configuration
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Brain instance type (imported from @agntk/brain at runtime) */
-export interface BrainInstance {
-  query(term: string, limit?: number): Promise<unknown[]>;
-  remember(fact: string, metadata?: Record<string, unknown>): Promise<void>;
-  recall(query: string, limit?: number): Promise<unknown[]>;
-  extract(text: string, source?: string): Promise<unknown>;
-  close(): Promise<void>;
-}

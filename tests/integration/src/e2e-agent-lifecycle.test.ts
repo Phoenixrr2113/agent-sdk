@@ -7,14 +7,9 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import { tool } from 'ai';
-import {
-  createAgent,
-  createPipeline,
-  createParallel,
-  asStep,
-  contentFilter,
-  SpecialistPool,
-} from '@agntk/core';
+import { createAgent } from '@agntk/core';
+import { createPipeline, createParallel, asStep } from '@agntk/core/workflow';
+import { contentFilter, SpecialistPool } from '@agntk/core/advanced';
 import { createMockModel, createMockToolModel, createMockMultiModel, createMockModelWithSpy } from './setup';
 
 describe('E2E: Agent Lifecycle', () => {

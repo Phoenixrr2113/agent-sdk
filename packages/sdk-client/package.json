@@ -13,7 +13,7 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node ../../scripts/fix-esm-imports.mjs ./dist",
     "typecheck": "tsc --noEmit",
     "dev": "tsc --watch",
     "test": "vitest",

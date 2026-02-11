@@ -20,10 +20,20 @@
       "types": "./dist/tools/index.d.ts",
       "import": "./dist/tools/index.js",
       "default": "./dist/tools/index.js"
+    },
+    "./evals": {
+      "types": "./dist/evals/index.d.ts",
+      "import": "./dist/evals/index.js",
+      "default": "./dist/evals/index.js"
+    },
+    "./advanced": {
+      "types": "./dist/advanced/index.d.ts",
+      "import": "./dist/advanced/index.js",
+      "default": "./dist/advanced/index.js"
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node ../../scripts/fix-esm-imports.mjs ./dist",
     "dev": "tsc --watch",
     "test": "vitest",
     "clean": "rm -rf dist"

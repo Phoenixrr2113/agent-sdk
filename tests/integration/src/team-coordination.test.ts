@@ -5,12 +5,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  createAgent,
-  TaskBoard,
-  createTeamTools,
-  createTeam,
-} from '@agntk/core';
+import { createAgent } from '@agntk/core';
+import { TaskBoard, createTeamTools, createTeam } from '@agntk/core/workflow';
 import { createMockModel } from './setup';
 
 describe('Team Coordination', () => {
