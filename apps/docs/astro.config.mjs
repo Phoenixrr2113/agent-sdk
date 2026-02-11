@@ -6,9 +6,9 @@ export default defineConfig({
     starlight({
       title: 'Agent SDK',
       description: 'A modular AI agent framework built on Vercel AI SDK',
-      social: {
-        github: 'https://github.com/Phoenixrr2113/agent-sdk',
-      },
+      social: [
+        { icon: 'github', label: 'GitHub', href: 'https://github.com/Phoenixrr2113/agent-sdk' },
+      ],
       sidebar: [
         {
           label: 'Getting Started',

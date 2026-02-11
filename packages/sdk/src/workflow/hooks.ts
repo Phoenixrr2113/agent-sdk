@@ -57,11 +57,13 @@ function isWdkAvailable(): boolean {
 
 /**
  * Reset WDK cache (for testing).
+ * When `forceNoWdk` is true, marks WDK as already checked but unavailable,
+ * preventing the dynamic import from running.
  * @internal
  */
-export function _resetWdkCache(): void {
+export function _resetWdkCache(forceNoWdk = false): void {
   _wdk = null;
-  _wdkChecked = false;
+  _wdkChecked = forceNoWdk;
 }
 
 // ============================================================================

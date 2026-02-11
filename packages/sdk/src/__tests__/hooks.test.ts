@@ -17,11 +17,15 @@ import {
   getHookRegistry,
   _resetHookRegistry,
   _resetHookCounter,
+  _resetWdkCache,
   HookRegistry,
   HookNotFoundError,
   HookNotPendingError,
   HookRejectedError,
 } from '../workflow/hooks';
+
+// Allow async hook registration to complete (getWdk() yields via await even when cached)
+const tick = () => Promise.resolve();
 
 // ============================================================================
 // Setup / Teardown
@@ -30,11 +34,15 @@ import {
 beforeEach(() => {
   _resetHookRegistry();
   _resetHookCounter();
+  // Force WDK as "checked but unavailable" so tests use the in-memory fallback
+  // instead of attempting a dynamic import('workflow') which would find @workflow/core
+  _resetWdkCache(true);
 });
 
 afterEach(() => {
   _resetHookRegistry();
   _resetHookCounter();
+  _resetWdkCache();
 });
 
 // ============================================================================
@@ -76,6 +84,7 @@ describe('defineHook', () => {
 
     // Start waiting (won't resolve yet)
     const promise = hook.wait({ action: 'delete files' });
+    await tick();
 
     // Hook should be registered as pending
     const pending = registry.listPending();
@@ -97,6 +106,7 @@ describe('defineHook', () => {
 
     const registry = getHookRegistry();
     const promise = hook.waitWithId('my-custom-id', { action: 'test' });
+    await tick();
 
     expect(registry.has('my-custom-id')).toBe(true);
 
@@ -115,6 +125,7 @@ describe('defineHook', () => {
     const registry = getHookRegistry();
     const p1 = hook.wait({ a: 1 });
     const p2 = hook.wait({ a: 2 });
+    await tick();
 
     const pending = registry.listPending();
     expect(pending.length).toBe(2);
@@ -137,6 +148,7 @@ describe('defineHook', () => {
     });
 
     const promise = hook.wait({ msg: 'Approve this?' });
+    await vi.advanceTimersByTimeAsync(0);
 
     // Advance timer past the timeout
     vi.advanceTimersByTime(6000);
@@ -163,6 +175,7 @@ describe('defineHook', () => {
 
     const registry = getHookRegistry();
     const promise = hook.wait({});
+    await vi.advanceTimersByTimeAsync(0);
 
     // Resume before timeout
     const pending = registry.listPending();
@@ -192,6 +205,7 @@ describe('defineHook', () => {
 
     const registry = getHookRegistry();
     const promise = hook.wait({ msg: 'Enter count' });
+    await tick();
 
     const pending = registry.listPending();
 
@@ -508,6 +522,7 @@ describe('Integration: full hook lifecycle', () => {
       action: 'delete',
       files: ['a.txt', 'b.txt'],
     });
+    await tick();
 
     // Verify the hook is pending
     const pending = registry.listPending();
@@ -535,6 +550,7 @@ describe('Integration: full hook lifecycle', () => {
 
     const registry = getHookRegistry();
     const resultPromise = hook.wait({ msg: 'Confirm?' });
+    await tick();
 
     const pending = registry.listPending();
     registry.reject(pending[0].id, 'User cancelled');
@@ -553,6 +569,7 @@ describe('Integration: full hook lifecycle', () => {
     const p1 = hook.waitWithId('step-1', { step: 1 });
     const p2 = hook.waitWithId('step-2', { step: 2 });
     const p3 = hook.waitWithId('step-3', { step: 3 });
+    await tick();
 
     expect(registry.listPending().length).toBe(3);
 

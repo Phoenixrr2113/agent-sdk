@@ -35,7 +35,7 @@ jobs:
         if: steps.check-changesets.outputs.changeset_count == 0
         run: |
           node scripts/generate-changeset-from-commits.mjs \
-            --base "${{ github.base_ref }}" \
+            --base "origin/${{ github.base_ref }}" \
             --head "${{ github.head_ref }}"
 
       - name: Commit changeset if created
