@@ -73,9 +73,10 @@ async function main(): Promise<void> {
   // Resolve configuration
   const config = resolveConfig(args);
 
-  // Handle --init (will be fully implemented in P2-MEM-001)
+  // Handle --init: create .agntk/ directory with template files
   if (config.init) {
-    console.log('[agntk] --init not yet implemented. Coming in Phase 2.');
+    const { initMemoryDirectory } = await import('./init.js');
+    await initMemoryDirectory(config.workspace);
     process.exit(0);
   }
 

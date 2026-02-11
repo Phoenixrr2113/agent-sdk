@@ -291,21 +291,15 @@ export interface WorkflowOptions {
 // Memory Configuration
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Configuration for memory system.
- * Phase 2 will replace this with markdown-based memory options.
- * @deprecated Will be simplified in Phase 2 to use markdown files.
- */
+/** Configuration for the markdown-based memory system. */
 export interface MemoryOptions {
-  /** Path to persist memory. If not provided, uses in-memory. */
-  path?: string;
+  /** Directory for project-local memory files. Default: '.agntk' */
+  projectDir?: string;
 
-  /** @deprecated Will be removed in Phase 2. */
-  embedModel?: string;
+  /** Directory for global (cross-project) memory files. Default: '~/.agntk' */
+  globalDir?: string;
 
-  /** @deprecated Will be removed in Phase 2. */
-  topK?: number;
-
-  /** @deprecated Will be removed in Phase 2. */
-  similarityThreshold?: number;
+  /** Custom MemoryStore implementation. Overrides file-based defaults. */
+  store?: import('../memory/types').MemoryStore;
 }
 

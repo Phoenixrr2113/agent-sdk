@@ -1,13 +1,13 @@
 /**
- * @fileoverview Integration tests for unified memory tools.
+ * @fileoverview Tests for markdown-based memory tools.
  *
  * Validates:
- * - Single remember tool writes to both Vectra and Graphology
- * - recall uses semantic search
- * - query_knowledge uses graph traversal
- * - forget removes from vector store
- * - No tool name collision (unified surface)
- * - Engine vs legacy store paths
+ * - Tool surface area (4 tools: remember, recall, update_context, forget)
+ * - remember: stores text, updates memory.md, optionally logs decisions
+ * - recall: keyword search across memory.md, decisions.md, context.md
+ * - update_context: rewrites context.md
+ * - forget: removes fact from memory.md
+ * - Graceful error handling
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -26,342 +26,258 @@ vi.mock('@agntk/logger', () => ({
   }),
 }));
 
-vi.mock('../config', () => ({
-  getConfig: () => ({ memory: {} }),
-}));
-
 vi.mock('../memory/extraction', () => ({
-  extractFacts: vi.fn(),
+  extractAndUpdateMemory: vi.fn(),
+  forgetFromMemory: vi.fn(),
+  generateDecisionEntry: vi.fn(),
+  EMPTY_MEMORY_MD: '# Memory\n\n## World Facts\n\n## Decisions\n\n## Entity Knowledge\n\n## Preferences & Patterns\n',
 }));
 
 import { createMemoryTools, type MemoryToolsOptions } from '../memory/tools';
-import { createMemoryEngine, type MemoryEngine, type MemoryGraphStore } from '../memory/engine';
-import type { MemoryStore, MemorySearchResult, MemoryItem } from '../memory/vectra-store';
-import { extractFacts } from '../memory/extraction';
+import { extractAndUpdateMemory, forgetFromMemory, generateDecisionEntry } from '../memory/extraction';
+import type { MemoryStore } from '../memory/types';
 import type { LanguageModel } from 'ai';
 
-const mockExtractFacts = extractFacts as ReturnType<typeof vi.fn>;
+const mockExtract = extractAndUpdateMemory as ReturnType<typeof vi.fn>;
+const mockForget = forgetFromMemory as ReturnType<typeof vi.fn>;
+const mockDecisionEntry = generateDecisionEntry as ReturnType<typeof vi.fn>;
 
 // ============================================================================
-// Test Helpers
+// Mock Store
 // ============================================================================
 
-function createMockVectorStore(): MemoryStore & {
-  _items: Map<string, { text: string; metadata: Record<string, unknown> }>;
+function createMockStore(): MemoryStore & {
+  _memory: string | null;
+  _context: string | null;
+  _decisions: string | null;
 } {
-  const items = new Map<string, { text: string; metadata: Record<string, unknown> }>();
-  let idCounter = 0;
-
-  return {
-    _items: items,
-    async remember(text: string, metadata?: Record<string, unknown>): Promise<string> {
-      const id = `mem_${++idCounter}`;
-      items.set(id, { text, metadata: metadata ?? {} });
-      return id;
-    },
-    async recall(query: string, opts?: { topK?: number; threshold?: number }): Promise<MemorySearchResult[]> {
-      const limit = opts?.topK ?? 5;
-      return Array.from(items.entries())
-        .filter(([, data]) => data.text.toLowerCase().includes(query.toLowerCase()))
-        .slice(0, limit)
-        .map(([id, data]) => ({
-          item: { id, text: data.text, metadata: data.metadata, timestamp: new Date() } as MemoryItem,
-          score: 0.9,
-        }));
-    },
-    async forget(id: string): Promise<boolean> {
-      return items.delete(id);
-    },
-    async forgetAll(): Promise<number> {
-      const count = items.size;
-      items.clear();
-      return count;
-    },
-    async count(): Promise<number> {
-      return items.size;
-    },
-    async close(): Promise<void> {},
+  const store = {
+    _memory: null as string | null,
+    _context: null as string | null,
+    _decisions: null as string | null,
+    loadIdentity: vi.fn().mockResolvedValue(null),
+    loadPreferences: vi.fn().mockResolvedValue(null),
+    loadProject: vi.fn().mockResolvedValue(null),
+    loadMemory: vi.fn(),
+    loadContext: vi.fn(),
+    loadDecisions: vi.fn(),
+    saveContext: vi.fn(),
+    saveMemory: vi.fn(),
+    savePreferences: vi.fn().mockResolvedValue(undefined),
+    appendDecision: vi.fn(),
   };
-}
 
-function createMockGraphStore(): MemoryGraphStore & {
-  _episodes: Map<string, Record<string, unknown>>;
-  _links: Array<{ episodeId: string; entityName: string }>;
-} {
-  const episodes = new Map<string, Record<string, unknown>>();
-  const links: Array<{ episodeId: string; entityName: string }> = [];
+  store.loadMemory.mockImplementation(() => Promise.resolve(store._memory));
+  store.loadContext.mockImplementation(() => Promise.resolve(store._context));
+  store.loadDecisions.mockImplementation(() => Promise.resolve(store._decisions));
+  store.saveContext.mockImplementation((content: string) => {
+    store._context = content;
+    return Promise.resolve();
+  });
+  store.saveMemory.mockImplementation((content: string) => {
+    store._memory = content;
+    return Promise.resolve();
+  });
+  store.appendDecision.mockImplementation((entry: string) => {
+    store._decisions = (store._decisions ?? '') + (store._decisions ? '\n\n' : '') + entry;
+    return Promise.resolve();
+  });
 
-  return {
-    _episodes: episodes,
-    _links: links,
-    async upsertEpisode(episode) {
-      episodes.set(episode.id, episode);
-    },
-    async linkEpisodeEntity(episodeId, entityName) {
-      links.push({ episodeId, entityName });
-    },
-    async getEpisodesByQuery(query, limit) {
-      const results: Array<Record<string, unknown>> = [];
-      for (const [, ep] of episodes) {
-        if (results.length >= limit) break;
-        const summary = String(ep.summary ?? '').toLowerCase();
-        const content = String(ep.content ?? '').toLowerCase();
-        if (summary.includes(query.toLowerCase()) || content.includes(query.toLowerCase())) {
-          results.push(ep);
-        }
-      }
-      return results;
-    },
-    async upsertContradiction(contradiction) {
-      // no-op for these tests
-    },
-  };
+  return store;
 }
 
 const mockModel = {} as LanguageModel;
 
+const toolContext = {
+  toolCallId: 'tc1',
+  messages: [],
+  abortSignal: undefined as unknown as AbortSignal,
+};
+
 // ============================================================================
-// Tests: createMemoryTools
+// Tests
 // ============================================================================
 
 describe('createMemoryTools', () => {
-  let vectorStore: ReturnType<typeof createMockVectorStore>;
-  let graphStore: ReturnType<typeof createMockGraphStore>;
-  let engine: MemoryEngine;
+  let store: ReturnType<typeof createMockStore>;
 
   beforeEach(() => {
-    vectorStore = createMockVectorStore();
-    graphStore = createMockGraphStore();
-    mockExtractFacts.mockReset();
-  });
-
-  describe('validation', () => {
-    it('should throw if neither engine nor store is provided', () => {
-      expect(() => createMemoryTools({} as MemoryToolsOptions)).toThrow(
-        'createMemoryTools requires either `engine` or `store`',
-      );
-    });
+    store = createMockStore();
+    mockExtract.mockReset();
+    mockForget.mockReset();
+    mockDecisionEntry.mockReset();
   });
 
   describe('tool surface area', () => {
-    it('should return remember, recall, forget (no query_knowledge) with plain store', () => {
-      const tools = createMemoryTools({ store: vectorStore });
-      expect(Object.keys(tools).sort()).toEqual(['forget', 'recall', 'remember']);
+    it('returns 4 tools: remember, recall, update_context, forget', () => {
+      const tools = createMemoryTools({ store });
+      expect(Object.keys(tools).sort()).toEqual(['forget', 'recall', 'remember', 'update_context']);
     });
 
-    it('should return remember, recall, forget, query_knowledge with engine', () => {
-      engine = createMemoryEngine({ vectorStore, graphStore, extractionModel: mockModel });
-      const tools = createMemoryTools({ engine });
-      expect(Object.keys(tools).sort()).toEqual(['forget', 'query_knowledge', 'recall', 'remember']);
-    });
-
-    it('should not have colliding tool names (no duplicates)', () => {
-      engine = createMemoryEngine({ vectorStore, graphStore, extractionModel: mockModel });
-      const tools = createMemoryTools({ engine });
-      const names = Object.keys(tools);
-      expect(new Set(names).size).toBe(names.length);
+    it('each tool has execute function and description', () => {
+      const tools = createMemoryTools({ store });
+      for (const [name, t] of Object.entries(tools)) {
+        expect(typeof t.execute).toBe('function');
+      }
     });
   });
 
-  describe('remember tool (with engine)', () => {
-    beforeEach(() => {
-      engine = createMemoryEngine({ vectorStore, graphStore, extractionModel: mockModel });
+  describe('remember tool', () => {
+    it('stores text directly when no model is provided', async () => {
+      const tools = createMemoryTools({ store }); // no model
+      const resultStr = await tools.remember.execute(
+        { text: 'TypeScript is typed' },
+        toolContext,
+      );
+      const result = JSON.parse(resultStr as string);
+      expect(result.success).toBe(true);
+      expect(store._memory).toContain('TypeScript is typed');
     });
 
-    it('should write to both vector and graph stores', async () => {
-      mockExtractFacts.mockResolvedValue({
-        facts: [
-          {
-            network: 'world_fact',
-            fact: 'Node.js 22 is LTS',
-            entities: [{ name: 'Node.js', type: 'Technology' }],
-            relationships: [],
-            confidence: 0.9,
-          },
-        ],
-        rawText: 'Node.js 22 is LTS',
-      });
+    it('uses LLM extraction when model is provided', async () => {
+      mockExtract.mockResolvedValue('# Memory\n\n## World Facts\n- TypeScript is typed');
 
-      const tools = createMemoryTools({ engine });
+      const tools = createMemoryTools({ store, model: mockModel });
       const resultStr = await tools.remember.execute(
-        { text: 'Node.js 22 is LTS', tags: ['tech'], importance: 'high' },
-        { toolCallId: 'tc1', messages: [], abortSignal: undefined as unknown as AbortSignal },
+        { text: 'TypeScript is typed' },
+        toolContext,
       );
       const result = JSON.parse(resultStr as string);
 
       expect(result.success).toBe(true);
-      expect(result.operation).toBe('ADD');
-      expect(result.factCount).toBe(1);
-      // Both stores should have data
-      expect(vectorStore._items.size).toBe(1);
-      expect(graphStore._episodes.size).toBe(1);
+      expect(mockExtract).toHaveBeenCalledWith(null, 'TypeScript is typed', mockModel);
+      expect(store._memory).toContain('TypeScript is typed');
     });
 
-    it('should link entities in graph store', async () => {
-      mockExtractFacts.mockResolvedValue({
-        facts: [
-          {
-            network: 'entity_summary',
-            fact: 'Bob manages Team Alpha',
-            entities: [
-              { name: 'Bob', type: 'Person' },
-              { name: 'Team Alpha', type: 'Team' },
-            ],
-            relationships: [{ from: 'Bob', to: 'Team Alpha', type: 'MANAGES' }],
-            confidence: 0.85,
-          },
-        ],
-        rawText: 'Bob manages Team Alpha',
-      });
+    it('logs to decisions.md when isDecision is true', async () => {
+      mockExtract.mockResolvedValue('updated memory');
+      mockDecisionEntry.mockResolvedValue('## 2025-01-01 — Use ESM');
 
-      const tools = createMemoryTools({ engine });
+      const tools = createMemoryTools({ store, model: mockModel });
       await tools.remember.execute(
-        { text: 'Bob manages Team Alpha' },
-        { toolCallId: 'tc2', messages: [], abortSignal: undefined as unknown as AbortSignal },
+        { text: 'We decided to use ESM', isDecision: true },
+        toolContext,
       );
 
-      expect(graphStore._links).toHaveLength(2);
-      expect(graphStore._links.map((l) => l.entityName).sort()).toEqual(['Bob', 'Team Alpha']);
+      expect(mockDecisionEntry).toHaveBeenCalledWith('We decided to use ESM', mockModel);
+      expect(store.appendDecision).toHaveBeenCalledWith('## 2025-01-01 — Use ESM');
     });
-  });
 
-  describe('remember tool (legacy store)', () => {
-    it('should write to vector store only', async () => {
-      const tools = createMemoryTools({ store: vectorStore });
+    it('returns error when extraction fails', async () => {
+      mockExtract.mockRejectedValue(new Error('LLM timeout'));
+
+      const tools = createMemoryTools({ store, model: mockModel });
       const resultStr = await tools.remember.execute(
-        { text: 'Legacy memory item' },
-        { toolCallId: 'tc3', messages: [], abortSignal: undefined as unknown as AbortSignal },
-      );
-      const result = JSON.parse(resultStr as string);
-
-      expect(result.success).toBe(true);
-      expect(result.operation).toBe('ADD');
-      expect(vectorStore._items.size).toBe(1);
-    });
-  });
-
-  describe('recall tool', () => {
-    it('should return matching memories via engine', async () => {
-      engine = createMemoryEngine({ vectorStore });
-      await vectorStore.remember('TypeScript is great', {});
-      await vectorStore.remember('Python is popular', {});
-
-      const tools = createMemoryTools({ engine });
-      const resultStr = await tools.recall.execute(
-        { query: 'TypeScript', limit: 5 },
-        { toolCallId: 'tc4', messages: [], abortSignal: undefined as unknown as AbortSignal },
-      );
-      const result = JSON.parse(resultStr as string);
-
-      expect(result.success).toBe(true);
-      expect(result.count).toBeGreaterThanOrEqual(1);
-    });
-
-    it('should return matching memories via legacy store', async () => {
-      await vectorStore.remember('Vitest testing', {});
-
-      const tools = createMemoryTools({ store: vectorStore });
-      const resultStr = await tools.recall.execute(
-        { query: 'Vitest', limit: 5 },
-        { toolCallId: 'tc5', messages: [], abortSignal: undefined as unknown as AbortSignal },
-      );
-      const result = JSON.parse(resultStr as string);
-
-      expect(result.success).toBe(true);
-      expect(result.count).toBe(1);
-    });
-  });
-
-  describe('forget tool', () => {
-    it('should remove memory from vector store', async () => {
-      const id = await vectorStore.remember('Delete me', {});
-      expect(vectorStore._items.size).toBe(1);
-
-      engine = createMemoryEngine({ vectorStore });
-      const tools = createMemoryTools({ engine });
-      const resultStr = await tools.forget.execute(
-        { id },
-        { toolCallId: 'tc6', messages: [], abortSignal: undefined as unknown as AbortSignal },
-      );
-      const result = JSON.parse(resultStr as string);
-
-      expect(result.success).toBe(true);
-      expect(vectorStore._items.size).toBe(0);
-    });
-
-    it('should return false for non-existent memory', async () => {
-      engine = createMemoryEngine({ vectorStore });
-      const tools = createMemoryTools({ engine });
-      const resultStr = await tools.forget.execute(
-        { id: 'nonexistent' },
-        { toolCallId: 'tc7', messages: [], abortSignal: undefined as unknown as AbortSignal },
+        { text: 'will fail' },
+        toolContext,
       );
       const result = JSON.parse(resultStr as string);
 
       expect(result.success).toBe(false);
+      expect(result.error).toContain('LLM timeout');
     });
   });
 
-  describe('query_knowledge tool', () => {
-    it('should search episodes in graph store', async () => {
-      engine = createMemoryEngine({ vectorStore, graphStore, extractionModel: mockModel });
+  describe('recall tool', () => {
+    it('returns empty results when no memory exists', async () => {
+      const tools = createMemoryTools({ store });
+      const resultStr = await tools.recall.execute({ query: 'anything' }, toolContext);
+      const result = JSON.parse(resultStr as string);
 
-      mockExtractFacts.mockResolvedValue({
-        facts: [
-          {
-            network: 'experience',
-            fact: 'Deployed v2.0 to production',
-            entities: [],
-            relationships: [],
-            confidence: 0.9,
-          },
-        ],
-        rawText: 'Deployed v2.0 to production',
-      });
+      expect(result.success).toBe(true);
+      expect(result.results).toEqual([]);
+    });
 
-      await engine.remember('Deployed v2.0 to production');
+    it('searches memory.md content', async () => {
+      store._memory = '# Memory\n\n## World Facts\n- TypeScript is typed\n- Python is interpreted';
+      const tools = createMemoryTools({ store });
+      const resultStr = await tools.recall.execute({ query: 'TypeScript' }, toolContext);
+      const result = JSON.parse(resultStr as string);
 
-      const tools = createMemoryTools({ engine });
-      const resultStr = await tools.query_knowledge!.execute(
-        { query: 'deployed', limit: 10 },
-        { toolCallId: 'tc8', messages: [], abortSignal: undefined as unknown as AbortSignal },
+      expect(result.success).toBe(true);
+      expect(result.results.length).toBeGreaterThan(0);
+      expect(result.results[0].source).toBe('memory.md');
+    });
+
+    it('searches decisions.md content', async () => {
+      store._decisions = '## 2025-01-01 — Use Vitest\n**Decision:** Use Vitest for testing';
+      const tools = createMemoryTools({ store });
+      const resultStr = await tools.recall.execute({ query: 'Vitest' }, toolContext);
+      const result = JSON.parse(resultStr as string);
+
+      expect(result.success).toBe(true);
+      expect(result.results.some((r: { source: string }) => r.source === 'decisions.md')).toBe(true);
+    });
+
+    it('searches context.md content', async () => {
+      store._context = '# Current Context\nWorking on memory system';
+      const tools = createMemoryTools({ store });
+      const resultStr = await tools.recall.execute({ query: 'memory' }, toolContext);
+      const result = JSON.parse(resultStr as string);
+
+      expect(result.success).toBe(true);
+      expect(result.results.some((r: { source: string }) => r.source === 'context.md')).toBe(true);
+    });
+
+    it('ignores very short query words (<=2 chars)', async () => {
+      store._memory = '# Memory\n\n- An is a word';
+      const tools = createMemoryTools({ store });
+      const resultStr = await tools.recall.execute({ query: 'an is' }, toolContext);
+      const result = JSON.parse(resultStr as string);
+
+      // "an" and "is" are both <=2 chars, so no matches
+      expect(result.results).toEqual([]);
+    });
+  });
+
+  describe('update_context tool', () => {
+    it('saves context with timestamp', async () => {
+      const tools = createMemoryTools({ store });
+      const resultStr = await tools.update_context.execute(
+        { summary: 'Implementing Phase 2 memory' },
+        toolContext,
       );
       const result = JSON.parse(resultStr as string);
 
       expect(result.success).toBe(true);
-      expect(result.count).toBe(1);
-    });
-
-    it('should not exist when using legacy store', () => {
-      const tools = createMemoryTools({ store: vectorStore });
-      expect(tools).not.toHaveProperty('query_knowledge');
+      expect(store._context).toContain('# Current Context');
+      expect(store._context).toContain('Implementing Phase 2 memory');
+      expect(store._context).toContain('Last updated:');
     });
   });
-});
 
-// ============================================================================
-// Tests: No tool collision in createAgent
-// ============================================================================
+  describe('forget tool', () => {
+    it('returns error when no model is provided', async () => {
+      const tools = createMemoryTools({ store }); // no model
+      const resultStr = await tools.forget.execute({ fact: 'something' }, toolContext);
+      const result = JSON.parse(resultStr as string);
 
-describe('no tool collision in createAgent', () => {
-  it('should not have duplicate tool names when memoryEngine is provided', async () => {
-    // This is a conceptual test — when brain tools are removed and unified memory
-    // tools are added, there should be no `remember` or `recall` defined twice.
-    const vectorStore = createMockVectorStore();
-    const engine = createMemoryEngine({ vectorStore });
-    const tools = createMemoryTools({ engine });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('language model');
+    });
 
-    // Verify each tool name appears exactly once
-    const toolNames = Object.keys(tools);
-    const uniqueNames = new Set(toolNames);
-    expect(uniqueNames.size).toBe(toolNames.length);
+    it('calls forgetFromMemory and saves result', async () => {
+      store._memory = '# Memory\n- old fact\n- keep this';
+      mockForget.mockResolvedValue('# Memory\n- keep this');
 
-    // Verify the expected names
-    expect(toolNames).toContain('remember');
-    expect(toolNames).toContain('recall');
-    expect(toolNames).toContain('forget');
-    // query_knowledge only with graph store
-    expect(toolNames).not.toContain('queryKnowledge'); // old brain tool name
-    expect(toolNames).not.toContain('extractEntities'); // old brain tool name
+      const tools = createMemoryTools({ store, model: mockModel });
+      const resultStr = await tools.forget.execute({ fact: 'old fact' }, toolContext);
+      const result = JSON.parse(resultStr as string);
+
+      expect(result.success).toBe(true);
+      expect(mockForget).toHaveBeenCalledWith('# Memory\n- old fact\n- keep this', 'old fact', mockModel);
+      expect(store._memory).toBe('# Memory\n- keep this');
+    });
+
+    it('returns error when forgetFromMemory throws', async () => {
+      mockForget.mockRejectedValue(new Error('LLM error'));
+
+      const tools = createMemoryTools({ store, model: mockModel });
+      const resultStr = await tools.forget.execute({ fact: 'something' }, toolContext);
+      const result = JSON.parse(resultStr as string);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('LLM error');
+    });
   });
 });

@@ -161,129 +161,24 @@ describe('buildDynamicSystemPrompt', () => {
   });
 });
 
-describe('buildSystemContext with memory integration', () => {
-  it('should accept memoryStore option without error', async () => {
-    // Mock memory store
-    const mockMemoryStore = {
-      remember: vi.fn(),
-      recall: vi.fn().mockResolvedValue([]),
-      forget: vi.fn(),
-      forgetAll: vi.fn(),
-      count: vi.fn(),
-      close: vi.fn(),
-    };
-
+describe('buildSystemContext with user preferences', () => {
+  it('should accept userPreferences option', async () => {
     const context = await buildSystemContext({
-      memoryStore: mockMemoryStore as any,
-      autoLoadPreferences: true,
+      userPreferences: {
+        name: 'John',
+        communicationStyle: 'concise',
+      },
     });
 
     expect(context).toHaveProperty('currentTime');
-    expect(context).toHaveProperty('userPreferences');
-  });
-
-  it('should load preferences from memory when autoLoadPreferences is true', async () => {
-    const mockMemoryStore = {
-      remember: vi.fn(),
-      recall: vi.fn().mockResolvedValue([
-        {
-          item: {
-            id: 'mem_1',
-            text: 'User prefers concise responses',
-            metadata: { tags: ['preference'], name: 'John' },
-            timestamp: new Date(),
-          },
-          score: 0.9,
-        },
-      ]),
-      forget: vi.fn(),
-      forgetAll: vi.fn(),
-      count: vi.fn(),
-      close: vi.fn(),
-    };
-
-    const context = await buildSystemContext({
-      memoryStore: mockMemoryStore as any,
-      autoLoadPreferences: true,
-    });
-
-    expect(mockMemoryStore.recall).toHaveBeenCalled();
-    expect(context.userPreferences).toBeDefined();
     expect(context.userPreferences?.name).toBe('John');
     expect(context.userPreferences?.communicationStyle).toBe('concise');
   });
 
-  it('should merge explicit preferences with memory preferences (explicit wins)', async () => {
-    const mockMemoryStore = {
-      remember: vi.fn(),
-      recall: vi.fn().mockResolvedValue([
-        {
-          item: {
-            id: 'mem_1',
-            text: 'User prefers detailed responses',
-            metadata: { name: 'Jane' },
-            timestamp: new Date(),
-          },
-          score: 0.9,
-        },
-      ]),
-      forget: vi.fn(),
-      forgetAll: vi.fn(),
-      count: vi.fn(),
-      close: vi.fn(),
-    };
-
-    const context = await buildSystemContext({
-      memoryStore: mockMemoryStore as any,
-      autoLoadPreferences: true,
-      userPreferences: {
-        name: 'Override Name',
-        language: 'Spanish',
-      },
-    });
-
-    // Explicit should override memory
-    expect(context.userPreferences?.name).toBe('Override Name');
-    expect(context.userPreferences?.language).toBe('Spanish');
-    // Memory should fill in gaps
-    expect(context.userPreferences?.communicationStyle).toBe('detailed');
-  });
-
-  it('should not call memory store when autoLoadPreferences is false', async () => {
-    const mockMemoryStore = {
-      remember: vi.fn(),
-      recall: vi.fn(),
-      forget: vi.fn(),
-      forgetAll: vi.fn(),
-      count: vi.fn(),
-      close: vi.fn(),
-    };
-
-    await buildSystemContext({
-      memoryStore: mockMemoryStore as any,
-      autoLoadPreferences: false,
-    });
-
-    expect(mockMemoryStore.recall).not.toHaveBeenCalled();
-  });
-
-  it('should handle memory store errors gracefully', async () => {
-    const mockMemoryStore = {
-      remember: vi.fn(),
-      recall: vi.fn().mockRejectedValue(new Error('Memory error')),
-      forget: vi.fn(),
-      forgetAll: vi.fn(),
-      count: vi.fn(),
-      close: vi.fn(),
-    };
-
-    const context = await buildSystemContext({
-      memoryStore: mockMemoryStore as any,
-      autoLoadPreferences: true,
-    });
-
-    // Should not throw, just return empty preferences
+  it('should work without userPreferences', async () => {
+    const context = await buildSystemContext({});
     expect(context).toHaveProperty('currentTime');
+    expect(context.userPreferences).toBeUndefined();
   });
 });
 

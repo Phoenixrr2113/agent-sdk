@@ -1,34 +1,28 @@
 /**
  * @agntk/core - Memory Tools
  *
- * Unified memory tools: remember, recall, forget, query_knowledge.
- * Uses the unified MemoryEngine for LLM extraction + parallel writes.
+ * Four markdown-based memory tools: remember, recall, update_context, forget.
+ * Uses MemoryStore for persistence and LLM for extraction/curation.
  */
 
-import { tool } from 'ai';
+import { tool, type LanguageModel } from 'ai';
 import { z } from 'zod';
 import { createLogger } from '@agntk/logger';
-import type { MemoryEngine } from './engine';
-import type { MemoryStore } from './vectra-store';
+import type { MemoryStore } from './types';
+import { extractAndUpdateMemory, forgetFromMemory, generateDecisionEntry } from './extraction';
 
-const log = createLogger('@agntk/core:memory');
+const log = createLogger('@agntk/core:memory-tools');
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface MemoryToolsOptions {
-  /** Unified memory engine (preferred — supports extraction + graph) */
-  engine?: MemoryEngine;
+  /** MemoryStore instance for reading/writing files */
+  store: MemoryStore;
 
-  /** Legacy: plain vector store (used when engine is not provided) */
-  store?: MemoryStore;
-
-  /** Default number of results to return */
-  defaultTopK?: number;
-
-  /** Default similarity threshold */
-  defaultThreshold?: number;
+  /** LanguageModel for extraction (required for remember/forget) */
+  model?: LanguageModel;
 }
 
 // ============================================================================
@@ -36,162 +30,237 @@ export interface MemoryToolsOptions {
 // ============================================================================
 
 /**
- * Create memory tools for an agent.
+ * Create the 4 memory tools for an agent.
  *
  * @example
  * ```typescript
- * // With unified engine (recommended)
- * const engine = createMemoryEngine({ vectorStore, graphStore, extractionModel });
- * const tools = createMemoryTools({ engine });
- *
- * // Legacy: with plain vector store
- * const store = await createMemoryStore({ path: './.memory' });
- * const tools = createMemoryTools({ store });
+ * const store = new MarkdownMemoryStore({ workspaceRoot: '/my/project' });
+ * const tools = createMemoryTools({ store, model });
  * ```
  */
 export function createMemoryTools(options: MemoryToolsOptions) {
-  const { engine, store, defaultTopK = 5, defaultThreshold = 0.7 } = options;
-
-  if (!engine && !store) {
-    throw new Error('createMemoryTools requires either `engine` or `store`');
-  }
+  const { store, model } = options;
 
   const remember = tool({
-    description: `Store information in long-term memory. Extracts structured facts, detects contradictions, and writes to both semantic and structural stores.`,
+    description:
+      'Store information in persistent memory. Extracts facts and updates memory.md. ' +
+      'Use this when the user says "remember this" or when you learn something worth preserving across sessions. ' +
+      'Also logs decisions to decisions.md when the input describes a decision.',
     inputSchema: z.object({
-      text: z.string().min(1).max(10000).describe('Information to remember'),
-      tags: z.array(z.string()).optional().describe('Optional tags for categorization'),
-      importance: z.enum(['low', 'medium', 'high']).optional().describe('Importance level'),
+      text: z
+        .string()
+        .min(1)
+        .max(10000)
+        .describe('Information to remember'),
+      isDecision: z
+        .boolean()
+        .optional()
+        .describe('Set to true if this is a decision that should be logged to decisions.md'),
     }),
-    execute: async ({ text, tags, importance }) => {
-      log.debug('remember() called', { textLength: text.length, tags, importance });
-      try {
-        const done = log.time('remember');
+    execute: async ({ text, isDecision }) => {
+      log.debug('remember() called', { textLength: text.length, isDecision });
 
-        if (engine) {
-          const result = await engine.remember(text, { tags, importance });
-          done();
-          log.info('Memory stored (unified)', { id: result.id, facts: result.facts.length, operation: result.operation });
-          return JSON.stringify({
-            success: true,
-            id: result.id,
-            operation: result.operation,
-            factCount: result.facts.length,
-            networks: [...new Set(result.facts.map((f) => f.network))],
-            contradiction: result.contradiction
-              ? { id: result.contradiction.id, existingFact: result.contradiction.existingFact }
-              : undefined,
-            message: result.contradiction
-              ? `Memory stored (UPDATE — contradiction detected with existing fact)`
-              : `Memory stored (${result.facts.length} facts extracted)`,
-          });
+      if (!model) {
+        // Without a model, store text directly as a bullet point in memory.md
+        const current = await store.loadMemory();
+        const updated = (current ?? '# Memory\n') + `\n- ${text}`;
+        await store.saveMemory(updated);
+        return JSON.stringify({ success: true, message: 'Stored (no extraction — no model available)' });
+      }
+
+      try {
+        // Extract and update memory.md via LLM
+        const currentMemory = await store.loadMemory();
+        const updatedMemory = await extractAndUpdateMemory(currentMemory, text, model);
+        await store.saveMemory(updatedMemory);
+
+        // Also log to decisions.md if flagged
+        if (isDecision) {
+          const entry = await generateDecisionEntry(text, model);
+          await store.appendDecision(entry);
+          log.info('Decision logged', { entryLength: entry.length });
         }
 
-        // Legacy path: plain vector store
-        const id = await store!.remember(text, { tags, importance });
-        done();
-        log.info('Memory stored (legacy)', { id });
-        return JSON.stringify({ success: true, id, operation: 'ADD', message: 'Memory stored' });
+        log.info('Memory updated via extraction', { inputLength: text.length });
+        return JSON.stringify({ success: true, message: 'Memory updated' });
       } catch (error) {
-        log.error('remember() failed', { error: error instanceof Error ? error.message : 'Unknown' });
-        return JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Failed' });
+        const msg = error instanceof Error ? error.message : String(error);
+        log.error('remember() failed', { error: msg });
+        return JSON.stringify({ success: false, error: msg });
       }
     },
   });
 
   const recall = tool({
-    description: `Search long-term memory for relevant information by semantic similarity.`,
+    description:
+      'Search persistent memory for relevant information. ' +
+      'Reads memory.md (curated facts) and decisions.md (decision log) and returns matching content. ' +
+      'Use this when you need to check what was previously remembered or decided.',
     inputSchema: z.object({
-      query: z.string().min(1).max(1000).describe('What to search for'),
-      limit: z.number().min(1).max(20).optional().describe('Max results (default 5)'),
-      threshold: z.number().min(0).max(1).optional().describe('Min similarity (default 0.7)'),
+      query: z
+        .string()
+        .min(1)
+        .max(1000)
+        .describe('What to search for in memory'),
     }),
-    execute: async ({ query, limit, threshold }) => {
-      log.debug('recall() called', { query: query.slice(0, 50), limit, threshold });
+    execute: async ({ query }) => {
+      log.debug('recall() called', { query: query.slice(0, 50) });
+
       try {
-        const done = log.time('recall');
-        const recallOpts = {
-          topK: limit ?? defaultTopK,
-          threshold: threshold ?? defaultThreshold,
-        };
-        const results = engine
-          ? await engine.recall(query, recallOpts)
-          : await store!.recall(query, recallOpts);
-        done();
-        log.info('Memory recalled', { query: query.slice(0, 30), resultsCount: results.length });
-        return JSON.stringify({
-          success: true,
-          memories: results.map((r) => ({
-            id: r.item.id,
-            text: r.item.text,
-            score: Math.round(r.score * 100) / 100,
-            tags: r.item.metadata?.tags,
-            timestamp: r.item.timestamp,
-          })),
-          count: results.length,
-        });
+        const results: Array<{ source: string; content: string }> = [];
+
+        // Search memory.md
+        const memory = await store.loadMemory();
+        if (memory) {
+          const memoryMatches = searchContent(memory, query);
+          if (memoryMatches.length > 0) {
+            results.push({ source: 'memory.md', content: memoryMatches.join('\n') });
+          }
+        }
+
+        // Search decisions.md
+        const decisions = await store.loadDecisions();
+        if (decisions) {
+          const decisionMatches = searchContent(decisions, query);
+          if (decisionMatches.length > 0) {
+            results.push({ source: 'decisions.md', content: decisionMatches.join('\n') });
+          }
+        }
+
+        // Search context.md
+        const context = await store.loadContext();
+        if (context) {
+          const contextMatches = searchContent(context, query);
+          if (contextMatches.length > 0) {
+            results.push({ source: 'context.md', content: contextMatches.join('\n') });
+          }
+        }
+
+        log.info('recall() completed', { query: query.slice(0, 30), resultCount: results.length });
+
+        if (results.length === 0) {
+          return JSON.stringify({
+            success: true,
+            message: 'No matching memories found.',
+            results: [],
+          });
+        }
+
+        return JSON.stringify({ success: true, results });
       } catch (error) {
-        log.error('recall() failed', { error: error instanceof Error ? error.message : 'Unknown' });
-        return JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Failed' });
+        const msg = error instanceof Error ? error.message : String(error);
+        log.error('recall() failed', { error: msg });
+        return JSON.stringify({ success: false, error: msg });
+      }
+    },
+  });
+
+  const update_context = tool({
+    description:
+      'Rewrite the session context file (context.md) with a summary of current work. ' +
+      'Call this at the end of a session or when the focus of work changes significantly. ' +
+      'The previous context.md is completely overwritten.',
+    inputSchema: z.object({
+      summary: z
+        .string()
+        .min(1)
+        .max(5000)
+        .describe('Summary of current session state: active work, recent changes, open questions, next steps'),
+    }),
+    execute: async ({ summary }) => {
+      log.debug('update_context() called', { summaryLength: summary.length });
+
+      try {
+        const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0];
+        const content = `# Current Context\n*Last updated: ${timestamp}*\n\n${summary}`;
+        await store.saveContext(content);
+
+        log.info('Context updated', { length: content.length });
+        return JSON.stringify({ success: true, message: 'Context updated' });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        log.error('update_context() failed', { error: msg });
+        return JSON.stringify({ success: false, error: msg });
       }
     },
   });
 
   const forget = tool({
-    description: `Remove a specific memory from long-term storage.`,
+    description:
+      'Remove a specific fact from persistent memory (memory.md). ' +
+      'Use this when information is no longer true or relevant.',
     inputSchema: z.object({
-      id: z.string().describe('Memory ID to delete'),
+      fact: z
+        .string()
+        .min(1)
+        .max(1000)
+        .describe('The fact to remove from memory'),
     }),
-    execute: async ({ id }) => {
-      log.debug('forget() called', { id });
+    execute: async ({ fact }) => {
+      log.debug('forget() called', { fact: fact.slice(0, 50) });
+
+      if (!model) {
+        return JSON.stringify({ success: false, error: 'Cannot forget without a language model' });
+      }
+
       try {
-        const success = engine ? await engine.forget(id) : await store!.forget(id);
-        log.info('Memory deleted', { id, success });
-        return JSON.stringify({ success, message: success ? 'Memory deleted' : 'Not found' });
+        const currentMemory = await store.loadMemory();
+        const updatedMemory = await forgetFromMemory(currentMemory, fact, model);
+        await store.saveMemory(updatedMemory);
+
+        log.info('Fact forgotten', { factLength: fact.length });
+        return JSON.stringify({ success: true, message: 'Fact removed from memory' });
       } catch (error) {
-        log.error('forget() failed', { id, error: error instanceof Error ? error.message : 'Unknown' });
-        return JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Failed' });
+        const msg = error instanceof Error ? error.message : String(error);
+        log.error('forget() failed', { error: msg });
+        return JSON.stringify({ success: false, error: msg });
       }
     },
   });
 
-  // Only expose query_knowledge when engine with graph store is available
-  const queryKnowledge = engine
-    ? tool({
-        description: `Query the knowledge graph for structural relationships and episodes. Use this for questions about entities, relationships, and past experiences rather than raw text similarity.`,
-        inputSchema: z.object({
-          query: z.string().min(1).max(1000).describe('What to search for in the knowledge graph'),
-          limit: z.number().min(1).max(50).optional().describe('Max results (default 10)'),
-        }),
-        execute: async ({ query, limit }) => {
-          log.debug('queryKnowledge() called', { query: query.slice(0, 50) });
-          try {
-            const results = await engine.queryKnowledge(query, limit ?? 10);
-            return JSON.stringify({
-              success: true,
-              results,
-              count: results.length,
-            });
-          } catch (error) {
-            log.error('queryKnowledge() failed', { error: error instanceof Error ? error.message : 'Unknown' });
-            return JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Failed' });
-          }
-        },
-      })
-    : undefined;
-
-  return {
-    remember,
-    recall,
-    forget,
-    ...(queryKnowledge ? { query_knowledge: queryKnowledge } : {}),
-  };
+  return { remember, recall, update_context, forget };
 }
 
 // ============================================================================
-// Re-exports
+// Search Helpers
 // ============================================================================
 
-export { createMemoryStore, type MemoryStore, type MemoryItem, type MemorySearchResult } from './vectra-store';
-export { createMemoryEngine, type MemoryEngine, type MemoryEngineConfig, type MemoryWriteResult } from './engine';
-export { type MemoryNetworkType, type MemoryOperation, type ExtractedFact, type ExtractionResult } from './extraction';
+/**
+ * Simple keyword search across lines of content.
+ * Returns lines that match any word in the query.
+ */
+function searchContent(content: string, query: string): string[] {
+  const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  if (queryWords.length === 0) return [];
+
+  const lines = content.split('\n');
+  const matches: string[] = [];
+
+  // Search by paragraph (groups of consecutive non-empty lines)
+  let currentParagraph: string[] = [];
+  for (const line of lines) {
+    if (line.trim() === '') {
+      if (currentParagraph.length > 0) {
+        const paragraph = currentParagraph.join('\n');
+        const lower = paragraph.toLowerCase();
+        if (queryWords.some(w => lower.includes(w))) {
+          matches.push(paragraph);
+        }
+        currentParagraph = [];
+      }
+    } else {
+      currentParagraph.push(line);
+    }
+  }
+
+  // Don't forget the last paragraph
+  if (currentParagraph.length > 0) {
+    const paragraph = currentParagraph.join('\n');
+    const lower = paragraph.toLowerCase();
+    if (queryWords.some(w => lower.includes(w))) {
+      matches.push(paragraph);
+    }
+  }
+
+  return matches;
+}

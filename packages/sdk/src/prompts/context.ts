@@ -5,7 +5,6 @@
 
 import { createLogger } from '@agntk/logger';
 import { GEOLOCATION_API_URL, GEOLOCATION_ENABLED_DEFAULT } from '../constants';
-import type { MemoryStore } from '../memory/vectra-store';
 
 const log = createLogger('@agntk/core:context');
 
@@ -61,12 +60,9 @@ export interface ContextOptions {
   userLocation?: UserLocation;
   userPreferences?: UserPreferences;
   fetchLocation?: boolean; // If true, attempt to get location from IP
-  /** Memory store for auto-loading preferences */
-  memoryStore?: MemoryStore;
-  /** If true and memoryStore provided, load preferences from memory */
-  autoLoadPreferences?: boolean;
-  /** Tags to filter memory items for preferences (default: ['preference', 'user-preference']) */
-  preferenceTags?: string[];
+  // Memory-based preference loading was removed when the vectra memory system
+  // was replaced with the markdown-based memory system (Phase 2).
+  // Preferences are now loaded from ~/.agntk/preferences.md by the memory loader.
 }
 
 // ============================================================================
@@ -161,102 +157,6 @@ async function generateWorkspaceMap(workspaceRoot: string): Promise<string> {
 }
 
 // ============================================================================
-// Memory Integration
-// ============================================================================
-
-/**
- * Load user preferences from memory store.
- * Queries for items tagged with preference-related tags and extracts structured data.
- */
-async function loadPreferencesFromMemory(
-  store: MemoryStore,
-  tags: string[] = ['preference', 'user-preference']
-): Promise<Partial<UserPreferences>> {
-  log.debug('Loading preferences from memory', { tags });
-
-  try {
-    // Query for preference-related memories
-    const results = await store.recall('user preferences settings style', { topK: 10 });
-
-    // Filter by tags if metadata has them
-    const preferenceItems = results.filter(r => {
-      const itemTags = r.item.metadata?.tags as string[] | undefined;
-      if (!itemTags) return true; // Include untagged items
-      return tags.some(tag => itemTags.includes(tag));
-    });
-
-    if (preferenceItems.length === 0) {
-      log.debug('No preference items found in memory');
-      return {};
-    }
-
-    // Extract preferences from memory items
-    const prefs: Partial<UserPreferences> = {};
-    const customPrefs: Record<string, unknown> = {};
-
-    for (const { item } of preferenceItems) {
-      const text = item.text.toLowerCase();
-      const metadata = item.metadata ?? {};
-
-      // Extract name
-      if (!prefs.name && metadata.name) {
-        prefs.name = String(metadata.name);
-      }
-
-      // Extract language
-      if (!prefs.language && metadata.language) {
-        prefs.language = String(metadata.language);
-      }
-
-      // Extract communication style
-      if (!prefs.communicationStyle) {
-        if (text.includes('concise') || text.includes('brief')) {
-          prefs.communicationStyle = 'concise';
-        } else if (text.includes('detailed') || text.includes('thorough')) {
-          prefs.communicationStyle = 'detailed';
-        } else if (text.includes('technical')) {
-          prefs.communicationStyle = 'technical';
-        } else if (text.includes('casual') || text.includes('friendly')) {
-          prefs.communicationStyle = 'casual';
-        }
-      }
-
-      // Extract code style preferences
-      if (text.includes('indent') || text.includes('tab') || text.includes('space')) {
-        prefs.codeStyle = prefs.codeStyle ?? {};
-        if (text.includes('tab')) {
-          prefs.codeStyle.indentation = 'tabs';
-        } else if (text.includes('space')) {
-          prefs.codeStyle.indentation = 'spaces';
-        }
-
-        // Look for indent size
-        const sizeMatch = text.match(/(\d+)\s*space/);
-        if (sizeMatch) {
-          prefs.codeStyle.indentSize = parseInt(sizeMatch[1], 10);
-        }
-      }
-
-      // Store any structured custom preferences from metadata
-      if (metadata.customPreference) {
-        const key = String(metadata.customPreferenceKey ?? 'custom');
-        customPrefs[key] = metadata.customPreference;
-      }
-    }
-
-    if (Object.keys(customPrefs).length > 0) {
-      prefs.customPreferences = customPrefs;
-    }
-
-    log.debug('Loaded preferences from memory', { prefsFound: Object.keys(prefs) });
-    return prefs;
-  } catch (error) {
-    log.warn('Failed to load preferences from memory', { error });
-    return {};
-  }
-}
-
-// ============================================================================
 // Context Builder
 // ============================================================================
 
@@ -267,9 +167,6 @@ export async function buildSystemContext(options: ContextOptions = {}): Promise<
     userLocation,
     userPreferences,
     fetchLocation = GEOLOCATION_ENABLED_DEFAULT,
-    memoryStore,
-    autoLoadPreferences = false,
-    preferenceTags,
   } = options;
 
   const now = new Date();
@@ -281,13 +178,7 @@ export async function buildSystemContext(options: ContextOptions = {}): Promise<
     location = await fetchUserLocation();
   }
 
-  // Optionally load preferences from memory
-  let preferences = userPreferences;
-  if (memoryStore && autoLoadPreferences) {
-    const memoryPrefs = await loadPreferencesFromMemory(memoryStore, preferenceTags);
-    // Merge: explicit preferences override memory-loaded ones
-    preferences = { ...memoryPrefs, ...userPreferences };
-  }
+  const preferences = userPreferences;
 
   const context: SystemContext = {
     currentTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),

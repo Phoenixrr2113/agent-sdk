@@ -42,7 +42,6 @@
     "@agntk/logger": "workspace:*",
     "@ai-sdk/openai-compatible": "^2.0.28",
     "ai": "6.0.77",
-    "vectra": "^0.9.0",
     "xstate": "^5.26.0",
     "zod": "^3.25.76"
   },

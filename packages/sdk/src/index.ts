@@ -14,6 +14,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export { createAgent } from './agent';
+export type { Agent } from './agent';
 export type {
   AgentOptions,
   AgentRole,
@@ -94,6 +95,10 @@ export { createLogger, logger } from './utils/logger';
 export type { Logger, LogLevel } from './utils/logger';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Memory — new markdown-based memory coming in Phase 2 (P2-MEM-*)
+// Memory
 // ═══════════════════════════════════════════════════════════════════════════════
-// TODO: Re-export new memory types after P2-MEM-002 through P2-MEM-005
+
+export type { MemoryStore, MemoryConfig } from './memory/types';
+export { MarkdownMemoryStore } from './memory/store';
+export type { MarkdownMemoryStoreOptions } from './memory/store';
+export { loadMemoryContext } from './memory/loader';

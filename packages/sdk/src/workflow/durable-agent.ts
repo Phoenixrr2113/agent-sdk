@@ -382,6 +382,7 @@ export function createDurableAgent(
     // Delegate standard Agent interface to the base agent
     agentId: baseAgent.agentId,
     role: baseAgent.role,
+    init: () => baseAgent.init(),
     getToolLoopAgent: () => baseAgent.getToolLoopAgent(),
     getSystemPrompt: () => baseAgent.getSystemPrompt(),
 

@@ -1,13 +1,9 @@
 /**
  * @agntk/core - Memory Extraction Pipeline
  *
- * LLM-powered extraction implementing the Hindsight 4-network taxonomy:
- * - world_fact: Generic factual knowledge
- * - experience: Episodes with lessons learned
- * - entity_summary: Entity summaries with relationships
- * - belief: Agent's evolving beliefs and assumptions
- *
- * Produces structured memory items from raw text via LLM.
+ * LLM-powered extraction for the markdown-based memory system.
+ * The LLM receives current memory.md + new input and returns updated memory.md.
+ * No vector store, no embeddings — the LLM handles curation, dedup, and contradiction detection.
  */
 
 import { generateText, type LanguageModel } from 'ai';
@@ -19,158 +15,150 @@ const log = createLogger('@agntk/core:extraction');
 // Types
 // ============================================================================
 
-/** Hindsight 4-network memory taxonomy */
+/** Hindsight 4-network memory taxonomy (used as section headers in memory.md) */
 export type MemoryNetworkType = 'world_fact' | 'experience' | 'entity_summary' | 'belief';
 
-/** Mem0-style write operation */
-export type MemoryOperation = 'ADD' | 'UPDATE' | 'DELETE' | 'NOOP';
-
-/** A single extracted fact from the LLM extraction pipeline */
-export interface ExtractedFact {
-  network: MemoryNetworkType;
-  fact: string;
-  entities: Array<{ name: string; type: string }>;
-  relationships: Array<{ from: string; to: string; type: string }>;
-  confidence: number;
-  tags?: string[];
-}
-
-/** Result of the extraction pipeline */
-export interface ExtractionResult {
-  facts: ExtractedFact[];
-  rawText: string;
-}
-
-/** Config for the extraction pipeline */
-export interface ExtractionConfig {
-  /** LanguageModel instance to use for extraction */
-  model: LanguageModel;
-  /** Temperature for extraction (default: 0.1) */
-  temperature?: number;
-  /** Max retries on parse failure (default: 2) */
-  maxRetries?: number;
-}
-
 // ============================================================================
-// Extraction Prompt
+// Prompts
 // ============================================================================
 
-const EXTRACTION_PROMPT = `You are a memory extraction system. Extract structured facts from the given text.
+const MEMORY_UPDATE_PROMPT = `You are a memory manager. Given the input and the current contents of memory.md, determine what to update.
 
-Classify each fact into one of these 4 memory networks:
-- world_fact: Objective, verifiable knowledge about the world (e.g., "TypeScript 5.3 supports import attributes")
-- experience: Events that happened, with outcomes and lessons (e.g., "Refactoring the auth module reduced bugs by 30%")
-- entity_summary: Key attributes of entities (people, projects, systems) (e.g., "Project Atlas uses PostgreSQL and Redis")
-- belief: Subjective assessments, preferences, or evolving assumptions (e.g., "The team prefers functional over OOP style")
+CURRENT MEMORY.MD:
+{CURRENT_MEMORY}
 
-For each fact, extract:
-- The fact statement (concise, self-contained)
-- Named entities mentioned (name + type like Person, Project, Technology, Organization, Concept)
-- Relationships between entities (from, to, type like USES, OWNS, WORKS_ON, DEPENDS_ON, RELATED_TO)
-- Confidence (0.0-1.0)
+INPUT TO PROCESS:
+"{INPUT}"
 
-## Text to Process
-"{TEXT}"
+Respond with the updated memory.md contents. Rules:
+- Add new facts under the appropriate section (World Facts, Decisions, Entity Knowledge, Preferences & Patterns)
+- If a new fact contradicts an existing one, REPLACE the old fact
+- If the fact is already captured, skip it
+- Keep each section concise — facts as bullet points, one line each
+- Remove facts that are no longer true
+- Maximum ~200 lines total
+- Always include all 4 section headers, even if a section is empty
 
-## Output Format (JSON only)
-{
-  "facts": [
-    {
-      "network": "world_fact|experience|entity_summary|belief",
-      "fact": "concise fact statement",
-      "entities": [{ "name": "EntityName", "type": "EntityType" }],
-      "relationships": [{ "from": "Entity1", "to": "Entity2", "type": "RELATIONSHIP_TYPE" }],
-      "confidence": 0.9
-    }
-  ]
-}
+Respond ONLY with the updated memory.md content. No explanations.`;
 
-Extract ALL meaningful facts. Be thorough but concise. Respond with valid JSON only.`;
+const MEMORY_FORGET_PROMPT = `You are a memory manager. Remove the specified fact from the current memory.md contents.
+
+CURRENT MEMORY.MD:
+{CURRENT_MEMORY}
+
+FACT TO REMOVE:
+"{INPUT}"
+
+Remove the fact (or the closest matching fact) from memory.md. If the fact is not found, return the contents unchanged.
+
+Respond ONLY with the updated memory.md content. No explanations.`;
+
+const DECISION_ENTRY_PROMPT = `You are a decision logger. A decision was just made. Write a concise log entry in this exact format:
+
+## {DATE} — [Decision Title]
+**Context:** [Why this came up]
+**Decision:** [What was decided]
+**Rationale:** [Why this choice]
+**Alternatives considered:** [What else was considered, if any]
+
+The decision:
+"{INPUT}"
+
+Respond ONLY with the formatted decision entry. No explanations.`;
 
 // ============================================================================
-// Extraction Pipeline
+// Empty memory template
+// ============================================================================
+
+export const EMPTY_MEMORY_MD = `# Memory
+
+## World Facts
+
+## Decisions
+
+## Entity Knowledge
+
+## Preferences & Patterns
+`;
+
+// ============================================================================
+// Extraction Functions
 // ============================================================================
 
 /**
- * Extract structured facts from raw text using an LLM.
+ * Send current memory + new input to LLM, get back updated memory.md content.
  */
-export async function extractFacts(
-  text: string,
-  config: ExtractionConfig,
-): Promise<ExtractionResult> {
-  const { model, temperature = 0.1, maxRetries = 2 } = config;
+export async function extractAndUpdateMemory(
+  currentMemory: string | null,
+  input: string,
+  model: LanguageModel,
+): Promise<string> {
+  const memory = currentMemory?.trim() || EMPTY_MEMORY_MD;
 
-  const prompt = EXTRACTION_PROMPT.replace('{TEXT}', text.replace(/"/g, '\\"'));
-  let lastError: unknown;
+  const prompt = MEMORY_UPDATE_PROMPT
+    .replace('{CURRENT_MEMORY}', memory)
+    .replace('{INPUT}', input.replace(/"/g, '\\"'));
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const { text: response } = await generateText({
-        model,
-        prompt,
-        temperature,
-      });
-
-      log.debug(`Extraction response (attempt ${attempt + 1})`, { preview: response.slice(0, 200) });
-
-      const facts = parseExtractionResponse(response);
-
-      if (facts.length === 0 && attempt < maxRetries) {
-        log.warn(`Empty extraction on attempt ${attempt + 1}, retrying`);
-        continue;
-      }
-
-      return { facts, rawText: text };
-    } catch (error) {
-      lastError = error;
-      log.warn(`Extraction attempt ${attempt + 1} failed`, { error: String(error) });
-      if (attempt < maxRetries) continue;
-    }
-  }
-
-  log.error('Extraction failed after retries', { error: String(lastError) });
-  // Return empty on failure rather than throwing — memory should still work without extraction
-  return { facts: [], rawText: text };
-}
-
-/**
- * Parse the LLM extraction response into structured facts.
- */
-function parseExtractionResponse(response: string): ExtractedFact[] {
-  const jsonMatch = response.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    log.warn('No JSON found in extraction response');
-    return [];
-  }
+  log.debug('Extracting memory update', { inputLength: input.length, memoryLength: memory.length });
 
   try {
-    const parsed = JSON.parse(jsonMatch[0]) as {
-      facts?: Array<{
-        network?: string;
-        fact?: string;
-        entities?: Array<{ name?: string; type?: string }>;
-        relationships?: Array<{ from?: string; to?: string; type?: string }>;
-        confidence?: number;
-      }>;
-    };
+    const { text } = await generateText({ model, prompt, temperature: 0.1 });
+    const result = text.trim();
 
-    const validNetworks = new Set<string>(['world_fact', 'experience', 'entity_summary', 'belief']);
+    if (!result) {
+      log.warn('Empty extraction result, returning current memory');
+      return memory;
+    }
 
-    return (parsed.facts ?? [])
-      .filter((f) => f.fact && f.network && validNetworks.has(f.network))
-      .map((f) => ({
-        network: f.network as MemoryNetworkType,
-        fact: f.fact!,
-        entities: (f.entities ?? [])
-          .filter((e) => e.name && e.type)
-          .map((e) => ({ name: e.name!, type: e.type! })),
-        relationships: (f.relationships ?? [])
-          .filter((r) => r.from && r.to && r.type)
-          .map((r) => ({ from: r.from!, to: r.to!, type: r.type! })),
-        confidence: Math.max(0, Math.min(1, f.confidence ?? 0.8)),
-      }));
+    log.debug('Memory updated', { oldLength: memory.length, newLength: result.length });
+    return result;
   } catch (error) {
-    log.error('Failed to parse extraction response', { error: String(error) });
-    return [];
+    log.error('Memory extraction failed', { error: error instanceof Error ? error.message : String(error) });
+    return memory;
+  }
+}
+
+/**
+ * Send current memory + fact to forget to LLM, get back updated memory.md content.
+ */
+export async function forgetFromMemory(
+  currentMemory: string | null,
+  factToForget: string,
+  model: LanguageModel,
+): Promise<string> {
+  const memory = currentMemory?.trim() || EMPTY_MEMORY_MD;
+
+  const prompt = MEMORY_FORGET_PROMPT
+    .replace('{CURRENT_MEMORY}', memory)
+    .replace('{INPUT}', factToForget.replace(/"/g, '\\"'));
+
+  try {
+    const { text } = await generateText({ model, prompt, temperature: 0.1 });
+    return text.trim() || memory;
+  } catch (error) {
+    log.error('Memory forget failed', { error: error instanceof Error ? error.message : String(error) });
+    return memory;
+  }
+}
+
+/**
+ * Generate a formatted decision log entry from a decision description.
+ */
+export async function generateDecisionEntry(
+  input: string,
+  model: LanguageModel,
+): Promise<string> {
+  const date = new Date().toISOString().split('T')[0];
+  const prompt = DECISION_ENTRY_PROMPT
+    .replace('{DATE}', date!)
+    .replace('{INPUT}', input.replace(/"/g, '\\"'));
+
+  try {
+    const { text } = await generateText({ model, prompt, temperature: 0.2 });
+    return text.trim();
+  } catch (error) {
+    log.error('Decision entry generation failed', { error: error instanceof Error ? error.message : String(error) });
+    // Fallback: simple entry
+    return `## ${date} — Decision\n**Decision:** ${input}`;
   }
 }

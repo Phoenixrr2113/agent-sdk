@@ -21,6 +21,9 @@ import { wrapToolsAsDurable } from './workflow/durable-tool';
 import { createReflectionPrepareStep } from './reflection';
 import { applyApproval, resolveApprovalConfig } from './tools/approval';
 import { wrapWithGuardrails } from './guardrails/runner';
+import { MarkdownMemoryStore } from './memory/store';
+import { loadMemoryContext } from './memory/loader';
+import { createMemoryTools } from './memory/tools';
 
 // ============================================================================
 // Logger
@@ -35,19 +38,22 @@ const log = createLogger('@agntk/core:agent');
 export interface Agent {
   /** Unique identifier for this agent instance */
   agentId: string;
-  
+
   /** Role of this agent */
   role: AgentRole;
-  
+
+  /** Initialize async resources (memory context loading). Called automatically by generate(). */
+  init: () => Promise<void>;
+
   /** Stream a response (returns the ToolLoopAgent's stream result) */
   stream: (input: { prompt: string }) => ReturnType<ToolLoopAgent['stream']>;
-  
+
   /** Generate a non-streaming response */
   generate: (input: { prompt: string }) => ReturnType<ToolLoopAgent['generate']>;
-  
+
   /** Get the underlying ToolLoopAgent instance */
   getToolLoopAgent: () => ToolLoopAgent;
-  
+
   /** Get the system prompt */
   getSystemPrompt: () => string;
 }
@@ -193,9 +199,28 @@ export function createAgent(options: AgentOptions = {}): Agent {
     tools = { ...tools, spawn_agent: spawnTool };
   }
 
-  // Memory tools will be wired in Phase 2 (P2-MEM-005)
-  // when enableMemory: true, the agent will load .agntk/ markdown files
-  // and add remember/recall/update_context/forget tools
+  // Memory: create store, add memory tools, prepare lazy context loading
+  let memoryStore: MarkdownMemoryStore | null = null;
+  let memoryContextLoaded = false;
+
+  if (options.enableMemory) {
+    const memOpts = options.memoryOptions ?? {};
+    memoryStore = (memOpts.store as MarkdownMemoryStore | undefined) ??
+      new MarkdownMemoryStore({
+        projectDir: memOpts.projectDir,
+        globalDir: memOpts.globalDir,
+        workspaceRoot,
+      });
+
+    const memoryTools = createMemoryTools({ store: memoryStore, model });
+    Object.assign(tools, memoryTools);
+
+    log.info('Memory enabled', {
+      projectPath: memoryStore.getProjectPath(),
+      globalPath: memoryStore.getGlobalPath(),
+      tools: Object.keys(memoryTools),
+    });
+  }
 
   // Apply approval to dangerous tools if configured
   const approvalConfig = resolveApprovalConfig(options.approval);
@@ -270,23 +295,58 @@ export function createAgent(options: AgentOptions = {}): Agent {
   // Create a child logger for this agent instance
   const agentLog = log.child({ agentId });
 
+  // Lazy memory context loader — runs once, cached as a singleton promise
+  let memoryInitPromise: Promise<void> | null = null;
+
+  function ensureMemoryContext(): Promise<void> {
+    if (!memoryStore) return Promise.resolve();
+    if (memoryContextLoaded) return Promise.resolve();
+    if (memoryInitPromise) return memoryInitPromise;
+
+    memoryInitPromise = (async () => {
+      memoryContextLoaded = true;
+      try {
+        const memoryContext = await loadMemoryContext(memoryStore!);
+        if (memoryContext) {
+          augmentedSystemPrompt = memoryContext + '\n\n' + augmentedSystemPrompt;
+          // Update the ToolLoopAgent instructions
+          (toolLoopAgent as unknown as { instructions: string }).instructions = augmentedSystemPrompt;
+          agentLog.debug('Memory context injected', { chars: memoryContext.length });
+        }
+      } catch (err) {
+        agentLog.warn('Failed to load memory context', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    })();
+
+    return memoryInitPromise;
+  }
+
   // Create the agent instance
   const agent: Agent = {
     agentId,
     role,
-    
+
+    init: () => ensureMemoryContext(),
+
     getToolLoopAgent: () => toolLoopAgent,
     getSystemPrompt: () => augmentedSystemPrompt,
-    
+
     stream: (input) => {
+      // Memory context is loaded lazily on first generate() call.
+      // For stream(), we kick off loading but can't await it synchronously.
+      // Callers should call generate() or await agent.init() first if memory is needed on first stream.
+      ensureMemoryContext();
       agentLog.info('stream() called', { promptLength: input.prompt.length });
       const done = agentLog.time('stream');
       const result = toolLoopAgent.stream({ prompt: input.prompt });
       // Note: Can't await async stream here, timing logged on first await
       return result;
     },
-    
+
     generate: async (input) => {
+      await ensureMemoryContext();
       agentLog.info('generate() called', {
         promptLength: input.prompt.length,
         prompt: input.prompt.slice(0, 500) + (input.prompt.length > 500 ? '...' : ''),
