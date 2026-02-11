@@ -16,8 +16,8 @@ vi.mock('@agntk/logger', () => ({
 }));
 
 // Mock workflow availability (not available by default)
-vi.mock('../workflow/durable-agent', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../workflow/durable-agent')>();
+vi.mock('../workflow/utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../workflow/utils')>();
   return {
     ...actual,
     checkWorkflowAvailability: vi.fn().mockResolvedValue(false),
@@ -27,7 +27,7 @@ vi.mock('../workflow/durable-agent', async (importOriginal) => {
 
 import { withApproval, withSchedule } from '../workflow/templates';
 import type { WorkflowTemplateResult } from '../workflow/templates';
-import { checkWorkflowAvailability } from '../workflow/durable-agent';
+import { checkWorkflowAvailability } from '../workflow/utils';
 
 const mockCheckAvailability = checkWorkflowAvailability as unknown as ReturnType<typeof vi.fn>;
 

@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import {
   getSgCliPath,
   setSgCliPath,
-  findSgCliPathSync,
+  findSgCliPath,
   DEFAULT_TIMEOUT_MS,
   DEFAULT_MAX_OUTPUT_BYTES,
   DEFAULT_MAX_MATCHES,
@@ -35,7 +35,7 @@ export async function getAstGrepPath(): Promise<string | null> {
   }
 
   initPromise = (async () => {
-    const syncPath = findSgCliPathSync();
+    const syncPath = findSgCliPath();
     if (syncPath && existsSync(syncPath)) {
       resolvedCliPath = syncPath;
       setSgCliPath(syncPath);
@@ -239,7 +239,7 @@ export async function runSg(options: RunOptions): Promise<SgResult> {
 }
 
 export function isCliAvailable(): boolean {
-  const path = findSgCliPathSync();
+  const path = findSgCliPath();
   return path !== null && existsSync(path);
 }
 

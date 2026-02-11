@@ -98,7 +98,6 @@ export {
 // Deep Reasoning Tool
 export {
   createDeepReasoningTool,
-  createSequentialThinkingTool,
   DeepReasoningEngine,
   configureDeepReasoning,
   isDeepReasoningEnabled,

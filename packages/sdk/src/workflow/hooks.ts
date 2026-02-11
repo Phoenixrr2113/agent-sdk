@@ -18,7 +18,7 @@
  */
 
 import { createLogger } from '@agntk/logger';
-import { parseDuration } from './durable-agent';
+import { parseDuration } from './utils';
 
 const log = createLogger('@agntk/core:workflow:hooks');
 

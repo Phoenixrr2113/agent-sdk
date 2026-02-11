@@ -25,5 +25,3 @@ export function createDeepReasoningTool() {
   });
 }
 
-/** @deprecated Use createDeepReasoningTool() factory instead */
-export const createSequentialThinkingTool = createDeepReasoningTool;

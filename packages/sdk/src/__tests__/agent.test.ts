@@ -79,8 +79,7 @@ vi.mock('../skills', () => ({
   buildSkillsSystemPrompt: () => '',
 }));
 
-vi.mock('../workflow/durable-agent', () => ({
-  createDurableAgent: (agent: unknown) => agent,
+vi.mock('../workflow/utils', () => ({
   checkWorkflowAvailability: async () => false,
 }));
 

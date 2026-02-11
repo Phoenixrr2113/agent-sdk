@@ -7,7 +7,7 @@
 
 import { createLogger } from '@agntk/logger';
 import type { Agent } from '../agent';
-import { checkWorkflowAvailability, parseDuration } from './durable-agent';
+import { checkWorkflowAvailability, parseDuration } from './utils';
 
 const log = createLogger('@agntk/core:workflow:templates');
 

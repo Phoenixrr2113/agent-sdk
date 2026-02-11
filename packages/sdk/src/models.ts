@@ -12,9 +12,6 @@ import type { LanguageModel } from 'ai';
 
 const log = createLogger('@agntk/core:models');
 
-// Re-export defaults for backward compatibility
-export { DEFAULT_MODELS as defaultModels };
-
 // ============================================================================
 // Provider Configuration
 // ============================================================================

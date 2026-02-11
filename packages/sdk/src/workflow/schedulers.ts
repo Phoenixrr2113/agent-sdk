@@ -11,7 +11,7 @@
 
 import { createLogger } from '@agntk/logger';
 import { sleep } from './hooks';
-import { parseDuration, formatDuration } from './durable-agent';
+import { parseDuration, formatDuration } from './utils';
 
 const log = createLogger('@agntk/core:workflow:scheduler');
 

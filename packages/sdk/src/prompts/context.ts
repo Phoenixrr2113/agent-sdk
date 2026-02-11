@@ -283,11 +283,4 @@ export async function buildDynamicSystemPrompt(
   return `${basePrompt}\n\n${contextBlock}`;
 }
 
-// Legacy overload for backward compatibility
-export async function buildSystemContextLegacy(
-  workspaceRoot?: string, 
-  includeWorkspaceMap = false
-): Promise<SystemContext> {
-  return buildSystemContext({ workspaceRoot, includeWorkspaceMap });
-}
 

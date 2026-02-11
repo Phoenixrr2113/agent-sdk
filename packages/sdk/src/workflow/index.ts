@@ -21,24 +21,13 @@ export {
   type DurabilityConfig,
 } from './durable-tool';
 
-// Durable agent factory
-// NOTE: createDurableAgent and its types are deprecated — use createAgent({ durable: true }) instead.
+// Workflow utilities (runtime detection, duration helpers)
 export {
-  /** @deprecated Use `createAgent({ durable: true })` instead. */
-  createDurableAgent,
   checkWorkflowAvailability,
   parseDuration,
   formatDuration,
   _resetWorkflowCache,
-  /** @deprecated Use `createAgent({ durable: true })` instead. */
-  type DurableAgent,
-  /** @deprecated Use `createAgent({ durable: true })` instead. */
-  type DurableAgentOptions,
-  /** @deprecated Use `createAgent({ durable: true })` instead. */
-  type DurableGenerateResult,
-  /** @deprecated Use `createAgent({ durable: true })` instead. */
-  type WebhookResponse,
-} from './durable-agent';
+} from './utils';
 
 // Standalone workflow templates
 export {

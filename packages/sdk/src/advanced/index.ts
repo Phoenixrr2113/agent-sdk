@@ -19,7 +19,7 @@ export type { ReflectionStrategy, ReflectionConfig } from '../reflection';
 // Guardrails (runners + built-ins)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export { contentFilter, topicFilter, lengthLimit, custom as customGuardrail } from '../guardrails/built-ins';
+export { contentFilter, topicFilter, lengthLimit, custom } from '../guardrails/built-ins';
 export { runGuardrails, wrapWithGuardrails, handleGuardrailResults, buildRetryFeedback } from '../guardrails/runner';
 export { GuardrailBlockedError } from '../guardrails/types';
 export type { Guardrail, GuardrailResult, GuardrailContext, GuardrailsConfig, OnBlockAction } from '../guardrails/types';
@@ -91,8 +91,6 @@ export type { ToolLifecycle, ToolContext, ToolError, ToolErrorType } from '../ty
 // Prompts (internals)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** @deprecated Use role-registry.ts via getRole() instead */
-export { systemPrompt, rolePrompts } from '../prompts/templates';
 export { buildSystemContext, formatSystemContextBlock, buildDynamicSystemPrompt } from '../prompts/context';
 export type { SystemContext } from '../prompts/context';
 

@@ -3,60 +3,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { systemPrompt, rolePrompts } from '../prompts/templates';
-import { 
-  buildSystemContext, 
+import {
+  buildSystemContext,
   formatSystemContextBlock,
   buildDynamicSystemPrompt,
-  type SystemContext 
+  type SystemContext
 } from '../prompts/context';
 
-describe('systemPrompt', () => {
-  it('should export a non-empty system prompt', () => {
-    expect(systemPrompt).toBeDefined();
-    expect(typeof systemPrompt).toBe('string');
-    expect(systemPrompt.length).toBeGreaterThan(100);
-  });
-
-  it('should include key sections', () => {
-    expect(systemPrompt).toContain('Philosophy');
-    expect(systemPrompt).toContain('Tools');
-    expect(systemPrompt).toContain('Completion');
-  });
-});
-
-describe('rolePrompts', () => {
-  it('should export role prompts object', () => {
-    expect(rolePrompts).toBeDefined();
-    expect(typeof rolePrompts).toBe('object');
-  });
-
-  it('should have generic role', () => {
-    expect(rolePrompts.generic).toBeDefined();
-    expect(rolePrompts.generic).toBe(systemPrompt);
-  });
-
-  it('should have coder role with code-specific content', () => {
-    expect(rolePrompts.coder).toBeDefined();
-    expect(rolePrompts.coder).toContain('code');
-  });
-
-  it('should have researcher role', () => {
-    expect(rolePrompts.researcher).toBeDefined();
-    expect(rolePrompts.researcher).toContain('research');
-  });
-
-  it('should have analyst role', () => {
-    expect(rolePrompts.analyst).toBeDefined();
-    expect(rolePrompts.analyst).toContain('analysis');
-  });
-
-  it('should extend base systemPrompt for specialized roles', () => {
-    expect(rolePrompts.coder).toContain(systemPrompt);
-    expect(rolePrompts.researcher).toContain(systemPrompt);
-    expect(rolePrompts.analyst).toContain(systemPrompt);
-  });
-});
+// systemPrompt / rolePrompts tests removed — prompts/templates.ts was deleted in Phase 4b.
+// Role prompts are now only in presets/roles.ts, tested via presets.test.ts.
 
 describe('buildSystemContext', () => {
   it('should return context with required fields', async () => {

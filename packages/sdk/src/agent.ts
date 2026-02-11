@@ -16,7 +16,7 @@ import { createToolPreset, type ToolPresetLevel } from './presets/tools';
 import { createSpawnAgentTool } from './tools/spawn-agent';
 import { wrapAllToolsWithRetry } from './tools/model-retry';
 import { loadSkills, buildSkillsSystemPrompt } from './skills';
-import { checkWorkflowAvailability } from './workflow/durable-agent';
+import { checkWorkflowAvailability } from './workflow/utils';
 import { wrapToolsAsDurable } from './workflow/durable-tool';
 import { createReflectionPrepareStep } from './reflection';
 import { applyApproval, resolveApprovalConfig } from './tools/approval';

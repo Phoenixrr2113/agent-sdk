@@ -5,7 +5,6 @@ export {
   NAPI_LANGUAGES,
   LANG_EXTENSIONS,
   findSgCliPath,
-  findSgCliPathSync,
   getSgCliPath,
   setSgCliPath,
   resetCliCache,

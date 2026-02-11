@@ -202,8 +202,6 @@ export function resetCliCache(): void {
   cachedCliPath = null;
 }
 
-// Alias for compatibility with oh-my-opencode naming
-export const findSgCliPathSync = findSgCliPath;
 
 export interface EnvironmentCheckResult {
   cli: {
