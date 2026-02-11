@@ -26,16 +26,6 @@ export const GEOLOCATION_API_URL = 'https://ip-api.com/json/?fields=city,regionN
 export const GEOLOCATION_ENABLED_DEFAULT = false;
 
 // ============================================================================
-// Brain / Extraction
-// ============================================================================
-
-/** Default LLM model for brain entity extraction */
-export const DEFAULT_BRAIN_EXTRACTION_MODEL = 'google/gemini-2.0-flash-001';
-
-/** Default max episodes stored in brain memory */
-export const DEFAULT_BRAIN_MAX_EPISODES = 1000;
-
-// ============================================================================
 // Browser Tool
 // ============================================================================
 
@@ -51,9 +41,6 @@ export const BROWSER_MAX_BUFFER = 5 * 1024 * 1024;
 // ============================================================================
 // Memory
 // ============================================================================
-
-/** Default Vectra storage path */
-export const DEFAULT_MEMORY_PATH = './.vectra-memory';
 
 /** Default top-K results for memory recall */
 export const DEFAULT_MEMORY_TOP_K = 5;

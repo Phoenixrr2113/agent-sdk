@@ -628,6 +628,141 @@ agent-sdk/
 └── agent-sdk.config.yaml
 ```
 
+## Integration Test Reference
+
+Run with `pnpm --filter demo integration`. Full output from a passing run:
+
+<details>
+<summary>35/35 tests passing — click to expand full output</summary>
+
+```
+════════════════════════════════════════════════════════════════════
+  🧪 REAL INTEGRATION TESTS — ALL PACKAGES
+════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════
+  🤖 TEST 1: Self-Testing Agent (all tools via generate)
+════════════════════════════════════════════════════════════════════
+
+       Tools called: [glob, shell, plan, deep_reasoning, browser, grep, ast_grep_search]
+       Total steps: 2
+       Response length: 692 chars
+  ✅ Agent exercises all tools
+
+════════════════════════════════════════════════════════════════════
+  🌊 TEST 2: Streaming (agent.stream)
+════════════════════════════════════════════════════════════════════
+
+       Chunks received: 133
+       Chunk types: [start, start-step, reasoning-start, reasoning-delta,
+                     tool-input-start, tool-input-delta, tool-call,
+                     reasoning-end, tool-result, finish-step,
+                     text-start, text-delta, text-end, finish]
+       Final text length: 107
+  ✅ agent.stream() with tool use
+
+════════════════════════════════════════════════════════════════════
+  🎭 TEST 3: All Roles (generate)
+════════════════════════════════════════════════════════════════════
+
+       generic: "4" (prompt: 328 chars)
+  ✅ generic role generates response
+       coder: "4" (prompt: 789 chars)
+  ✅ coder role generates response
+       researcher: "4" (prompt: 768 chars)
+  ✅ researcher role generates response
+       analyst: "4" (prompt: 718 chars)
+  ✅ analyst role generates response
+
+════════════════════════════════════════════════════════════════════
+  🔒 TEST 4: Durable Agent
+════════════════════════════════════════════════════════════════════
+
+       ✓ DurableAgent created with durableGenerate, withApproval, scheduled
+  ✅ createAgent({ durable: true }) creates DurableAgent
+       Response: "durable-ok"
+  ✅ Durable agent generate() still works (passthrough)
+       ✓ Tools wrapped for durability
+  ✅ wrapToolsAsDurable() wraps real tools
+       2h = 7200000ms, back = "2h"
+  ✅ parseDuration / formatDuration
+
+════════════════════════════════════════════════════════════════════
+  🧠 TEST 5: Brain Integration
+════════════════════════════════════════════════════════════════════
+
+  ✅ createBrain() — connected to FalkorDB
+       Injected tools: [queryKnowledge, remember, recall, extractEntities]
+       Tools used: [remember, remember, remember, remember, recall, remember]
+  ✅ Agent with brain uses remember + recall
+       ✓ Disconnected
+  ✅ brain.close()
+
+════════════════════════════════════════════════════════════════════
+  🌐 TEST 6: Server + Client Full-Stack
+════════════════════════════════════════════════════════════════════
+
+  ✅ GET /health
+  ✅ GET /status
+       Response: "client-ok"
+  ✅ AgentHttpClient.generate()
+       Events: 2, types: [text-delta, ]
+       Streamed text: 9 chars
+  ✅ AgentHttpClient.generateStream()
+
+════════════════════════════════════════════════════════════════════
+  📝 TEST 7: Logger
+════════════════════════════════════════════════════════════════════
+
+  INF [@test] integration test entry key="value"
+  ✅ Logger writes to console transport
+       JSON keys: [level, namespace, message, timestamp, data]
+  ✅ formatJSON() produces valid JSON
+  ✅ formatPretty() produces readable output
+  ✅ formatSSE() produces SSE format
+  ✅ Namespace utilities
+       After reset — patterns: 0
+  ✅ enable() / disable() / resetConfig() lifecycle
+  ✅ createNoopLogger() works silently
+  ✅ flush()
+
+════════════════════════════════════════════════════════════════════
+  ⚙️ TEST 8: SDK Infrastructure (config, prompts, skills, hooks, schedulers)
+════════════════════════════════════════════════════════════════════
+
+       Provider: openrouter
+  ✅ Config — loadConfig + configure + getConfig
+       ✓ All 4 tiers resolve
+  ✅ resolveModel() for all tiers
+       systemPrompt: 2995 chars, context built
+  ✅ System prompts and context
+       Discovered: 2 skills — [code-review, refactoring]
+  ✅ Skills — discoverSkills() finds SKILL.md files
+       Prompt: 848 chars, contains both skills with body content
+  ✅ Skills — buildSkillsSystemPrompt() produces injected prompt
+       Agent prompt: 1176 chars, skills injected ✓
+  ✅ Skills — createAgent({ skills }) injects into system prompt
+       Hook "test-approval" defined, registry has 0 entries
+  ✅ Hooks — defineHook + registry
+       Workflow: "test-daily-check"
+  ✅ Schedulers — createScheduledWorkflow
+       Observability enabled: false
+  ✅ Observability — check status
+       Workflow runtime available: true
+  ✅ Workflow availability check
+
+════════════════════════════════════════════════════════════════════
+  📊 FINAL RESULTS
+════════════════════════════════════════════════════════════════════
+
+  ✅ Passed:  35
+  ❌ Failed:  0
+  ⏭️  Skipped: 0
+  📋 Total:   35
+```
+
+</details>
+
 ## Requirements
 
 - Node.js >= 20

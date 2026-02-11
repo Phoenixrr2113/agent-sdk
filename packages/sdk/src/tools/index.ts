@@ -17,21 +17,6 @@ export {
   type ToolCreator,
 } from './factory';
 
-// Provider
-export {
-  createAllTools,
-  createToolActivationManager,
-  createToolRegistry,
-  instrumentTools,
-  CORE_TOOL_NAMES,
-  type CoreToolName,
-  type ToolProviderConfig,
-  type ToolProviderResult,
-  type ToolActivationManager,
-  type ToolRegistry,
-  type ToolRegistryEntry,
-} from './provider';
-
 // Glob Tool
 export {
   globTool,

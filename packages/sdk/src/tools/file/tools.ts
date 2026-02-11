@@ -17,10 +17,34 @@ import { success, error } from '../utils/tool-result';
 // ============================================================================
 
 function resolveAndValidatePath(filePath: string, workspaceRoot: string): string {
+  // Reject null bytes — can truncate paths in C-level APIs
+  if (filePath.includes('\0')) {
+    throw new Error('Null bytes not allowed in file paths');
+  }
+
   const resolved = path.resolve(workspaceRoot, filePath);
-  if (!resolved.startsWith(path.resolve(workspaceRoot))) {
+  // Follow symlinks on the workspace root to get canonical path
+  // (on macOS, /var -> /private/var would cause false rejections)
+  const realWorkspace = fs.realpathSync(path.resolve(workspaceRoot));
+
+  let realResolved: string;
+  try {
+    // Follow symlinks to get the ACTUAL filesystem target
+    realResolved = fs.realpathSync(resolved);
+  } catch {
+    // File doesn't exist yet (file_create/file_write) — validate parent directory
+    const parentReal = fs.realpathSync(path.dirname(resolved));
+    if (!parentReal.startsWith(realWorkspace + path.sep) && parentReal !== realWorkspace) {
+      throw new Error(`Path "${filePath}" is outside workspace root`);
+    }
+    return resolved;
+  }
+
+  // Trailing path.sep prevents "/workspace-evil" matching "/workspace"
+  if (!realResolved.startsWith(realWorkspace + path.sep) && realResolved !== realWorkspace) {
     throw new Error(`Path "${filePath}" is outside workspace root`);
   }
+
   return resolved;
 }
 

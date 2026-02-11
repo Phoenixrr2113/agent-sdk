@@ -9,6 +9,7 @@ import type { UsageLimits } from '../usage-limits';
 import type { ReflectionConfig } from '../reflection';
 import type { ApprovalConfig } from '../tools/approval';
 import type { GuardrailsConfig } from '../guardrails/types';
+import type { StreamEvent, StreamEventCallback } from './streaming';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Main AgentOptions Interface
@@ -237,14 +238,11 @@ export type AskUserHandler = (question: string) => Promise<string>;
 /** Callback for step completion. */
 export type StepFinishCallback = (step: StepResult<ToolSet>, index: number) => void | Promise<void>;
 
-/** Callback for streaming events. */
-export type StreamEventCallback = (event: StreamEvent) => void;
-
-/** Stream event types. */
-export interface StreamEvent {
-  type: 'text-delta' | 'tool-call' | 'tool-result' | 'step-finish' | 'finish';
-  data: unknown;
-}
+/**
+ * Callback for streaming events.
+ * Re-exported from types/streaming.ts — the canonical source with full type safety.
+ */
+export type { StreamEvent, StreamEventCallback } from './streaming';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-Agent Configuration

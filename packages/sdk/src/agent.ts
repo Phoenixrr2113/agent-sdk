@@ -304,7 +304,6 @@ export function createAgent(options: AgentOptions = {}): Agent {
     if (memoryInitPromise) return memoryInitPromise;
 
     memoryInitPromise = (async () => {
-      memoryContextLoaded = true;
       try {
         const memoryContext = await loadMemoryContext(memoryStore!);
         if (memoryContext) {
@@ -317,6 +316,8 @@ export function createAgent(options: AgentOptions = {}): Agent {
         agentLog.warn('Failed to load memory context', {
           error: err instanceof Error ? err.message : String(err),
         });
+      } finally {
+        memoryContextLoaded = true;
       }
     })();
 
@@ -333,15 +334,11 @@ export function createAgent(options: AgentOptions = {}): Agent {
     getToolLoopAgent: () => toolLoopAgent,
     getSystemPrompt: () => augmentedSystemPrompt,
 
-    stream: (input) => {
-      // Memory context is loaded lazily on first generate() call.
-      // For stream(), we kick off loading but can't await it synchronously.
-      // Callers should call generate() or await agent.init() first if memory is needed on first stream.
-      ensureMemoryContext();
+    stream: async (input) => {
+      await ensureMemoryContext();
       agentLog.info('stream() called', { promptLength: input.prompt.length });
       const done = agentLog.time('stream');
       const result = toolLoopAgent.stream({ prompt: input.prompt });
-      // Note: Can't await async stream here, timing logged on first await
       return result;
     },
 

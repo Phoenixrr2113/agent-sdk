@@ -191,11 +191,11 @@ describe('custom guardrail', () => {
 });
 
 // ============================================================================
-// runGuardrails (parallel execution)
+// runGuardrails (sequential execution with filter chaining)
 // ============================================================================
 
 describe('runGuardrails', () => {
-  it('should run guardrails in parallel', async () => {
+  it('should run guardrails sequentially', async () => {
     const order: string[] = [];
 
     const guard1: Guardrail = {
@@ -218,13 +218,50 @@ describe('runGuardrails', () => {
       },
     };
 
-    const results = await runGuardrails([guard1, guard2], 'test', { phase: 'input' });
+    const { results } = await runGuardrails([guard1, guard2], 'test', { phase: 'input' });
 
     expect(results).toHaveLength(2);
     expect(results.every((r) => r.passed)).toBe(true);
-    // Both should start before either ends (parallel)
+    // Sequential: g1 completes before g2 starts
     expect(order[0]).toBe('g1-start');
-    expect(order[1]).toBe('g2-start');
+    expect(order[1]).toBe('g1-end');
+    expect(order[2]).toBe('g2-start');
+    expect(order[3]).toBe('g2-end');
+  });
+
+  it('should chain filters sequentially so each operates on the previous output', async () => {
+    const piiFilter: Guardrail = {
+      name: 'pii-filter',
+      check: async (text) => ({
+        passed: false,
+        name: 'pii-filter',
+        message: 'PII detected',
+        filtered: text.replace(/\d{3}-\d{2}-\d{4}/g, '[SSN REDACTED]'),
+      }),
+    };
+
+    const lengthFilter: Guardrail = {
+      name: 'length-filter',
+      check: async (text) => ({
+        passed: false,
+        name: 'length-filter',
+        message: 'too long',
+        filtered: text.slice(0, 50),
+      }),
+    };
+
+    const { results, filteredText } = await runGuardrails(
+      [piiFilter, lengthFilter],
+      'My SSN is 123-45-6789 and this is a long sentence that should be truncated',
+      { phase: 'output' },
+    );
+
+    expect(results).toHaveLength(2);
+    // The key assertion: PII should be redacted AND text should be truncated
+    // If filters ran in parallel, the truncated version would still contain the SSN
+    expect(filteredText).not.toContain('123-45-6789');
+    expect(filteredText).toContain('[SSN REDACTED]');
+    expect(filteredText.length).toBeLessThanOrEqual(50);
   });
 
   it('should handle guardrail errors gracefully', async () => {
@@ -233,16 +270,17 @@ describe('runGuardrails', () => {
       check: () => { throw new Error('boom'); },
     };
 
-    const results = await runGuardrails([guard], 'test', { phase: 'input' });
+    const { results } = await runGuardrails([guard], 'test', { phase: 'input' });
 
     expect(results).toHaveLength(1);
     expect(results[0].passed).toBe(false);
     expect(results[0].message).toContain('boom');
   });
 
-  it('should return empty array for no guardrails', async () => {
-    const results = await runGuardrails([], 'test', { phase: 'input' });
+  it('should return empty results for no guardrails', async () => {
+    const { results, filteredText } = await runGuardrails([], 'test', { phase: 'input' });
     expect(results).toEqual([]);
+    expect(filteredText).toBe('test');
   });
 });
 
@@ -256,7 +294,7 @@ describe('handleGuardrailResults', () => {
       { passed: true, name: 'g1' },
       { passed: true, name: 'g2' },
     ];
-    const outcome = handleGuardrailResults(results, 'text', 'output', 'throw');
+    const outcome = handleGuardrailResults(results, 'text', 'text', 'output', 'throw');
     expect(outcome.blocked).toBe(false);
   });
 
@@ -264,14 +302,14 @@ describe('handleGuardrailResults', () => {
     const results: GuardrailResult[] = [
       { passed: false, name: 'g1', message: 'blocked' },
     ];
-    expect(() => handleGuardrailResults(results, 'text', 'output', 'throw')).toThrow(GuardrailBlockedError);
+    expect(() => handleGuardrailResults(results, 'text', 'text', 'output', 'throw')).toThrow(GuardrailBlockedError);
   });
 
   it('should return filtered text with onBlock=filter', () => {
     const results: GuardrailResult[] = [
       { passed: false, name: 'g1', message: 'blocked', filtered: 'clean text' },
     ];
-    const outcome = handleGuardrailResults(results, 'dirty text', 'output', 'filter');
+    const outcome = handleGuardrailResults(results, 'dirty text', 'clean text', 'output', 'filter');
     expect(outcome.blocked).toBe(true);
     expect(outcome.text).toBe('clean text');
   });
@@ -280,7 +318,7 @@ describe('handleGuardrailResults', () => {
     const results: GuardrailResult[] = [
       { passed: false, name: 'g1', message: 'blocked' },
     ];
-    const outcome = handleGuardrailResults(results, 'text', 'output', 'retry');
+    const outcome = handleGuardrailResults(results, 'text', 'text', 'output', 'retry');
     expect(outcome.blocked).toBe(true);
     expect(outcome.text).toBe('text');
   });
@@ -437,7 +475,7 @@ describe('wrapWithGuardrails', () => {
     expect(result.text).toBe('Clean response');
   });
 
-  it('should run 2 input guardrails concurrently', async () => {
+  it('should run input guardrails sequentially for correct filter chaining', async () => {
     const order: string[] = [];
 
     const guard1: Guardrail = {
@@ -468,7 +506,7 @@ describe('wrapWithGuardrails', () => {
 
     await wrapped({ prompt: 'test' });
 
-    // Both should start before either finishes
-    expect(order.slice(0, 2)).toEqual(['input-1-start', 'input-2-start']);
+    // Guardrails run sequentially so each filter operates on previous output
+    expect(order).toEqual(['input-1-start', 'input-1-end', 'input-2-start', 'input-2-end']);
   });
 });

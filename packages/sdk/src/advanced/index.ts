@@ -91,6 +91,7 @@ export type { ToolLifecycle, ToolContext, ToolError, ToolErrorType } from '../ty
 // Prompts (internals)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/** @deprecated Use role-registry.ts via getRole() instead */
 export { systemPrompt, rolePrompts } from '../prompts/templates';
 export { buildSystemContext, formatSystemContextBlock, buildDynamicSystemPrompt } from '../prompts/context';
 export type { SystemContext } from '../prompts/context';
@@ -110,10 +111,10 @@ export { loadSkillsFromPaths, buildSkillsSystemPrompt, searchSkills, filterEligi
 export type { SkillSearchResult } from '../skills';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Logger (extended types)
+// Logger — import directly from @agntk/logger
 // ═══════════════════════════════════════════════════════════════════════════════
-
-export type { LoggerOptions, LogEntry, LogSubscriber, AgentContext as LoggerAgentContext } from '../utils/logger';
+// Removed: shadow logger type re-exports (BUG-001).
+// Use: import { type LoggerOptions, ... } from '@agntk/logger';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Usage Limits (extended types)

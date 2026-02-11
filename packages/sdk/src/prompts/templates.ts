@@ -1,6 +1,10 @@
 /**
  * @agntk/core - System Prompt Templates
  * Core system prompts for agent behavior
+ *
+ * @deprecated Use `presets/role-registry.ts` instead. That module is the canonical
+ * source of truth for role prompts, used by `createAgent()` via `getRole()`.
+ * This file is kept for backward compatibility of public exports only.
  */
 
 export const systemPrompt = `You are an autonomous agent. Your purpose is to accomplish the user's goal using whatever approach makes sense.

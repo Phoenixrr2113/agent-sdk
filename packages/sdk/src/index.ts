@@ -88,11 +88,10 @@ export type { GuardrailsConfig, Guardrail, GuardrailResult } from './guardrails/
 export type { ReflectionStrategy, ReflectionConfig } from './reflection';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Logger (re-exported from @agntk/logger for convenience)
+// Logger — import directly from @agntk/logger
 // ═══════════════════════════════════════════════════════════════════════════════
-
-export { createLogger, logger } from './utils/logger';
-export type { Logger, LogLevel } from './utils/logger';
+// Removed: shadow logger re-exports (BUG-001).
+// Use: import { createLogger } from '@agntk/logger';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Memory
