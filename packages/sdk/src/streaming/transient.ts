@@ -279,6 +279,8 @@ export function streamProgress(
 
 /**
  * Stream reasoning step transiently.
+ *
+ * @internal Forward-designed for CLI streaming feature. No production callers yet.
  */
 export function streamReasoningStep(
   ctx: ToolContext,
@@ -303,6 +305,8 @@ export function streamReasoningStep(
 
 /**
  * Stream sub-agent output transiently.
+ *
+ * @internal Forward-designed for CLI streaming feature. No production callers yet.
  */
 export function streamSubAgent(
   ctx: ToolContext,

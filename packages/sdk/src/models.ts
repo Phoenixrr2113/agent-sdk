@@ -136,42 +136,23 @@ function createModelForProvider(
 // Model Tier Functions
 // ============================================================================
 
+/**
+ * Create a model for a given tier, respecting env overrides and Ollama fallback.
+ */
+function createTierModel(tier: ModelTier): LanguageModel {
+  if (process.env['OLLAMA_ENABLED'] === 'true') {
+    const modelName = getOllamaEnvModel(tier) || DEFAULT_MODELS.ollama[tier];
+    return createModelForProvider('ollama', modelName);
+  }
+  const modelName = getEnvModel(tier) || DEFAULT_MODELS.openrouter[tier];
+  return createModelForProvider('openrouter', modelName);
+}
+
 export const models = {
-  fast: (): LanguageModel => {
-    if (process.env['OLLAMA_ENABLED'] === 'true') {
-      const modelName = getOllamaEnvModel('fast') || DEFAULT_MODELS.ollama.fast;
-      return createModelForProvider('ollama', modelName);
-    }
-    const modelName = getEnvModel('fast') || DEFAULT_MODELS.openrouter.fast;
-    return createModelForProvider('openrouter', modelName);
-  },
-
-  standard: (): LanguageModel => {
-    if (process.env['OLLAMA_ENABLED'] === 'true') {
-      const modelName = getOllamaEnvModel('standard') || DEFAULT_MODELS.ollama.standard;
-      return createModelForProvider('ollama', modelName);
-    }
-    const modelName = getEnvModel('standard') || DEFAULT_MODELS.openrouter.standard;
-    return createModelForProvider('openrouter', modelName);
-  },
-
-  reasoning: (): LanguageModel => {
-    if (process.env['OLLAMA_ENABLED'] === 'true') {
-      const modelName = getOllamaEnvModel('reasoning') || DEFAULT_MODELS.ollama.reasoning;
-      return createModelForProvider('ollama', modelName);
-    }
-    const modelName = getEnvModel('reasoning') || DEFAULT_MODELS.openrouter.reasoning;
-    return createModelForProvider('openrouter', modelName);
-  },
-
-  powerful: (): LanguageModel => {
-    if (process.env['OLLAMA_ENABLED'] === 'true') {
-      const modelName = getOllamaEnvModel('powerful') || DEFAULT_MODELS.ollama.powerful;
-      return createModelForProvider('ollama', modelName);
-    }
-    const modelName = getEnvModel('powerful') || DEFAULT_MODELS.openrouter.powerful;
-    return createModelForProvider('openrouter', modelName);
-  },
+  fast: (): LanguageModel => createTierModel('fast'),
+  standard: (): LanguageModel => createTierModel('standard'),
+  reasoning: (): LanguageModel => createTierModel('reasoning'),
+  powerful: (): LanguageModel => createTierModel('powerful'),
 };
 
 // ============================================================================
@@ -224,16 +205,12 @@ export function resolveModel(options: ModelResolutionOptions = {}): LanguageMode
 // ============================================================================
 
 export function getModelInfo(tier: ModelTier): { provider: ModelProvider; name: string } {
-  if (process.env['OLLAMA_ENABLED'] === 'true') {
-    return {
-      provider: 'ollama',
-      name: getOllamaEnvModel(tier) || DEFAULT_MODELS.ollama[tier],
-    };
-  }
-  return {
-    provider: 'openrouter',
-    name: getEnvModel(tier) || DEFAULT_MODELS.openrouter[tier],
-  };
+  const isOllama = process.env['OLLAMA_ENABLED'] === 'true';
+  const provider: ModelProvider = isOllama ? 'ollama' : 'openrouter';
+  const name = isOllama
+    ? (getOllamaEnvModel(tier) || DEFAULT_MODELS.ollama[tier])
+    : (getEnvModel(tier) || DEFAULT_MODELS.openrouter[tier]);
+  return { provider, name };
 }
 
 export function listAvailableTiers(): ModelTier[] {

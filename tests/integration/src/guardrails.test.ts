@@ -71,13 +71,13 @@ describe('Guardrails', () => {
   });
 
   describe('runGuardrails', () => {
-    it('should run all guardrails in parallel and collect results', async () => {
+    it('should run all guardrails sequentially and collect results', async () => {
       const guards = [
         contentFilter(),
         lengthLimit({ maxChars: 10 }),
       ];
 
-      const results = await runGuardrails(guards, 'This message is too long and clean', {
+      const { results } = await runGuardrails(guards, 'This message is too long and clean', {
         prompt: 'test',
         phase: 'output',
       });
