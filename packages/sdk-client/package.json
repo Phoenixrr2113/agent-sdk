@@ -29,6 +29,30 @@
     "vitest": "^3.2.3",
     "@types/node": "^20.17.19"
   },
-  "keywords": ["ai", "agent", "client", "http", "websocket"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agntk/agntk.git",
+    "directory": "packages/sdk-client"
+  },
+  "homepage": "https://github.com/agntk/agntk#readme",
+  "bugs": {
+    "url": "https://github.com/agntk/agntk/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "client",
+    "http",
+    "websocket",
+    "sse"
+  ],
   "license": "MIT"
 }

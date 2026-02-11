@@ -62,12 +62,31 @@
       "optional": true
     }
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agntk/agntk.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/agntk/agntk#readme",
+  "bugs": {
+    "url": "https://github.com/agntk/agntk/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "keywords": [
     "ai",
     "agent",
     "llm",
     "ai-sdk",
-    "tools"
+    "tools",
+    "workflow",
+    "durable"
   ],
   "license": "MIT"
 }

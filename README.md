@@ -630,7 +630,7 @@ agent-sdk/
 
 ## Requirements
 
-- Node.js >= 18
+- Node.js >= 20
 - pnpm >= 9
 - FalkorDB (optional, for `@agntk/brain`)
 - Temporal (optional, for durable workflows)

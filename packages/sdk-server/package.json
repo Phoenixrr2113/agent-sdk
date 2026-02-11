@@ -32,11 +32,30 @@
     "typescript": "^5.7.3",
     "vitest": "^3.2.3"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agntk/agntk.git",
+    "directory": "packages/sdk-server"
+  },
+  "homepage": "https://github.com/agntk/agntk#readme",
+  "bugs": {
+    "url": "https://github.com/agntk/agntk/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "keywords": [
     "ai",
     "agent",
     "server",
-    "hono"
+    "hono",
+    "sse",
+    "websocket"
   ],
   "license": "MIT"
 }

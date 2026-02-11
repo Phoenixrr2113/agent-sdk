@@ -1,5 +1,5 @@
 {
-  "name": "agntk-monorepo",
+  "name": "agntk",
   "version": "0.1.0",
   "private": true,
   "description": "Agent SDK - AI agent tools and server for the AI SDK",
@@ -44,6 +44,14 @@
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agntk/agntk.git"
+  },
+  "homepage": "https://github.com/agntk/agntk#readme",
+  "bugs": {
+    "url": "https://github.com/agntk/agntk/issues"
+  },
   "engines": {
     "node": ">=20.0.0"
   },
