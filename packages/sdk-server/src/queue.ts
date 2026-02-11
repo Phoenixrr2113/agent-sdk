@@ -1,13 +1,13 @@
 /**
- * @agent/sdk-server - Concurrency Queue
+ * @agntk/server - Concurrency Queue
  *
  * Limits concurrent agent executions to prevent resource exhaustion.
  * Requests that exceed the limit are queued with configurable timeout.
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 
-const log = createLogger('@agent/sdk-server:queue');
+const log = createLogger('@agntk/server:queue');
 
 /**
  * Configuration for the concurrency queue.

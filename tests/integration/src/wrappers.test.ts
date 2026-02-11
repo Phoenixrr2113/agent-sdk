@@ -15,8 +15,8 @@ import {
   resolveApprovalConfig,
   isDangerousTool,
   DANGEROUS_TOOLS,
-} from '@agent/sdk';
-import type { ReflectionConfig } from '@agent/sdk';
+} from '@agntk/core';
+import type { ReflectionConfig } from '@agntk/core';
 import { createMockModel, createMockMultiModel } from './setup';
 
 describe('Wrappers', () => {

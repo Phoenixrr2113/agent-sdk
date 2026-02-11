@@ -1,5 +1,5 @@
 {
-  "name": "@agent/brain",
+  "name": "@agntk/brain",
   "version": "0.1.0",
   "type": "module",
   "description": "Knowledge graph and memory system for AI agents",
@@ -34,7 +34,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@agent/logger": "workspace:*",
+    "@agntk/logger": "workspace:*",
     "@openrouter/ai-sdk-provider": "^1.5.4",
     "ai": "6.0.77",
     "falkordb": "^6.4.1",
@@ -44,7 +44,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@agent/config-typescript": "workspace:*",
+    "@agntk/config-typescript": "workspace:*",
     "@types/node": "^20.17.19",
     "tree-sitter": "^0.22.4",
     "tree-sitter-c-sharp": "^0.23.1",

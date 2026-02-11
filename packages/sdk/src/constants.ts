@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - SDK-wide Constants
+ * @agntk/core - SDK-wide Constants
  *
  * Centralized constants for URLs, defaults, and magic numbers.
  * All hardcoded values should live here for easy configuration.

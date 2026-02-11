@@ -47,7 +47,7 @@ maxSteps: 10
 ## Loading Configuration
 
 ```typescript
-import { loadConfig, configure, getConfig, resolveModel } from '@agent/sdk';
+import { loadConfig, configure, getConfig, resolveModel } from '@agntk/core';
 
 // Load from YAML
 const config = loadConfig('./agent-sdk.config.yaml');

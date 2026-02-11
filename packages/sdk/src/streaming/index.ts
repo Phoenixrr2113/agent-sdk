@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Streaming Module
+ * @agntk/core - Streaming Module
  *
  * Exports for transient streaming and custom data parts.
  */

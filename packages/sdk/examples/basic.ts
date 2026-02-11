@@ -3,7 +3,7 @@
  * Demonstrates core API for creating and using an agent.
  */
 
-import { createAgent } from '@agent/sdk';
+import { createAgent } from '@agntk/core';
 
 async function main() {
   // Create agent with standard tools

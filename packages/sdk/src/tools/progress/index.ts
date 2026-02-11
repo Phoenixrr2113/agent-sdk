@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Progress Tracking Tools
+ * @agntk/core - Progress Tracking Tools
  *
  * Manages a progress.json file in the workspace for long-running agents
  * to track task completion across sessions. Session log is append-only.
@@ -9,9 +9,9 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { tool } from 'ai';
 import { z } from 'zod';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 
-const log = createLogger('@agent/sdk:progress');
+const log = createLogger('@agntk/core:progress');
 
 // ============================================================================
 // Types

@@ -1,5 +1,5 @@
-// @agent/sdk-client - Main exports
-// Re-exports client functionality for connecting to @agent/sdk-server
+// @agntk/client - Main exports
+// Re-exports client functionality for connecting to @agntk/server
 
 export { AgentClient, type AgentClientOptions } from './client';
 export { AgentHttpClient } from './http-client';

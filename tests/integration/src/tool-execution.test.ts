@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import { tool } from 'ai';
-import { createAgent } from '@agent/sdk';
+import { createAgent } from '@agntk/core';
 import { createMockModel, createMockToolModel } from './setup';
 
 describe('Tool Execution', () => {

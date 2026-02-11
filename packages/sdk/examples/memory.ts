@@ -3,7 +3,7 @@
  * Demonstrates semantic memory for context persistence.
  */
 
-import { createAgent } from '@agent/sdk';
+import { createAgent } from '@agntk/core';
 
 async function main() {
   // Create agent with memory enabled

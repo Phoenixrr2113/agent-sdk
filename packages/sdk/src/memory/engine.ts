@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Unified Memory Engine
+ * @agntk/core - Unified Memory Engine
  *
  * Single write path: remember() → LLM extraction → parallel writes to Vectra + Graph.
  * Implements Mem0 ADD/UPDATE/DELETE/NOOP pattern with Hindsight 4-network taxonomy.
@@ -12,7 +12,7 @@
  */
 
 import type { LanguageModel } from 'ai';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type { MemoryStore, MemorySearchResult } from './vectra-store';
 import {
   extractFacts,
@@ -21,7 +21,7 @@ import {
   type MemoryOperation,
 } from './extraction';
 
-const log = createLogger('@agent/sdk:memory-engine');
+const log = createLogger('@agntk/core:memory-engine');
 
 // ============================================================================
 // Types

@@ -8,7 +8,7 @@ description: Build your first agent in 5 minutes
 ## Create Your First Agent
 
 ```typescript
-import { createAgent } from '@agent/sdk';
+import { createAgent } from '@agntk/core';
 
 const agent = createAgent({
   role: 'coder',                // 'generic' | 'coder' | 'researcher' | 'analyst'

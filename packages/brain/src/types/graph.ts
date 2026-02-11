@@ -1,5 +1,5 @@
 /**
- * @agent/brain - Graph Types
+ * @agntk/brain - Graph Types
  * Types for graph visualization and queries
  */
 

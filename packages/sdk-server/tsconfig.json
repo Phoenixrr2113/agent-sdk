@@ -1,5 +1,5 @@
 {
-  "extends": "@agent/config-typescript/library.json",
+  "extends": "@agntk/config-typescript/library.json",
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist",

@@ -10,9 +10,9 @@ import { getGrammar as getPythonGrammar } from '../plugins/python';
 import { getGrammar as getCSharpGrammar } from '../plugins/csharp';
 import { readFile } from 'node:fs/promises';
 import { extname } from 'node:path';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 
-const logger = createLogger('@agent/brain:parser');
+const logger = createLogger('@agntk/brain:parser');
 
 // ============================================================================
 // Types

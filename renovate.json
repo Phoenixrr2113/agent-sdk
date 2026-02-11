@@ -34,10 +34,10 @@
       "automergeStrategy": "squash"
     },
     {
-      "description": "Group all @agent/* internal packages with automerge",
+      "description": "Group all @agntk/* internal packages with automerge",
       "matchDatasources": ["npm"],
-      "matchPackagePatterns": ["^@agent/"],
-      "groupName": "Internal @agent packages",
+      "matchPackagePatterns": ["^@agntk/"],
+      "groupName": "Internal @agntk packages",
       "automerge": true,
       "automergeType": "pr",
       "automergeStrategy": "squash"

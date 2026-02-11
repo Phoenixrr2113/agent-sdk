@@ -1,5 +1,5 @@
 /**
- * @fileoverview Type exports for @agent/sdk
+ * @fileoverview Type exports for @agntk/core
  */
 
 // Agent configuration types

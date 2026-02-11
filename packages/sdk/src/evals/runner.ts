@@ -1,10 +1,10 @@
 /**
- * @agent/sdk - Eval Suite Runner
+ * @agntk/core - Eval Suite Runner
  *
  * Runs eval cases with concurrency control and reporting.
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type {
   EvalSuiteConfig,
   EvalSuiteResult,
@@ -15,7 +15,7 @@ import type {
 } from './types';
 import type { Agent } from '../agent';
 
-const log = createLogger('@agent/sdk:evals');
+const log = createLogger('@agntk/core:evals');
 
 // ============================================================================
 // Suite Factory

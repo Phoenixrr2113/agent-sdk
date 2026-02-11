@@ -5,9 +5,9 @@
 
 import { FalkorDB, type Graph, type FalkorDBOptions } from 'falkordb';
 import type { QueryOptions as FalkorQueryOptions } from 'falkordb/dist/src/commands';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 
-const log = createLogger('@agent/brain:graph');
+const log = createLogger('@agntk/brain:graph');
 
 /**
  * FalkorDB connection configuration

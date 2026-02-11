@@ -3,7 +3,7 @@
  * Orchestrates parsing of entire codebases and persisting to graph
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { stat, readFile } from 'node:fs/promises';
 import { basename, extname } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
@@ -25,7 +25,7 @@ function asSyntaxNode(node: Parser.SyntaxNode): SyntaxNode {
   return node as unknown as SyntaxNode;
 }
 
-const logger = createLogger('@agent/brain:parseProject');
+const logger = createLogger('@agntk/brain:parseProject');
 
 const SUPPORTED_EXTENSIONS: readonly string[] = [
   '.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs',

@@ -1,8 +1,8 @@
 /**
- * @agent/sdk-server - Type Definitions
+ * @agntk/server - Type Definitions
  */
 
-import type { AgentOptions } from '@agent/sdk';
+import type { AgentOptions } from '@agntk/core';
 import type { QueueConfig } from './queue';
 import type { StreamBufferOptions } from './stream-buffer';
 
@@ -56,7 +56,7 @@ export interface AgentServerOptions {
 
 /**
  * Agent instance interface (minimal contract)
- * Full typing comes from @agent/sdk
+ * Full typing comes from @agntk/core
  */
 export interface AgentInstance {
   generate: (opts: GenerateOptions) => Promise<GenerateResult>;

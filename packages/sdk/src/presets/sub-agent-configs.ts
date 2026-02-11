@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Sub-Agent Role Configurations
+ * @agntk/core - Sub-Agent Role Configurations
  * Predefined configurations for specialized sub-agent roles
  */
 

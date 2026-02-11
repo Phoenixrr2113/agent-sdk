@@ -15,7 +15,7 @@ importers:
         specifier: ^2.8.2
         version: 2.8.2
     devDependencies:
-      '@agent/config-eslint':
+      '@agntk/config-eslint':
         specifier: workspace:*
         version: link:packages/config-eslint
       '@changesets/cli':
@@ -52,40 +52,6 @@ importers:
         specifier: ^8.0.0
         version: 8.53.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
 
-  apps/demo:
-    dependencies:
-      '@agent/brain':
-        specifier: workspace:*
-        version: link:../../packages/brain
-      '@agent/logger':
-        specifier: workspace:*
-        version: link:../../packages/logger
-      '@agent/sdk':
-        specifier: workspace:*
-        version: link:../../packages/sdk
-      '@agent/sdk-client':
-        specifier: workspace:*
-        version: link:../../packages/sdk-client
-      '@agent/sdk-server':
-        specifier: workspace:*
-        version: link:../../packages/sdk-server
-      dotenv:
-        specifier: ^17.2.3
-        version: 17.2.3
-    devDependencies:
-      '@agent/config-typescript':
-        specifier: workspace:*
-        version: link:../../packages/config-typescript
-      '@types/node':
-        specifier: ^20.17.19
-        version: 20.19.29
-      tsx:
-        specifier: ^4.19.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-
   apps/docs:
     dependencies:
       '@astrojs/starlight':
@@ -110,7 +76,7 @@ importers:
 
   packages/brain:
     dependencies:
-      '@agent/logger':
+      '@agntk/logger':
         specifier: workspace:*
         version: link:../logger
       '@openrouter/ai-sdk-provider':
@@ -135,7 +101,7 @@ importers:
         specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
-      '@agent/config-typescript':
+      '@agntk/config-typescript':
         specifier: workspace:*
         version: link:../config-typescript
       '@types/node':
@@ -188,7 +154,7 @@ importers:
 
   packages/logger:
     devDependencies:
-      '@agent/config-typescript':
+      '@agntk/config-typescript':
         specifier: workspace:*
         version: link:../config-typescript
       '@types/node':
@@ -203,7 +169,7 @@ importers:
 
   packages/sdk:
     dependencies:
-      '@agent/logger':
+      '@agntk/logger':
         specifier: workspace:*
         version: link:../logger
       '@ai-sdk/openai-compatible':
@@ -234,7 +200,7 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
     devDependencies:
-      '@agent/config-typescript':
+      '@agntk/config-typescript':
         specifier: workspace:*
         version: link:../config-typescript
       '@types/node':
@@ -249,14 +215,14 @@ importers:
 
   packages/sdk-client:
     dependencies:
-      '@agent/logger':
+      '@agntk/logger':
         specifier: workspace:*
         version: link:../logger
       ai:
         specifier: 6.0.77
         version: 6.0.77(zod@4.3.6)
     devDependencies:
-      '@agent/config-typescript':
+      '@agntk/config-typescript':
         specifier: workspace:*
         version: link:../config-typescript
       '@types/node':
@@ -271,12 +237,12 @@ importers:
 
   packages/sdk-server:
     dependencies:
-      '@agent/logger':
-        specifier: workspace:*
-        version: link:../logger
-      '@agent/sdk':
+      '@agntk/core':
         specifier: workspace:*
         version: link:../sdk
+      '@agntk/logger':
+        specifier: workspace:*
+        version: link:../logger
       '@hono/node-server':
         specifier: ^1.13.8
         version: 1.19.9(hono@4.11.4)
@@ -287,7 +253,7 @@ importers:
         specifier: ^4.7.4
         version: 4.11.4
     devDependencies:
-      '@agent/config-typescript':
+      '@agntk/config-typescript':
         specifier: workspace:*
         version: link:../config-typescript
       '@types/node':
@@ -302,13 +268,13 @@ importers:
 
   tests/integration:
     devDependencies:
-      '@agent/sdk':
-        specifier: workspace:*
-        version: link:../../packages/sdk
-      '@agent/sdk-client':
+      '@agntk/client':
         specifier: workspace:*
         version: link:../../packages/sdk-client
-      '@agent/sdk-server':
+      '@agntk/core':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@agntk/server':
         specifier: workspace:*
         version: link:../../packages/sdk-server
       ai:
@@ -11780,6 +11746,7 @@ snapshots:
   get-tsconfig@4.13.0:
     dependencies:
       resolve-pkg-maps: 1.0.0
+    optional: true
 
   get-uri@6.0.5:
     dependencies:
@@ -13972,7 +13939,8 @@ snapshots:
 
   resolve-from@5.0.0: {}
 
-  resolve-pkg-maps@1.0.0: {}
+  resolve-pkg-maps@1.0.0:
+    optional: true
 
   resolve@1.22.11:
     dependencies:
@@ -14631,6 +14599,7 @@ snapshots:
       get-tsconfig: 4.13.0
     optionalDependencies:
       fsevents: 2.3.3
+    optional: true
 
   turbo-darwin-64@2.7.4:
     optional: true

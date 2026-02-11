@@ -48,7 +48,7 @@ vi.mock('node:fs/promises', () => ({
   mkdir: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@agent/logger', () => ({
+vi.mock('@agntk/logger', () => ({
   createLogger: () => ({
     info: vi.fn(),
     debug: vi.fn(),

@@ -322,7 +322,7 @@ export interface MemoryOptions {
 // Brain Configuration
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Brain instance type (imported from @agent/brain at runtime) */
+/** Brain instance type (imported from @agntk/brain at runtime) */
 export interface BrainInstance {
   query(term: string, limit?: number): Promise<unknown[]>;
   remember(fact: string, metadata?: Record<string, unknown>): Promise<void>;

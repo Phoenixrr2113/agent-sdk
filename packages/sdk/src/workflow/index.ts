@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Workflow Module
+ * @agntk/core - Workflow Module
  *
  * Exports for workflow durability and orchestration.
  * Provides durable agent wrapping and tool checkpointing

@@ -33,11 +33,11 @@ pnpm --filter demo integration
 ```
 agent-sdk/
 ├── packages/
-│   ├── sdk/           # @agent/sdk — Core agent factory
-│   ├── sdk-server/    # @agent/sdk-server — HTTP server
-│   ├── sdk-client/    # @agent/sdk-client — Client library
-│   ├── logger/        # @agent/logger — Structured logging
-│   └── brain/         # @agent/brain — Knowledge graph
+│   ├── sdk/           # @agntk/core — Core agent factory
+│   ├── sdk-server/    # @agntk/server — HTTP server
+│   ├── sdk-client/    # @agntk/client — Client library
+│   ├── logger/        # @agntk/logger — Structured logging
+│   └── brain/         # @agntk/brain — Knowledge graph
 ├── apps/
 │   ├── demo/          # Integration tests and demos
 │   └── docs/          # Documentation site
@@ -48,7 +48,7 @@ agent-sdk/
 
 ### FalkorDB (for Knowledge Graph)
 
-If you plan to use `@agent/brain`, you'll need FalkorDB running locally:
+If you plan to use `@agntk/brain`, you'll need FalkorDB running locally:
 
 ```bash
 docker run -p 6379:6379 falkordb/falkordb

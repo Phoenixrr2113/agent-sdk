@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Tools Module
+ * @agntk/core - Tools Module
  *
  * Central export for tool factory, provider, and utilities.
  */

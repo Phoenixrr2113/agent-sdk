@@ -3,15 +3,15 @@ title: SDK Server
 description: Hono-based HTTP server with REST, SSE, and WebSocket endpoints
 ---
 
-# SDK Server (`@agent/sdk-server`)
+# SDK Server (`@agntk/server`)
 
 Hono-based HTTP server with REST, SSE streaming, and WebSocket endpoints.
 
 ## Basic Setup
 
 ```typescript
-import { createAgentServer } from '@agent/sdk-server';
-import { createAgent } from '@agent/sdk';
+import { createAgentServer } from '@agntk/server';
+import { createAgent } from '@agntk/core';
 
 const agent = createAgent({
   role: 'coder',
@@ -55,7 +55,7 @@ server.start();
 ## Server Options
 
 ```typescript
-import { createAgentServer } from '@agent/sdk-server';
+import { createAgentServer } from '@agntk/server';
 
 const server = createAgentServer({
   agent,

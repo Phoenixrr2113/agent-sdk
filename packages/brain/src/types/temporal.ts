@@ -1,5 +1,5 @@
 /**
- * @agent/brain - Temporal Types
+ * @agntk/brain - Temporal Types
  * Types for temporal awareness - tracking when facts are valid
  */
 

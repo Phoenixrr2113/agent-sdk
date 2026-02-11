@@ -1,5 +1,5 @@
 /**
- * @agent/brain
+ * @agntk/brain
  * Knowledge graph and memory system for AI agents
  *
  * The brain provides:
@@ -11,8 +11,8 @@
  *
  * @example
  * ```typescript
- * import { createClient, createQueries, createOperations } from '@agent/brain';
- * import { EntityExtractor } from '@agent/brain/nlp';
+ * import { createClient, createQueries, createOperations } from '@agntk/brain';
+ * import { EntityExtractor } from '@agntk/brain/nlp';
  *
  * // Connect to knowledge graph
  * const client = await createClient({

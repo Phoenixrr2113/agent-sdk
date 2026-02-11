@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Logger Tests
+ * @agntk/core - Logger Tests
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Tool Factory
+ * @agntk/core - Tool Factory
  *
  * Factory pattern for creating tool sets with dependency injection.
  * Adapted from packages/core/src/tools/factory.ts

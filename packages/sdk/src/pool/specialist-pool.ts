@@ -5,7 +5,7 @@
  * Each specialist can have skills injected and maintains conversation history.
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type {
   SpecialistPoolConfig,
   SpecialistConfig,
@@ -17,7 +17,7 @@ import type {
 import type { AgentOptions, AgentRole } from '../types/agent';
 import { loadSkillsFromPaths, buildSkillsSystemPrompt } from '../skills';
 
-const log = createLogger('@agent/sdk:pool');
+const log = createLogger('@agntk/core:pool');
 
 // ============================================================================
 // Constants

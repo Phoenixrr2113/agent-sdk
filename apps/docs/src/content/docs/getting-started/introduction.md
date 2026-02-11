@@ -22,16 +22,16 @@ Agent SDK provides a complete toolkit for building AI agents that can:
 
 | Package | Description |
 |---------|-------------|
-| `@agent/sdk` | Core agent factory — tools, roles, config, streaming, durability, hooks, scheduling |
-| `@agent/sdk-server` | Hono HTTP server — REST + SSE + WebSocket endpoints |
-| `@agent/sdk-client` | Client library — HTTP, SSE streams, WebSocket, session management |
-| `@agent/logger` | Structured logging — namespace filtering, file/SSE transports, formatters |
-| `@agent/brain` | Knowledge graph — FalkorDB, code parsing, NLP entity extraction |
+| `@agntk/core` | Core agent factory — tools, roles, config, streaming, durability, hooks, scheduling |
+| `@agntk/server` | Hono HTTP server — REST + SSE + WebSocket endpoints |
+| `@agntk/client` | Client library — HTTP, SSE streams, WebSocket, session management |
+| `@agntk/logger` | Structured logging — namespace filtering, file/SSE transports, formatters |
+| `@agntk/brain` | Knowledge graph — FalkorDB, code parsing, NLP entity extraction |
 
 ## Quick Example
 
 ```typescript
-import { createAgent } from '@agent/sdk';
+import { createAgent } from '@agntk/core';
 
 const agent = createAgent({
   role: 'coder',

@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Durable Agent Factory
+ * @agntk/core - Durable Agent Factory
  *
  * Creates agents with workflow durability features.
  * Uses the Workflow DevKit ("use workflow" / "use step" directives)
@@ -13,11 +13,11 @@
  * @see https://useworkflow.dev
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type { Agent } from '../agent';
 import type { AgentOptions, WorkflowOptions } from '../types/agent';
 
-const log = createLogger('@agent/sdk:workflow:durable');
+const log = createLogger('@agntk/core:workflow:durable');
 
 // ============================================================================
 // Types
@@ -331,8 +331,8 @@ async function durableScheduledWorkflow(
  *
  * @example
  * ```typescript
- * import { createAgent } from '@agent/sdk';
- * import { createDurableAgent } from '@agent/sdk/workflow';
+ * import { createAgent } from '@agntk/core';
+ * import { createDurableAgent } from '@agntk/core/workflow';
  *
  * const base = createAgent({ role: 'coder', toolPreset: 'standard' });
  * const agent = createDurableAgent(base);

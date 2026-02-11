@@ -6,11 +6,11 @@ A modular AI agent framework built on [Vercel AI SDK](https://ai-sdk.dev). Zero-
 
 | Package | Description |
 |---------|-------------|
-| `@agent/sdk` | Core agent factory — tools, roles, config, streaming, durability, hooks, scheduling |
-| `@agent/sdk-server` | Hono HTTP server — REST + SSE + WebSocket endpoints |
-| `@agent/sdk-client` | Client library — HTTP, SSE streams, WebSocket, session management |
-| `@agent/logger` | Structured logging — namespace filtering, file/SSE transports, formatters |
-| `@agent/brain` | Knowledge graph — FalkorDB, code parsing, NLP entity extraction |
+| `@agntk/core` | Core agent factory — tools, roles, config, streaming, durability, hooks, scheduling |
+| `@agntk/server` | Hono HTTP server — REST + SSE + WebSocket endpoints |
+| `@agntk/client` | Client library — HTTP, SSE streams, WebSocket, session management |
+| `@agntk/logger` | Structured logging — namespace filtering, file/SSE transports, formatters |
+| `@agntk/brain` | Knowledge graph — FalkorDB, code parsing, NLP entity extraction |
 
 ## Quick Start
 
@@ -25,12 +25,12 @@ pnpm --filter demo integration
 
 ---
 
-## Core: `@agent/sdk`
+## Core: `@agntk/core`
 
 ### Creating an Agent
 
 ```typescript
-import { createAgent } from '@agent/sdk';
+import { createAgent } from '@agntk/core';
 
 const agent = createAgent({
   role: 'coder',                // 'generic' | 'coder' | 'researcher' | 'analyst'
@@ -211,7 +211,7 @@ maxSteps: 10
 ```
 
 ```typescript
-import { loadConfig, configure, getConfig, resolveModel } from '@agent/sdk';
+import { loadConfig, configure, getConfig, resolveModel } from '@agntk/core';
 
 // Load from YAML
 const config = loadConfig('./agent-sdk.config.yaml');
@@ -262,7 +262,7 @@ agent.scheduled('1h', async () => { /* health check */ });
 Human-in-the-loop approval with typed hooks:
 
 ```typescript
-import { defineHook, getHookRegistry } from '@agent/sdk';
+import { defineHook, getHookRegistry } from '@agntk/core';
 
 const approvalHook = defineHook<{ amount: number }, boolean>({
   name: 'purchase-approval',
@@ -284,7 +284,7 @@ const registry = getHookRegistry();
 Recurring tasks with zero-compute sleep:
 
 ```typescript
-import { createScheduledWorkflow, parseDuration, formatDuration } from '@agent/sdk';
+import { createScheduledWorkflow, parseDuration, formatDuration } from '@agntk/core';
 
 const schedule = createScheduledWorkflow({
   name: 'daily-check',
@@ -308,7 +308,7 @@ formatDuration(7200000);  // "2h"
 Auto-discover and inject `SKILL.md` files into the agent's system prompt:
 
 ```typescript
-import { createAgent, discoverSkills, buildSkillsSystemPrompt } from '@agent/sdk';
+import { createAgent, discoverSkills, buildSkillsSystemPrompt } from '@agntk/core';
 
 // Automatic via createAgent:
 const agent = createAgent({
@@ -323,7 +323,7 @@ const skillPrompt = buildSkillsSystemPrompt(skills);
 ### System Prompts
 
 ```typescript
-import { systemPrompt, rolePrompts, buildSystemContext } from '@agent/sdk';
+import { systemPrompt, rolePrompts, buildSystemContext } from '@agntk/core';
 
 // Default system prompt
 console.log(systemPrompt);
@@ -343,7 +343,7 @@ const context = buildSystemContext({
 Optional Langfuse integration for tracing:
 
 ```typescript
-import { initObservability, isObservabilityEnabled, createTelemetrySettings } from '@agent/sdk';
+import { initObservability, isObservabilityEnabled, createTelemetrySettings } from '@agntk/core';
 
 if (isObservabilityEnabled()) {
   initObservability({
@@ -356,12 +356,12 @@ const settings = createTelemetrySettings({ agentId: 'my-agent', role: 'coder' })
 
 ---
 
-## Brain: `@agent/brain`
+## Brain: `@agntk/brain`
 
 Knowledge graph backed by FalkorDB with code parsing and NLP entity extraction.
 
 ```typescript
-import { createBrain } from '@agent/brain';
+import { createBrain } from '@agntk/brain';
 
 // Connect to FalkorDB
 const brain = await createBrain({
@@ -390,13 +390,13 @@ docker run -p 6379:6379 falkordb/falkordb
 
 ---
 
-## Server: `@agent/sdk-server`
+## Server: `@agntk/server`
 
 Hono-based HTTP server with REST, SSE streaming, and WebSocket endpoints.
 
 ```typescript
-import { createAgentServer } from '@agent/sdk-server';
-import { createAgent } from '@agent/sdk';
+import { createAgentServer } from '@agntk/server';
+import { createAgent } from '@agntk/core';
 
 const agent = createAgent({ role: 'coder', toolPreset: 'standard' });
 const server = createAgentServer({ agent, port: 3001 });
@@ -432,7 +432,7 @@ server.start();
 ### Server Options
 
 ```typescript
-import { createAgentServer, createRateLimitMiddleware, createAuthMiddleware } from '@agent/sdk-server';
+import { createAgentServer, createRateLimitMiddleware, createAuthMiddleware } from '@agntk/server';
 
 const server = createAgentServer({
   agent,
@@ -443,12 +443,12 @@ const server = createAgentServer({
 
 ---
 
-## Client: `@agent/sdk-client`
+## Client: `@agntk/client`
 
 Client library for connecting to an Agent SDK server.
 
 ```typescript
-import { AgentHttpClient } from '@agent/sdk-client';
+import { AgentHttpClient } from '@agntk/client';
 
 const client = new AgentHttpClient('http://localhost:3001');
 
@@ -508,7 +508,7 @@ const resumed = client.generateStream(request, {
 ### Other Clients
 
 ```typescript
-import { AgentClient, ChatClient, AgentWebSocketClient, BrowserStreamClient } from '@agent/sdk-client';
+import { AgentClient, ChatClient, AgentWebSocketClient, BrowserStreamClient } from '@agntk/client';
 
 // High-level chat client with session management
 const chat = new ChatClient(httpClient, { sessionId: 'abc' });
@@ -525,12 +525,12 @@ const browser = new BrowserStreamClient({ url: 'ws://localhost:3001/ws/browser-s
 
 ---
 
-## Logger: `@agent/logger`
+## Logger: `@agntk/logger`
 
 Zero-dependency structured logging with namespace filtering.
 
 ```typescript
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 
 const log = createLogger('@myapp:feature');
 log.info('Request processed', { userId: '123', durationMs: 45 });
@@ -548,12 +548,12 @@ done(); // Logs with duration
 
 ```bash
 # Enable via environment variable
-DEBUG=@agent/sdk:* node app.js
-DEBUG=@agent/*,-@agent/sdk:verbose node app.js
+DEBUG=@agntk/core:* node app.js
+DEBUG=@agntk/*,-@agntk/core:verbose node app.js
 ```
 
 ```typescript
-import { enable, disable, resetConfig } from '@agent/logger';
+import { enable, disable, resetConfig } from '@agntk/logger';
 
 enable('@myapp:*');
 disable('@myapp:verbose');
@@ -563,7 +563,7 @@ resetConfig();  // Clear all patterns
 ### Transports
 
 ```typescript
-import { createConsoleTransport, createFileTransport, createSSETransport, addTransport } from '@agent/logger';
+import { createConsoleTransport, createFileTransport, createSSETransport, addTransport } from '@agntk/logger';
 
 // Console (default)
 addTransport(createConsoleTransport({ colorize: true }));
@@ -578,7 +578,7 @@ const sse = createSSETransport();
 ### Formatters
 
 ```typescript
-import { formatPretty, formatJSON, formatSSE } from '@agent/logger';
+import { formatPretty, formatJSON, formatSSE } from '@agntk/logger';
 
 const entry = { level: 'info', namespace: '@app', message: 'hello', timestamp: Date.now(), data: {} };
 
@@ -617,11 +617,11 @@ npx workflow inspect runs --web
 ```
 agent-sdk/
 ├── packages/
-│   ├── sdk/           # @agent/sdk — Core agent factory
-│   ├── sdk-server/    # @agent/sdk-server — HTTP server
-│   ├── sdk-client/    # @agent/sdk-client — Client library
-│   ├── logger/        # @agent/logger — Structured logging
-│   └── brain/         # @agent/brain — Knowledge graph
+│   ├── sdk/           # @agntk/core — Core agent factory
+│   ├── sdk-server/    # @agntk/server — HTTP server
+│   ├── sdk-client/    # @agntk/client — Client library
+│   ├── logger/        # @agntk/logger — Structured logging
+│   └── brain/         # @agntk/brain — Knowledge graph
 ├── apps/
 │   ├── demo/          # Integration tests and demos
 │   └── web/           # Next.js dashboard
@@ -632,7 +632,7 @@ agent-sdk/
 
 - Node.js >= 18
 - pnpm >= 9
-- FalkorDB (optional, for `@agent/brain`)
+- FalkorDB (optional, for `@agntk/brain`)
 - Temporal (optional, for durable workflows)
 
 ## License

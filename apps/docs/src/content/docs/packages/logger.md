@@ -3,14 +3,14 @@ title: Logger
 description: Zero-dependency structured logging with namespace filtering
 ---
 
-# Logger (`@agent/logger`)
+# Logger (`@agntk/logger`)
 
 Zero-dependency structured logging with namespace filtering.
 
 ## Basic Usage
 
 ```typescript
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 
 const log = createLogger('@myapp:feature');
 
@@ -33,14 +33,14 @@ done(); // Logs with duration
 Enable via environment variable:
 
 ```bash
-DEBUG=@agent/sdk:* node app.js
-DEBUG=@agent/*,-@agent/sdk:verbose node app.js
+DEBUG=@agntk/core:* node app.js
+DEBUG=@agntk/*,-@agntk/core:verbose node app.js
 ```
 
 Or programmatically:
 
 ```typescript
-import { enable, disable, resetConfig } from '@agent/logger';
+import { enable, disable, resetConfig } from '@agntk/logger';
 
 enable('@myapp:*');
 disable('@myapp:verbose');
@@ -52,7 +52,7 @@ resetConfig();  // Clear all patterns
 ### Console (Default)
 
 ```typescript
-import { createConsoleTransport, addTransport } from '@agent/logger';
+import { createConsoleTransport, addTransport } from '@agntk/logger';
 
 addTransport(createConsoleTransport({ colorize: true }));
 ```
@@ -60,7 +60,7 @@ addTransport(createConsoleTransport({ colorize: true }));
 ### File Output
 
 ```typescript
-import { createFileTransport, addTransport } from '@agent/logger';
+import { createFileTransport, addTransport } from '@agntk/logger';
 
 addTransport(createFileTransport({ path: './logs/agent.log' }));
 ```
@@ -68,7 +68,7 @@ addTransport(createFileTransport({ path: './logs/agent.log' }));
 ### SSE for Real-time UI
 
 ```typescript
-import { createSSETransport, addTransport } from '@agent/logger';
+import { createSSETransport, addTransport } from '@agntk/logger';
 
 const sse = createSSETransport();
 addTransport(sse);
@@ -77,7 +77,7 @@ addTransport(sse);
 ## Formatters
 
 ```typescript
-import { formatPretty, formatJSON, formatSSE } from '@agent/logger';
+import { formatPretty, formatJSON, formatSSE } from '@agntk/logger';
 
 const entry = {
   level: 'info',

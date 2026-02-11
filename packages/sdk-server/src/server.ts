@@ -1,16 +1,16 @@
 /**
- * @agent/sdk-server - Server Factory
+ * @agntk/server - Server Factory
  * Creates and manages the agent HTTP server with optional WebSocket support
  */
 
 import { serve } from '@hono/node-server';
 import { createNodeWebSocket } from '@hono/node-ws';
 import { Hono } from 'hono';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { createAgentRoutes } from './routes';
 import type { AgentServerOptions } from './types';
 
-const log = createLogger('@agent/sdk-server');
+const log = createLogger('@agntk/server');
 
 export interface AgentServer {
   /** Hono routes instance */
@@ -28,8 +28,8 @@ export interface AgentServer {
  * 
  * @example
  * ```typescript
- * import { createAgentServer } from '@agent/sdk-server';
- * import { createAgent } from '@agent/sdk';
+ * import { createAgentServer } from '@agntk/server';
+ * import { createAgent } from '@agntk/core';
  * 
  * const agent = createAgent({ role: 'coder' });
  * const server = createAgentServer({ agent, port: 3001 });
@@ -87,7 +87,7 @@ export function createAgentServer(options: AgentServerOptions = {}): AgentServer
  * 
  * @example
  * ```typescript
- * import { quickStart } from '@agent/sdk-server';
+ * import { quickStart } from '@agntk/server';
  * 
  * quickStart({ port: 3001, role: 'researcher' });
  * ```

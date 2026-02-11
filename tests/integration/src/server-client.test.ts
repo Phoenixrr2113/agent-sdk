@@ -4,9 +4,9 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createAgent } from '@agent/sdk';
-import { createAgentServer } from '@agent/sdk-server';
-import { AgentHttpClient } from '@agent/sdk-client';
+import { createAgent } from '@agntk/core';
+import { createAgentServer } from '@agntk/server';
+import { AgentHttpClient } from '@agntk/client';
 import { createMockModel } from './setup';
 
 const TEST_PORT = 4567;

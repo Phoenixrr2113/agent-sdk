@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Scheduled Workflows Tests (ADV-SCHEDULER-018)
+ * @agntk/core - Scheduled Workflows Tests (ADV-SCHEDULER-018)
  *
  * Tests for:
  * - createScheduledWorkflow() — loop, sleep, execute pattern

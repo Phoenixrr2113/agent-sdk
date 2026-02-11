@@ -1,8 +1,8 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { Context, Next } from 'hono';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 
-const log = createLogger('@agent/sdk-server:middleware');
+const log = createLogger('@agntk/server:middleware');
 
 /** Default max request body size: 1 MB */
 const DEFAULT_MAX_BODY_SIZE = 1024 * 1024;

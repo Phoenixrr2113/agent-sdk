@@ -21,7 +21,7 @@ import {
   HookRejectedError,
   FatalError,
   RetryableError,
-} from '@agent/sdk';
+} from '@agntk/core';
 
 describe('Hooks & Human-in-the-Loop', () => {
   describe('defineHook', () => {

@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Evals Framework
+ * @agntk/core - Evals Framework
  *
  * Build eval suites to test agent behavior with assertions.
  */

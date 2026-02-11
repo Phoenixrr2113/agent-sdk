@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Role Configurations
+ * @agntk/core - Role Configurations
  *
  * Agent role presets with system prompts and call options.
  * Adapted from packages/core/src/agents/roles.ts

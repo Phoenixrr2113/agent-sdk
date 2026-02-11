@@ -12,7 +12,7 @@ import {
   TaskBoard,
   SpecialistPool,
   createPoolTools,
-} from '@agent/sdk';
+} from '@agntk/core';
 import { createMockModel } from './setup';
 
 describe('Workflows', () => {

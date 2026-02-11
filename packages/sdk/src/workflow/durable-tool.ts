@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Durable Tool Wrapper
+ * @agntk/core - Durable Tool Wrapper
  *
  * Wraps tools with durability directives for crash recovery.
  * Uses the Workflow DevKit's "use step" directive to checkpoint tool executions.
@@ -9,9 +9,9 @@
  */
 
 import type { Tool } from 'ai';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 
-const log = createLogger('@agent/sdk:workflow:tool');
+const log = createLogger('@agntk/core:workflow:tool');
 
 // ============================================================================
 // Types

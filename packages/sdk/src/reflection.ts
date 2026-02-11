@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Reflection Strategies
+ * @agntk/core - Reflection Strategies
  *
  * Implements reflection strategies that inject goal-state prompts between
  * agent steps, improving multi-step task completion (+27.7% success in research).

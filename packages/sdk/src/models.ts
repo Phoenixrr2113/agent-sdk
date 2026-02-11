@@ -1,16 +1,16 @@
 /**
- * @agent/sdk - Model Configuration
+ * @agntk/core - Model Configuration
  *
  * Model tier definitions supporting multiple providers.
  * All providers use @ai-sdk/openai-compatible for unified access.
  */
 
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { getModelForTier, getConfig, DEFAULT_MODELS, DEFAULT_PROVIDER } from './config';
 import type { LanguageModel } from 'ai';
 
-const log = createLogger('@agent/sdk:models');
+const log = createLogger('@agntk/core:models');
 
 // Re-export defaults for backward compatibility
 export { DEFAULT_MODELS as defaultModels };

@@ -1,8 +1,8 @@
 {
-  "name": "@agent/sdk-client",
+  "name": "@agntk/client",
   "version": "0.1.0",
   "type": "module",
-  "description": "HTTP/WebSocket client for @agent/sdk-server",
+  "description": "HTTP/WebSocket client for @agntk/server",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -20,11 +20,11 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@agent/logger": "workspace:*",
+    "@agntk/logger": "workspace:*",
     "ai": "6.0.77"
   },
   "devDependencies": {
-    "@agent/config-typescript": "workspace:*",
+    "@agntk/config-typescript": "workspace:*",
     "typescript": "^5.7.3",
     "vitest": "^3.2.3",
     "@types/node": "^20.17.19"

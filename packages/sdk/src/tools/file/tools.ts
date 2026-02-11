@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - File Tool Implementations
+ * @agntk/core - File Tool Implementations
  *
  * Provides file_read, file_write, file_edit, file_create tools.
  * All paths are resolved relative to and scoped within workspaceRoot.

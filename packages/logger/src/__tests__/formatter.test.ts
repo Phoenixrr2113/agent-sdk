@@ -1,5 +1,5 @@
 /**
- * @agent/logger - Formatter Tests
+ * @agntk/logger - Formatter Tests
  */
 
 import { describe, it, expect } from 'vitest';
@@ -9,7 +9,7 @@ import type { LogEntry } from '../types';
 const createEntry = (overrides: Partial<LogEntry> = {}): LogEntry => ({
   id: 'test-id-123',
   timestamp: '2026-01-15T12:00:00.000Z',
-  namespace: '@agent/test',
+  namespace: '@agntk/test',
   level: 'info',
   message: 'Test message',
   ...overrides,
@@ -21,7 +21,7 @@ describe('formatPretty', () => {
     const result = formatPretty(entry, false);
 
     expect(result).toContain('INF');
-    expect(result).toContain('[@agent/test]');
+    expect(result).toContain('[@agntk/test]');
     expect(result).toContain('Test message');
   });
 
@@ -87,7 +87,7 @@ describe('formatJSON', () => {
 
     expect(parsed.id).toBe('test-id-123');
     expect(parsed.timestamp).toBe('2026-01-15T12:00:00.000Z');
-    expect(parsed.namespace).toBe('@agent/test');
+    expect(parsed.namespace).toBe('@agntk/test');
     expect(parsed.level).toBe('info');
     expect(parsed.message).toBe('Test message');
     expect(parsed.data).toEqual({ key: 'value' });
@@ -118,6 +118,6 @@ describe('formatSSE', () => {
     expect(() => JSON.parse(json)).not.toThrow();
 
     const parsed = JSON.parse(json);
-    expect(parsed.namespace).toBe('@agent/test');
+    expect(parsed.namespace).toBe('@agntk/test');
   });
 });

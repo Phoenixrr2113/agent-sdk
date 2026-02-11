@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Model Retry
+ * @agntk/core - Model Retry
  *
  * Error class and tool wrapper for LLM-retryable tool errors.
  * When a tool throws ModelRetry, the error message is fed back to
@@ -7,9 +7,9 @@
  * better parameters.
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 
-const log = createLogger('@agent/sdk:model-retry');
+const log = createLogger('@agntk/core:model-retry');
 
 // ============================================================================
 // ModelRetry Error

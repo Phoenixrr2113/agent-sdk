@@ -1,4 +1,4 @@
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type { Sample, AnnotatedSample } from '../types';
 import { EntityExtractor } from './extractor';
 import { loadSamples, saveAnnotations } from './storage';

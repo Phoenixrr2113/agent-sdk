@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { createAgent } from '@agent/sdk';
+import { createAgent } from '@agntk/core';
 import { createMockModel, createMockStreamModel } from './setup';
 
 describe('Agent Core', () => {

@@ -1,5 +1,5 @@
 {
-  "name": "@agent/logger",
+  "name": "@agntk/logger",
   "version": "0.1.0",
   "type": "module",
   "description": "Zero-dependency debug logging with namespace filtering, file output, and SSE support",
@@ -24,7 +24,7 @@
     "clean": "rm -rf dist"
   },
   "devDependencies": {
-    "@agent/config-typescript": "workspace:*",
+    "@agntk/config-typescript": "workspace:*",
     "typescript": "^5.7.3",
     "vitest": "^3.2.3",
     "@types/node": "^20.17.19"

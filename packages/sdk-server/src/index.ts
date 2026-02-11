@@ -1,4 +1,4 @@
-// @agent/sdk-server - Main exports
+// @agntk/server - Main exports
 
 export { createAgentServer, quickStart } from './server';
 export type { AgentServer } from './server';

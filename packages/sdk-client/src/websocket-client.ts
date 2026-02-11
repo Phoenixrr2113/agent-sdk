@@ -1,10 +1,10 @@
 // WebSocket client for streaming
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { WebSocketError } from './errors';
 import type { StreamEvent, ChatMessage, TokenUsage } from './types';
 
-const log = createLogger('@agent/sdk-client:ws');
+const log = createLogger('@agntk/client:ws');
 
 export interface WebSocketClientConfig {
   url: string;

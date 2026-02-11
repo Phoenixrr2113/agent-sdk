@@ -1,14 +1,14 @@
 /**
- * @agent/sdk - Pipeline Workflow Builder
+ * @agntk/core - Pipeline Workflow Builder
  *
  * Chain agents/workflows sequentially. Each step's output
  * becomes the next step's input prompt.
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type { Workflow, WorkflowInput, WorkflowOutput, PipelineConfig } from './types';
 
-const log = createLogger('@agent/sdk:workflow:pipeline');
+const log = createLogger('@agntk/core:workflow:pipeline');
 
 /**
  * Create a pipeline that chains steps sequentially.

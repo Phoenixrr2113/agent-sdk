@@ -1,5 +1,5 @@
 /**
- * @agent/sdk-client - HTTP Client Tests
+ * @agntk/client - HTTP Client Tests
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

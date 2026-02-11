@@ -1,13 +1,13 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { getToolConfig } from '../../config';
 import { runRgFiles } from './cli';
 import { formatGlobResult } from './utils';
 import { success, error } from '../utils/tool-result';
 
-const log = createLogger('@agent/sdk:glob');
+const log = createLogger('@agntk/core:glob');
 
 // Get config values with fallbacks
 function getGlobConfig() {

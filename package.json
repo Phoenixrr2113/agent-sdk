@@ -1,5 +1,5 @@
 {
-  "name": "agent-sdk-monorepo",
+  "name": "agntk-monorepo",
   "version": "0.1.0",
   "private": true,
   "description": "Agent SDK - AI agent tools and server for the AI SDK",
@@ -22,7 +22,7 @@
     "size": "size-limit"
   },
   "devDependencies": {
-    "@agent/config-eslint": "workspace:*",
+    "@agntk/config-eslint": "workspace:*",
     "@changesets/cli": "^2.29.8",
     "@commitlint/cli": "^20.4.1",
     "@commitlint/config-conventional": "^20.4.1",

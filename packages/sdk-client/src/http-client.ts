@@ -1,6 +1,6 @@
 // HTTP client for agent server
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { ApiClientError } from './errors';
 import type {
   ChatRequest,
@@ -12,7 +12,7 @@ import type {
   StreamMetadata,
 } from './types';
 
-const log = createLogger('@agent/sdk-client');
+const log = createLogger('@agntk/client');
 
 export class AgentHttpClient {
   constructor(private baseUrl: string) {

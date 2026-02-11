@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Scheduled Workflows
+ * @agntk/core - Scheduled Workflows
  *
  * Implements recurring task execution using Workflow DevKit's `sleep()`.
  * Each scheduled workflow is a durable loop: execute → sleep → repeat.
@@ -9,11 +9,11 @@
  * @see https://useworkflow.dev
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { sleep } from './hooks';
 import { parseDuration, formatDuration } from './durable-agent';
 
-const log = createLogger('@agent/sdk:workflow:scheduler');
+const log = createLogger('@agntk/core:workflow:scheduler');
 
 // ============================================================================
 // Types

@@ -6,10 +6,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type { SkillMeta, SkillContent, SkillsConfig, SkillRequirements } from './types';
 
-const log = createLogger('@agent/sdk:skills');
+const log = createLogger('@agntk/core:skills');
 
 const DEFAULT_SKILLS_DIRS = [
   '.claude/skills',

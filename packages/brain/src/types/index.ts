@@ -1,5 +1,5 @@
 /**
- * @agent/brain - Types
+ * @agntk/brain - Types
  * Shared type definitions for the brain package
  */
 

@@ -2,25 +2,25 @@ module.exports = [
   {
     path: 'packages/sdk/dist/index.js',
     limit: '100 KB',
-    name: '@agent/sdk',
+    name: '@agntk/core',
     import: '{ AgentSDK }',
   },
   {
     path: 'packages/sdk-server/dist/index.js',
     limit: '100 KB',
-    name: '@agent/sdk-server',
+    name: '@agntk/server',
     import: '{ createServer }',
   },
   {
     path: 'packages/sdk-client/dist/index.js',
     limit: '100 KB',
-    name: '@agent/sdk-client',
+    name: '@agntk/client',
     import: '{ SDKClient }',
   },
   {
     path: 'packages/logger/dist/index.js',
     limit: '100 KB',
-    name: '@agent/logger',
+    name: '@agntk/logger',
     import: '{ Logger }',
   },
 ];

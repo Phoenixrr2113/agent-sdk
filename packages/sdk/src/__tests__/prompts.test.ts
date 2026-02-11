@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Prompts Tests
+ * @agntk/core - Prompts Tests
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

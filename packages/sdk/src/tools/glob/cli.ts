@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { stat } from 'node:fs/promises';
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import {
   resolveGrepCli,
   type GrepBackend,
@@ -13,7 +13,7 @@ import {
 } from './constants';
 import type { GlobOptions, GlobResult, FileMatch } from './types';
 
-const log = createLogger('@agent/sdk:glob:cli');
+const log = createLogger('@agntk/core:glob:cli');
 
 export interface ResolvedCli {
   path: string;

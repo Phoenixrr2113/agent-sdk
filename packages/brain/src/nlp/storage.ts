@@ -1,9 +1,9 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 import type { Sample, AnnotatedSample } from '../types';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 
-const logger = createLogger('@agent/brain:storage');
+const logger = createLogger('@agntk/brain:storage');
 
 export function loadSamples(path: string): Sample[] {
   logger.debug(`loadSamples: ${path}`);

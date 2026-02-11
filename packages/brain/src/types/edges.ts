@@ -1,5 +1,5 @@
 /**
- * @agent/brain - Edge Types
+ * @agntk/brain - Edge Types
  * Relationship types for the knowledge graph
  */
 

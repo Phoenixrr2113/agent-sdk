@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Minimal Logger
+ * @agntk/core - Minimal Logger
  * Zero-dependency logger that works in Node, Bun, and browser environments
  */
 

@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Memory Tools
+ * @agntk/core - Memory Tools
  *
  * Unified memory tools: remember, recall, forget, query_knowledge.
  * Uses the unified MemoryEngine for LLM extraction + parallel writes.
@@ -7,11 +7,11 @@
 
 import { tool } from 'ai';
 import { z } from 'zod';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type { MemoryEngine } from './engine';
 import type { MemoryStore } from './vectra-store';
 
-const log = createLogger('@agent/sdk:memory');
+const log = createLogger('@agntk/core:memory');
 
 // ============================================================================
 // Types

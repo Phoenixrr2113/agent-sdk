@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Transient Streaming Tests
+ * @agntk/core - Transient Streaming Tests
  */
 
 import { describe, it, expect, vi } from 'vitest';

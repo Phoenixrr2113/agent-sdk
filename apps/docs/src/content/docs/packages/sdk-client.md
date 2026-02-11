@@ -3,14 +3,14 @@ title: SDK Client
 description: Client library for connecting to an Agent SDK server
 ---
 
-# SDK Client (`@agent/sdk-client`)
+# SDK Client (`@agntk/client`)
 
 Client library for connecting to an Agent SDK server.
 
 ## Basic Setup
 
 ```typescript
-import { AgentHttpClient } from '@agent/sdk-client';
+import { AgentHttpClient } from '@agntk/client';
 
 const client = new AgentHttpClient('http://localhost:3001');
 ```
@@ -81,7 +81,7 @@ const resumed = client.generateStream(request, {
 High-level chat client with session management:
 
 ```typescript
-import { ChatClient } from '@agent/sdk-client';
+import { ChatClient } from '@agntk/client';
 
 const chat = new ChatClient(httpClient, { sessionId: 'abc' });
 await chat.stream(request, {
@@ -94,7 +94,7 @@ await chat.stream(request, {
 Real-time communication:
 
 ```typescript
-import { AgentWebSocketClient } from '@agent/sdk-client';
+import { AgentWebSocketClient } from '@agntk/client';
 
 const ws = new AgentWebSocketClient({
   url: 'ws://localhost:3001/ws'
@@ -106,7 +106,7 @@ const ws = new AgentWebSocketClient({
 Browser viewport streaming:
 
 ```typescript
-import { BrowserStreamClient } from '@agent/sdk-client';
+import { BrowserStreamClient } from '@agntk/client';
 
 const browser = new BrowserStreamClient({
   url: 'ws://localhost:3001/ws/browser-stream'

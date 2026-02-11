@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Streaming Types
+ * @agntk/core - Streaming Types
  * Standalone streaming event types for agent communication
  */
 

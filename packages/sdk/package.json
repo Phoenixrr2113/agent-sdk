@@ -1,5 +1,5 @@
 {
-  "name": "@agent/sdk",
+  "name": "@agntk/core",
   "version": "0.1.0",
   "type": "module",
   "description": "Opinionated agent SDK extending AI SDK's ToolLoopAgent",
@@ -29,7 +29,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@agent/logger": "workspace:*",
+    "@agntk/logger": "workspace:*",
     "@ai-sdk/openai-compatible": "^2.0.28",
     "ai": "6.0.77",
     "vectra": "^0.9.0",
@@ -37,7 +37,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@agent/config-typescript": "workspace:*",
+    "@agntk/config-typescript": "workspace:*",
     "@types/node": "^20.17.19",
     "typescript": "^5.7.3",
     "vitest": "^3.2.3"

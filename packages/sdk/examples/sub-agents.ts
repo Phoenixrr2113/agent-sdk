@@ -3,7 +3,7 @@
  * Demonstrates spawning specialized sub-agents for complex tasks.
  */
 
-import { createAgent } from '@agent/sdk';
+import { createAgent } from '@agntk/core';
 
 async function main() {
   // Create coordinator agent with sub-agent capability

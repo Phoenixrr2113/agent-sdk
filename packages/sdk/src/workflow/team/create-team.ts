@@ -5,7 +5,7 @@
  * composition with createPipeline and createParallel.
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type {
   TeamConfig,
   TeamMemberConfig,
@@ -21,7 +21,7 @@ import type { WorkflowInput, WorkflowOutput } from '../builders/types';
 import { TaskBoard } from './task-board';
 import { teamCoordinationMachine, teammateMachine } from './machines';
 
-const log = createLogger('@agent/sdk:team');
+const log = createLogger('@agntk/core:team');
 
 /**
  * Create a team of agents that coordinate via messaging, claim tasks

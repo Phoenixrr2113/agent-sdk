@@ -4,9 +4,9 @@
  * a typed API for receiving frames and injecting user input.
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 
-const log = createLogger('@agent/sdk-client:browser-stream');
+const log = createLogger('@agntk/client:browser-stream');
 
 // ============================================================================
 // Types

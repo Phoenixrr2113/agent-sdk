@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'fs';
 import type { Sample } from '../../types';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { randomUUID } from 'crypto';
 
 const logger = createLogger('nlp:claude-importer');

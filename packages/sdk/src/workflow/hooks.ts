@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Workflow Hooks & Human-in-the-Loop
+ * @agntk/core - Workflow Hooks & Human-in-the-Loop
  *
  * Provides typed suspension points for workflow execution.
  * When a hook fires, the workflow pauses (zero compute) and waits for
@@ -17,10 +17,10 @@
  * @see https://useworkflow.dev
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { parseDuration } from './durable-agent';
 
-const log = createLogger('@agent/sdk:workflow:hooks');
+const log = createLogger('@agntk/core:workflow:hooks');
 
 // ============================================================================
 // WDK Runtime Detection

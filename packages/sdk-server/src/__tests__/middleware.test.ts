@@ -1,5 +1,5 @@
 /**
- * @agent/sdk-server - Middleware Tests
+ * @agntk/server - Middleware Tests
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';

@@ -7,7 +7,7 @@ import type { StepResult, ToolSet } from 'ai';
 import type { EvalAgentResult, EvalReporter } from '../evals/types';
 import type { Agent } from '../agent';
 
-vi.mock('@agent/logger', () => ({
+vi.mock('@agntk/logger', () => ({
   createLogger: () => ({
     info: vi.fn(),
     debug: vi.fn(),

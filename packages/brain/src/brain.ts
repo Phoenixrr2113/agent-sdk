@@ -1,15 +1,15 @@
 /**
- * @agent/brain - Brain Factory
+ * @agntk/brain - Brain Factory
  * Creates a connected brain instance with graph, memory, and extraction capabilities
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { createClient, createQueries, createOperations, type GraphClient, type GraphQueries, type GraphOperations, type EpisodeRow } from './graph';
 import { EntityExtractor, EntityResolver, ContradictionDetector, type ExtractorConfig } from './nlp';
 import { ContextAssembler, type AssembledContext } from './context';
 import type { Episode, Experience, SearchResult, AnnotatedSample, Sample, Contradiction } from './types';
 
-const logger = createLogger('@agent/brain');
+const logger = createLogger('@agntk/brain');
 
 /** Default LLM model for entity extraction */
 const DEFAULT_EXTRACTION_MODEL = 'google/gemini-2.0-flash-001';

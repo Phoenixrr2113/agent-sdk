@@ -1,17 +1,17 @@
-# @agent/sdk
+# @agntk/core
 
 Core agent factory for the Agent SDK. Built on [Vercel AI SDK](https://ai-sdk.dev).
 
 ## Installation
 
 ```bash
-pnpm add @agent/sdk
+pnpm add @agntk/core
 ```
 
 ## Quick Start
 
 ```typescript
-import { createAgent } from '@agent/sdk';
+import { createAgent } from '@agntk/core';
 
 const agent = createAgent({
   role: 'coder',
@@ -96,7 +96,7 @@ interface StreamResult {
 | `full` | `glob`, `grep`, `shell`, `plan`, `deep_reasoning`, `ast_grep_search`, `ast_grep_replace`, `browser` |
 
 ```typescript
-import { createToolPreset } from '@agent/sdk';
+import { createToolPreset } from '@agntk/core';
 
 // Get tools without creating an agent
 const tools = createToolPreset('standard', { workspaceRoot: '/my/project' });
@@ -133,7 +133,7 @@ tools:
 ### Programmatic
 
 ```typescript
-import { loadConfig, configure, getConfig, defineConfig, resolveModel } from '@agent/sdk';
+import { loadConfig, configure, getConfig, defineConfig, resolveModel } from '@agntk/core';
 
 loadConfig('./agent-sdk.config.yaml');
 configure({ models: { defaultProvider: 'anthropic' } });
@@ -166,7 +166,7 @@ const durableResult = await (agent as DurableAgent).durableGenerate('Complex tas
 ## Workflow Hooks
 
 ```typescript
-import { defineHook, getHookRegistry } from '@agent/sdk';
+import { defineHook, getHookRegistry } from '@agntk/core';
 
 const hook = defineHook<{ amount: number }, boolean>({
   name: 'purchase-approval',
@@ -180,7 +180,7 @@ const approved = await hook.wait({ amount: 5000 });
 ## Scheduled Workflows
 
 ```typescript
-import { createScheduledWorkflow, parseDuration, formatDuration } from '@agent/sdk';
+import { createScheduledWorkflow, parseDuration, formatDuration } from '@agntk/core';
 
 const schedule = createScheduledWorkflow({
   name: 'hourly-check',
@@ -197,7 +197,7 @@ formatDuration(7200000);  // "2h"
 ## Brain Integration
 
 ```typescript
-import { createBrain } from '@agent/brain';
+import { createBrain } from '@agntk/brain';
 
 const brain = await createBrain({
   graph: { host: 'localhost', port: 6379, graphName: 'my_graph' },
@@ -212,7 +212,7 @@ await brain.close();
 ## Skills
 
 ```typescript
-import { createAgent, discoverSkills, buildSkillsSystemPrompt } from '@agent/sdk';
+import { createAgent, discoverSkills, buildSkillsSystemPrompt } from '@agntk/core';
 
 // Auto-discover:
 const agent = createAgent({ skills: { directories: ['.agents/skills'] } });
@@ -225,7 +225,7 @@ const prompt = buildSkillsSystemPrompt(skills);
 ## System Prompts
 
 ```typescript
-import { systemPrompt, rolePrompts, buildSystemContext } from '@agent/sdk';
+import { systemPrompt, rolePrompts, buildSystemContext } from '@agntk/core';
 
 console.log(systemPrompt);        // Default system prompt
 console.log(rolePrompts.coder);   // Coder-specific prompt
@@ -237,32 +237,32 @@ const ctx = buildSystemContext({ workspaceRoot: '/my/project', role: 'coder' });
 
 ```typescript
 // Core
-export { createAgent } from '@agent/sdk';
+export { createAgent } from '@agntk/core';
 
 // Config
-export { loadConfig, configure, getConfig, defineConfig, resolveModel } from '@agent/sdk';
+export { loadConfig, configure, getConfig, defineConfig, resolveModel } from '@agntk/core';
 
 // Presets
-export { createToolPreset, toolPresets, roleConfigs } from '@agent/sdk';
+export { createToolPreset, toolPresets, roleConfigs } from '@agntk/core';
 
 // Prompts
-export { systemPrompt, rolePrompts, buildSystemContext } from '@agent/sdk';
+export { systemPrompt, rolePrompts, buildSystemContext } from '@agntk/core';
 
 // Skills
-export { discoverSkills, buildSkillsSystemPrompt } from '@agent/sdk';
+export { discoverSkills, buildSkillsSystemPrompt } from '@agntk/core';
 
 // Workflow
-export { createDurableAgent, defineHook, getHookRegistry, createScheduledWorkflow } from '@agent/sdk';
-export { parseDuration, formatDuration, wrapToolsAsDurable } from '@agent/sdk';
+export { createDurableAgent, defineHook, getHookRegistry, createScheduledWorkflow } from '@agntk/core';
+export { parseDuration, formatDuration, wrapToolsAsDurable } from '@agntk/core';
 
 // Memory
-export { createMemoryStore, createMemoryTools } from '@agent/sdk';
+export { createMemoryStore, createMemoryTools } from '@agntk/core';
 
 // Observability
-export { initObservability, isObservabilityEnabled, createTelemetrySettings } from '@agent/sdk';
+export { initObservability, isObservabilityEnabled, createTelemetrySettings } from '@agntk/core';
 
 // Streaming
-export { streamTransient, withTransientStreaming } from '@agent/sdk';
+export { streamTransient, withTransientStreaming } from '@agntk/core';
 ```
 
 ## License

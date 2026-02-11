@@ -1,4 +1,4 @@
-// @agent/sdk - Main exports
+// @agntk/core - Main exports
 
 // Core
 export { createAgent } from './agent';

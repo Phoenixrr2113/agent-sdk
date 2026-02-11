@@ -2,10 +2,10 @@
  * @fileoverview Template engine for variable substitution in prompts.
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { getConfig } from '../config';
 
-const log = createLogger('@agent/sdk:templates');
+const log = createLogger('@agntk/core:templates');
 
 // ============================================================================
 // Types

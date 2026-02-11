@@ -6,12 +6,12 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve, extname } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { AgentConfigSchema, PartialAgentConfigSchema, type AgentConfig, type PartialAgentConfig } from './schema';
 import { DEFAULT_MODELS, DEFAULT_PROVIDER, DEFAULT_MAX_STEPS } from './defaults';
 import type { ModelTier, Provider } from './schema';
 
-const log = createLogger('@agent/sdk:config');
+const log = createLogger('@agntk/core:config');
 
 // ============================================================================
 // Global Config State

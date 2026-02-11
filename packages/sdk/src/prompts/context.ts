@@ -1,13 +1,13 @@
 /**
- * @agent/sdk - System Context Builder
+ * @agntk/core - System Context Builder
  * Builds dynamic context information for agent system prompts
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { GEOLOCATION_API_URL, GEOLOCATION_ENABLED_DEFAULT } from '../constants';
 import type { MemoryStore } from '../memory/vectra-store';
 
-const log = createLogger('@agent/sdk:context');
+const log = createLogger('@agntk/core:context');
 
 // ============================================================================
 // Types

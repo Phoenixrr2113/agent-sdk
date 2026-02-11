@@ -8,8 +8,8 @@ import {
   createMemoryEngine,
   createSearchSkillsTool,
   clearSkillsCache,
-} from '@agent/sdk';
-import type { MemoryStore, MemorySearchResult } from '@agent/sdk';
+} from '@agntk/core';
+import type { MemoryStore, MemorySearchResult } from '@agntk/core';
 
 /**
  * In-memory adapter satisfying the MemoryStore interface.

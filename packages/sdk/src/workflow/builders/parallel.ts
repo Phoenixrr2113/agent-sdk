@@ -1,14 +1,14 @@
 /**
- * @agent/sdk - Parallel Workflow Builder
+ * @agntk/core - Parallel Workflow Builder
  *
  * Fan out to multiple agents/workflows concurrently,
  * then synthesize the results.
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type { Workflow, WorkflowInput, WorkflowOutput, ParallelConfig } from './types';
 
-const log = createLogger('@agent/sdk:workflow:parallel');
+const log = createLogger('@agntk/core:workflow:parallel');
 
 /**
  * Create a parallel workflow that fans out to multiple steps concurrently.

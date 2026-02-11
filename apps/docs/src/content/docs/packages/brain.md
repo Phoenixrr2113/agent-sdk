@@ -3,14 +3,14 @@ title: Brain
 description: Knowledge graph backed by FalkorDB with code parsing and NLP entity extraction
 ---
 
-# Brain (`@agent/brain`)
+# Brain (`@agntk/brain`)
 
 Knowledge graph backed by FalkorDB with code parsing and NLP entity extraction.
 
 ## Basic Setup
 
 ```typescript
-import { createBrain } from '@agent/brain';
+import { createBrain } from '@agntk/brain';
 
 // Connect to FalkorDB
 const brain = await createBrain({
@@ -26,7 +26,7 @@ const brain = await createBrain({
 ## Using with an Agent
 
 ```typescript
-import { createAgent } from '@agent/sdk';
+import { createAgent } from '@agntk/core';
 
 const agent = createAgent({
   brain,

@@ -1,17 +1,17 @@
 /**
- * @agent/sdk - Best-of-N Test-Time Scaling
+ * @agntk/core - Best-of-N Test-Time Scaling
  *
  * Run an agent N times and pick the best output via LLM judge.
  * Supports parallel/sequential execution, list-wise/pair-wise judging,
  * and budget caps via UsageLimits.
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type { LanguageModel } from 'ai';
 import type { Agent } from '../agent';
 import type { UsageLimits } from '../usage-limits';
 
-const log = createLogger('@agent/sdk:best-of-n');
+const log = createLogger('@agntk/core:best-of-n');
 
 // ============================================================================
 // Types

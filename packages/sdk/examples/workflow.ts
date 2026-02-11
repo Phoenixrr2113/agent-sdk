@@ -3,8 +3,8 @@
  * Demonstrates durable, resumable agent execution.
  */
 
-import { createAgent } from '@agent/sdk';
-// import { createDurableAgent } from '@agent/sdk/workflow';
+import { createAgent } from '@agntk/core';
+// import { createDurableAgent } from '@agntk/core/workflow';
 
 async function basicWorkflow() {
   // Standard agent with durability enabled

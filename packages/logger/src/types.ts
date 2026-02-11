@@ -24,7 +24,7 @@ export const LOG_LEVELS: Record<LogLevel, number> = {
 export interface LogEntry {
   /** ISO timestamp */
   timestamp: string;
-  /** Logger namespace (e.g., "@agent/sdk:agent") */
+  /** Logger namespace (e.g., "@agntk/core:agent") */
   namespace: string;
   /** Log level */
   level: LogLevel;

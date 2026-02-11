@@ -8,9 +8,9 @@ import type {
   PluginRegistration,
   RegisteredPlugin,
 } from '../types';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 
-const logger = createLogger('@agent/brain:registry');
+const logger = createLogger('@agntk/brain:registry');
 
 // ============================================================================
 // Language Registry Class

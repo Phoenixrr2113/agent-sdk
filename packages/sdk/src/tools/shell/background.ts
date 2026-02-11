@@ -1,8 +1,8 @@
 /**
- * @agent/sdk - Background Process Management Tool
+ * @agntk/core - Background Process Management Tool
  *
  * Manages long-running background processes with session tracking.
- * Ported from @agent/brain shell to consolidate shell tools.
+ * Ported from @agntk/brain shell to consolidate shell tools.
  */
 
 import { tool } from 'ai';

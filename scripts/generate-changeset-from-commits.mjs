@@ -39,13 +39,13 @@ for (let i = 0; i < args.length; i++) {
 
 // Package mapping
 const packageMap = {
-  'packages/sdk/': '@agent/sdk',
-  'packages/sdk-server/': '@agent/sdk-server',
-  'packages/sdk-client/': '@agent/sdk-client',
-  'packages/logger/': '@agent/logger',
-  'packages/brain/': '@agent/brain',
-  'packages/config-typescript/': '@agent/config-typescript',
-  'packages/config-eslint/': '@agent/config-eslint',
+  'packages/sdk/': '@agntk/core',
+  'packages/sdk-server/': '@agntk/server',
+  'packages/sdk-client/': '@agntk/client',
+  'packages/logger/': '@agntk/logger',
+  'packages/brain/': '@agntk/brain',
+  'packages/config-typescript/': '@agntk/config-typescript',
+  'packages/config-eslint/': '@agntk/config-eslint',
 };
 
 // Get list of commits between base and head

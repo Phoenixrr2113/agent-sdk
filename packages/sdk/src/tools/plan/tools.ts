@@ -1,6 +1,6 @@
 import { tool } from 'ai';
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { getToolConfig } from '../../config';
 import { success, error } from '../utils/tool-result';
 
@@ -20,7 +20,7 @@ import {
 } from './types';
 import { runTypeCheck, runTestCommand } from './utils';
 
-const log = createLogger('@agent/sdk:plan');
+const log = createLogger('@agntk/core:plan');
 
 // Get config values with fallbacks
 function getPlanConfig() {

@@ -1,5 +1,5 @@
 {
-  "extends": "@agent/config-typescript/client.json",
+  "extends": "@agntk/config-typescript/client.json",
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist",

@@ -1,13 +1,13 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { getToolConfig } from '../../config';
 import { runRg } from './cli';
 import { formatGrepResult } from './utils';
 import { success, error } from '../utils/tool-result';
 
-const log = createLogger('@agent/sdk:grep');
+const log = createLogger('@agntk/core:grep');
 
 // Get config values with fallbacks
 function getGrepConfig() {

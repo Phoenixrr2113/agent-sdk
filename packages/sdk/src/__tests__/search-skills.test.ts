@@ -7,7 +7,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 
-vi.mock('@agent/logger', () => ({
+vi.mock('@agntk/logger', () => ({
   createLogger: () => ({
     info: vi.fn(),
     debug: vi.fn(),

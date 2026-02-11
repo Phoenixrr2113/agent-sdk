@@ -1,5 +1,5 @@
 /**
- * @agent/logger - Core Logger Tests
+ * @agntk/logger - Core Logger Tests
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -18,12 +18,12 @@ describe('createLogger', () => {
   });
 
   it('should create a logger with the given namespace', () => {
-    const log = createLogger('@agent/test');
-    expect(log.namespace).toBe('@agent/test');
+    const log = createLogger('@agntk/test');
+    expect(log.namespace).toBe('@agntk/test');
   });
 
   it('should have all log level methods', () => {
-    const log = createLogger('@agent/test');
+    const log = createLogger('@agntk/test');
     expect(typeof log.error).toBe('function');
     expect(typeof log.warn).toBe('function');
     expect(typeof log.info).toBe('function');
@@ -32,8 +32,8 @@ describe('createLogger', () => {
   });
 
   it('should return true for isEnabled when namespace is enabled', () => {
-    enable('@agent/*');
-    const log = createLogger('@agent/test');
+    enable('@agntk/*');
+    const log = createLogger('@agntk/test');
     expect(log.isEnabled()).toBe(true);
   });
 
@@ -45,11 +45,11 @@ describe('createLogger', () => {
     };
 
     addTransport(mockTransport);
-    const log = createLogger('@agent/test');
+    const log = createLogger('@agntk/test');
     log.info('Test message', { key: 'value' });
 
     expect(entries).toHaveLength(1);
-    expect(entries[0].namespace).toBe('@agent/test');
+    expect(entries[0].namespace).toBe('@agntk/test');
     expect(entries[0].level).toBe('info');
     expect(entries[0].message).toBe('Test message');
     expect(entries[0].data).toEqual({ key: 'value' });
@@ -63,7 +63,7 @@ describe('createLogger', () => {
     };
 
     addTransport(mockTransport);
-    const log = createLogger('@agent/test');
+    const log = createLogger('@agntk/test');
     log.info('Test');
 
     expect(entries[0].id).toBeDefined();
@@ -76,7 +76,7 @@ describe('createLogger', () => {
       const entries: LogEntry[] = [];
       addTransport({ name: 'mock', write: (e) => entries.push(e) });
 
-      const log = createLogger('@agent/test');
+      const log = createLogger('@agntk/test');
       log.error('Error message');
 
       expect(entries[0].level).toBe('error');
@@ -86,7 +86,7 @@ describe('createLogger', () => {
       const entries: LogEntry[] = [];
       addTransport({ name: 'mock', write: (e) => entries.push(e) });
 
-      const log = createLogger('@agent/test');
+      const log = createLogger('@agntk/test');
       log.warn('Warn message');
 
       expect(entries[0].level).toBe('warn');
@@ -97,7 +97,7 @@ describe('createLogger', () => {
       addTransport({ name: 'mock', write: (e) => entries.push(e) });
       configure({ level: 'warn' }); // Only warn and error
 
-      const log = createLogger('@agent/test');
+      const log = createLogger('@agntk/test');
       log.info('Info message'); // Should not log
       log.warn('Warn message'); // Should log
 
@@ -111,7 +111,7 @@ describe('createLogger', () => {
       const entries: LogEntry[] = [];
       addTransport({ name: 'mock', write: (e) => entries.push(e) });
 
-      const log = createLogger('@agent/test');
+      const log = createLogger('@agntk/test');
       const child = log.child({ requestId: 'req-123' });
       
       child.info('Child message', { extra: 'data' });
@@ -123,10 +123,10 @@ describe('createLogger', () => {
     });
 
     it('should maintain parent namespace', () => {
-      const log = createLogger('@agent/test');
+      const log = createLogger('@agntk/test');
       const child = log.child({ runId: 'run-1' });
       
-      expect(child.namespace).toBe('@agent/test');
+      expect(child.namespace).toBe('@agntk/test');
     });
   });
 
@@ -135,7 +135,7 @@ describe('createLogger', () => {
       const entries: LogEntry[] = [];
       addTransport({ name: 'mock', write: (e) => entries.push(e) });
 
-      const log = createLogger('@agent/test');
+      const log = createLogger('@agntk/test');
       const done = log.time('operation');
       
       // Simulate some work
@@ -157,7 +157,7 @@ describe('createLogger', () => {
         write: () => { throw new Error('Transport error'); },
       });
 
-      const log = createLogger('@agent/test');
+      const log = createLogger('@agntk/test');
       
       expect(() => log.info('Test')).not.toThrow();
       expect(consoleError).toHaveBeenCalled();
@@ -169,9 +169,9 @@ describe('createLogger', () => {
 
 describe('createNoopLogger', () => {
   it('should create a logger with no-op methods', () => {
-    const log = createNoopLogger('@agent/noop');
+    const log = createNoopLogger('@agntk/noop');
     
-    expect(log.namespace).toBe('@agent/noop');
+    expect(log.namespace).toBe('@agntk/noop');
     expect(log.isEnabled()).toBe(false);
     
     // These should not throw
@@ -186,7 +186,7 @@ describe('createNoopLogger', () => {
   });
 
   it('should return noop logger from child', () => {
-    const log = createNoopLogger('@agent/noop');
+    const log = createNoopLogger('@agntk/noop');
     const child = log.child({ key: 'value' });
     
     expect(child.isEnabled()).toBe(false);

@@ -9,7 +9,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Shell tools have been consolidated into @agent/sdk.
+// Shell tools have been consolidated into @agntk/core.
 // Shell tests are in packages/sdk/src/__tests__/browser-tool.test.ts and background.test.ts.
 
 describe('Episode Persistence', () => {

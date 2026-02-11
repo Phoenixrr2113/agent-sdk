@@ -1,6 +1,6 @@
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { generateText, type LanguageModel } from 'ai';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type {
   Sample,
   AnnotatedSample,
@@ -10,7 +10,7 @@ import type {
   RelationshipType,
 } from '../types';
 
-const logger = createLogger('@agent/brain:nlp');
+const logger = createLogger('@agntk/brain:nlp');
 
 const ENTITY_TYPES: EntityType[] = [
   'Person',

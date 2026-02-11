@@ -15,7 +15,7 @@ import {
   wrapSelectedToolsAsDurable,
   parseDuration,
   formatDuration,
-} from '@agent/sdk';
+} from '@agntk/core';
 import { createMockModel } from './setup';
 
 describe('Durability', () => {

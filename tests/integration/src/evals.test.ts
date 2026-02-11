@@ -12,7 +12,7 @@ import {
   outputMatches,
   stepCount,
   tokenUsage,
-} from '@agent/sdk';
+} from '@agntk/core';
 import { createMockModel, createMockMultiModel } from './setup';
 
 describe('Evaluation Framework', () => {

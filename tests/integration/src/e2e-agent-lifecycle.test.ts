@@ -14,7 +14,7 @@ import {
   asStep,
   contentFilter,
   SpecialistPool,
-} from '@agent/sdk';
+} from '@agntk/core';
 import { createMockModel, createMockToolModel, createMockMultiModel, createMockModelWithSpy } from './setup';
 
 describe('E2E: Agent Lifecycle', () => {

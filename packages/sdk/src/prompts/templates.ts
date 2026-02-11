@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - System Prompt Templates
+ * @agntk/core - System Prompt Templates
  * Core system prompts for agent behavior
  */
 

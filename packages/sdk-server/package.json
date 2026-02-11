@@ -1,8 +1,8 @@
 {
-  "name": "@agent/sdk-server",
+  "name": "@agntk/server",
   "version": "0.1.0",
   "type": "module",
-  "description": "HTTP/WebSocket server for @agent/sdk",
+  "description": "HTTP/WebSocket server for @agntk/core",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -20,14 +20,14 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@agent/logger": "workspace:*",
-    "@agent/sdk": "workspace:*",
+    "@agntk/logger": "workspace:*",
+    "@agntk/core": "workspace:*",
     "@hono/node-server": "^1.13.8",
     "@hono/node-ws": "^1.3.0",
     "hono": "^4.7.4"
   },
   "devDependencies": {
-    "@agent/config-typescript": "workspace:*",
+    "@agntk/config-typescript": "workspace:*",
     "@types/node": "^20.17.19",
     "typescript": "^5.7.3",
     "vitest": "^3.2.3"

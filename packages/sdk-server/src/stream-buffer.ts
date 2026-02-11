@@ -1,14 +1,14 @@
 /**
- * @agent/sdk-server - Stream Event Buffer
+ * @agntk/server - Stream Event Buffer
  *
  * In-memory buffer for SSE events keyed by workflow run ID.
  * Enables resumable streams — clients can reconnect and replay
  * from the last event they received.
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 
-const log = createLogger('@agent/sdk-server:stream-buffer');
+const log = createLogger('@agntk/server:stream-buffer');
 
 export interface BufferedEvent {
   id: string;

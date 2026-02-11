@@ -1,5 +1,5 @@
 /**
- * @agent/brain - Code Entity Types
+ * @agntk/brain - Code Entity Types
  * Node types for code entities in the knowledge graph
  */
 

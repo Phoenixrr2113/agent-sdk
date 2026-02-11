@@ -1,5 +1,5 @@
 /**
- * @agent/sdk-server - StreamEventBuffer Tests
+ * @agntk/server - StreamEventBuffer Tests
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';

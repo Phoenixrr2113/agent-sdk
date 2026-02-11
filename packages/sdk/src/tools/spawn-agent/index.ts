@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Spawn Agent Tool
+ * @agntk/core - Spawn Agent Tool
  * Tool for spawning sub-agents with streaming output
  */
 

@@ -3,11 +3,11 @@
  */
 
 import { z } from 'zod';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { getConfig } from '../config';
 import { applyTemplate } from '../prompts/template';
 
-const log = createLogger('@agent/sdk:roles');
+const log = createLogger('@agntk/core:roles');
 
 // ============================================================================
 // Types

@@ -6,10 +6,10 @@
  * If not installed, observability features gracefully degrade (no-op).
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type { ObservabilityConfig, TelemetrySettings } from './types';
 
-const log = createLogger('@agent/sdk:observability');
+const log = createLogger('@agntk/core:observability');
 
 let initialized = false;
 
@@ -22,7 +22,7 @@ let initialized = false;
  *
  * @example
  * ```typescript
- * import { initObservability } from '@agent/sdk';
+ * import { initObservability } from '@agntk/core';
  *
  * await initObservability({
  *   provider: 'langfuse',

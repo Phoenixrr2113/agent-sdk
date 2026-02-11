@@ -1,16 +1,16 @@
 /**
- * @agent/sdk - Transient Streaming Infrastructure
+ * @agntk/core - Transient Streaming Infrastructure
  *
  * Enables tools to stream data to the UI without persisting to conversation context.
  * This keeps the context window lean while providing rich UI feedback.
  */
 
 import type { Tool } from 'ai';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type { ToolContext } from '../types/lifecycle';
 import type { AgentDataParts, AnyDataPart } from './data-parts';
 
-const log = createLogger('@agent/sdk:streaming');
+const log = createLogger('@agntk/core:streaming');
 
 // ============================================================================
 // Types

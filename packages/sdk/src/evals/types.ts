@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Evals Framework Types
+ * @agntk/core - Evals Framework Types
  */
 
 import type { StepResult, ToolSet } from 'ai';

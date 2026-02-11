@@ -1,8 +1,8 @@
 /**
- * @agent/brain - Brain Tools
+ * @agntk/brain - Brain Tools
  *
  * Tools that agents can use to interact with the brain.
- * Shell tools have been consolidated into @agent/sdk.
+ * Shell tools have been consolidated into @agntk/core.
  */
 
 import { tool } from 'ai';
@@ -159,7 +159,7 @@ Returns entities (people, projects, goals, problems, etc.) and their relationshi
 // ============================================================================
 
 /**
- * Create all brain tools. Shell tools are now in @agent/sdk.
+ * Create all brain tools. Shell tools are now in @agntk/core.
  *
  * @deprecated Use `createBrainKnowledgeTools` and `createBrainAnalysisTools` separately.
  */

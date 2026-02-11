@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Agent } from '../agent';
 
-vi.mock('@agent/logger', () => ({
+vi.mock('@agntk/logger', () => ({
   createLogger: () => ({
     info: vi.fn(),
     debug: vi.fn(),

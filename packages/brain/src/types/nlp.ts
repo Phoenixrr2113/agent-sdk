@@ -1,5 +1,5 @@
 /**
- * @agent/brain - NLP Types
+ * @agntk/brain - NLP Types
  * Types for entity/relationship extraction from natural language
  */
 

@@ -11,7 +11,7 @@ import {
   subAgentConfigs,
   getSubAgentConfig,
   resolveModel,
-} from '@agent/sdk';
+} from '@agntk/core';
 import { createMockModel } from './setup';
 
 describe('Presets & Models', () => {

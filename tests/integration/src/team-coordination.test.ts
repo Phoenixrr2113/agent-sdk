@@ -10,7 +10,7 @@ import {
   TaskBoard,
   createTeamTools,
   createTeam,
-} from '@agent/sdk';
+} from '@agntk/core';
 import { createMockModel } from './setup';
 
 describe('Team Coordination', () => {

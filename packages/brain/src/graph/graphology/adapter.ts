@@ -6,7 +6,7 @@
  */
 
 import { DirectedGraph } from 'graphology';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type { QueryPort } from '../ports';
 import type {
   GraphData,
@@ -37,7 +37,7 @@ import {
 } from '../schema';
 import type { EpisodeRow } from '../operations/episode-ops';
 
-const log = createLogger('@agent/brain:graphology');
+const log = createLogger('@agntk/brain:graphology');
 
 // ============================================================================
 // Helper Types — local aliases to avoid graphology-types dependency

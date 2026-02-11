@@ -1,15 +1,15 @@
 /**
- * @agent/logger
+ * @agntk/logger
  * 
  * Zero-dependency debug logging with namespace filtering, file output, and SSE support.
  * 
  * @example
  * ```typescript
- * import { createLogger, addTransport, createFileTransport } from '@agent/logger';
+ * import { createLogger, addTransport, createFileTransport } from '@agntk/logger';
  * 
- * // Enable via environment: DEBUG=@agent/sdk:*
+ * // Enable via environment: DEBUG=@agntk/core:*
  * 
- * const log = createLogger('@agent/sdk:agent');
+ * const log = createLogger('@agntk/core:agent');
  * log.info('Agent started', { role: 'coder' });
  * 
  * // Add file output

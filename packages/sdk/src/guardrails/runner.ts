@@ -2,7 +2,7 @@
  * @fileoverview Guardrail runner with parallel execution and fast-fail.
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type {
   Guardrail,
   GuardrailResult,
@@ -12,7 +12,7 @@ import type {
 } from './types';
 import { GuardrailBlockedError } from './types';
 
-const log = createLogger('@agent/sdk:guardrails');
+const log = createLogger('@agntk/core:guardrails');
 
 // ============================================================================
 // Parallel Runner

@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Tool Approval System
+ * @agntk/core - Tool Approval System
  *
  * Wraps tools with AI SDK's native `needsApproval` flag for human-in-the-loop
  * safety. When `approval: true` is set on the agent, dangerous tools
@@ -13,9 +13,9 @@
  */
 
 import type { Tool, ToolSet } from 'ai';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 
-const log = createLogger('@agent/sdk:approval');
+const log = createLogger('@agntk/core:approval');
 
 // ============================================================================
 // Types

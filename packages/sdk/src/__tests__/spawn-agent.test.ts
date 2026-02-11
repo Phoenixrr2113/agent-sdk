@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Spawn Agent Tool Tests
+ * @agntk/core - Spawn Agent Tool Tests
  */
 
 import { describe, it, expect, vi } from 'vitest';

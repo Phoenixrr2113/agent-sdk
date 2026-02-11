@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Core Agent Factory
+ * @agntk/core - Core Agent Factory
  * 
  * Creates agents using AI SDK's ToolLoopAgent pattern.
  * Provides opinionated defaults for tools, roles, and streaming.
@@ -7,7 +7,7 @@
 
 import { generateId, ToolLoopAgent, stepCountIs } from 'ai';
 import type { Tool, ToolSet } from 'ai';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type { AgentOptions, AgentRole, ToolPreset } from './types/agent';
 import { createMemoryTools } from './memory/tools';
 import { usageLimitStop } from './usage-limits';
@@ -27,7 +27,7 @@ import { wrapWithGuardrails } from './guardrails/runner';
 // Logger
 // ============================================================================
 
-const log = createLogger('@agent/sdk:agent');
+const log = createLogger('@agntk/core:agent');
 
 // ============================================================================
 // Agent Instance Type

@@ -2,10 +2,10 @@
  * @fileoverview Tool Preset Registry - manages built-in and custom presets.
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { getConfig } from '../config';
 
-const log = createLogger('@agent/sdk:presets');
+const log = createLogger('@agntk/core:presets');
 
 // ============================================================================
 // Types

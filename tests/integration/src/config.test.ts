@@ -12,7 +12,7 @@ import {
   getModelForTier,
   DEFAULT_MODELS,
   DEFAULT_PROVIDER,
-} from '@agent/sdk';
+} from '@agntk/core';
 
 describe('Configuration', () => {
   describe('defaults', () => {

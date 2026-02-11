@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Workflow Hooks Tests (SDK-HOOKS-008)
+ * @agntk/core - Workflow Hooks Tests (SDK-HOOKS-008)
  *
  * Tests for:
  * - defineHook() typed hook factory

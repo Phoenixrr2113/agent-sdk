@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Search Skills Tool
+ * @agntk/core - Search Skills Tool
  *
  * AI SDK tool that allows agents to dynamically search for skills by keyword.
  * Backed by cached frontmatter metadata with file-change invalidation.
@@ -8,11 +8,11 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import * as fs from 'node:fs';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { discoverSkills, searchSkills } from '../skills/loader';
 import type { SkillMeta } from '../skills/types';
 
-const log = createLogger('@agent/sdk:search-skills');
+const log = createLogger('@agntk/core:search-skills');
 
 // ============================================================================
 // Cache

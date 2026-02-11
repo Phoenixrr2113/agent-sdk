@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Sub-Agent Configs Tests
+ * @agntk/core - Sub-Agent Configs Tests
  */
 
 import { describe, it, expect } from 'vitest';

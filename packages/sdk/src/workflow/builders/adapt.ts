@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Agent → WorkflowStep Adapter
+ * @agntk/core - Agent → WorkflowStep Adapter
  *
  * Converts an Agent to a WorkflowStep so agents and workflows are interchangeable.
  */

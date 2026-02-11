@@ -1,5 +1,5 @@
 /**
- * @agent/sdk-client - Resumable Streams Tests
+ * @agntk/client - Resumable Streams Tests
  *
  * Tests for the client-side resumable stream feature (SDK-STREAMS-007).
  * Verifies reconnect logic, metadata capture, and exponential backoff.

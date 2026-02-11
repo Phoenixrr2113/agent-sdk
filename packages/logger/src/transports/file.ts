@@ -49,7 +49,7 @@ export function createFileTransport(options: FileTransportOptions): LogTransport
         try {
           flushBuffer();
         } catch (err) {
-          console.error('[@agent/logger] Failed to write to file:', err);
+          console.error('[@agntk/logger] Failed to write to file:', err);
         }
       }
     },

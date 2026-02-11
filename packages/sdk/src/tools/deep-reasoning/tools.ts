@@ -1,11 +1,11 @@
 import { tool } from 'ai';
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { DEEP_REASONING_DESCRIPTION, UNRESTRICTED_MODE_DESCRIPTION } from './constants';
 import { getDeepReasoningEngine, isDeepReasoningEnabled } from './engine';
 import { deepReasoningInputSchema, type ThoughtData } from './types';
 
-const log = createLogger('@agent/sdk:reasoning');
+const log = createLogger('@agntk/core:reasoning');
 
 export function createDeepReasoningTool() {
   const description = isDeepReasoningEnabled()

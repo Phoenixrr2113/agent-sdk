@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Usage Limits
+ * @agntk/core - Usage Limits
  *
  * Token and request caps for agents. Prevents runaway loops from
  * burning API budget by enforcing maxRequests, maxInputTokens,

@@ -3,14 +3,14 @@ title: SDK Core
 description: Core agent factory with tools, roles, and configuration
 ---
 
-# SDK Core (`@agent/sdk`)
+# SDK Core (`@agntk/core`)
 
 The core agent factory provides tools, roles, configuration, streaming, durability, hooks, and scheduling.
 
 ## Creating an Agent
 
 ```typescript
-import { createAgent } from '@agent/sdk';
+import { createAgent } from '@agntk/core';
 
 const agent = createAgent({
   role: 'coder',
@@ -117,7 +117,7 @@ The SDK uses a cascading config system:
 3. **Defaults** — built-in fallbacks
 
 ```typescript
-import { loadConfig, configure, getConfig, resolveModel } from '@agent/sdk';
+import { loadConfig, configure, getConfig, resolveModel } from '@agntk/core';
 
 const config = loadConfig('./agent-sdk.config.yaml');
 configure({ models: { defaultProvider: 'anthropic' } });
@@ -154,7 +154,7 @@ agent.scheduled('1h', async () => { /* health check */ });
 Human-in-the-loop approval with typed hooks:
 
 ```typescript
-import { defineHook } from '@agent/sdk';
+import { defineHook } from '@agntk/core';
 
 const approvalHook = defineHook<{ amount: number }, boolean>({
   name: 'purchase-approval',
@@ -171,7 +171,7 @@ const approved = await approvalHook.wait({ amount: 5000 });
 Recurring tasks with zero-compute sleep:
 
 ```typescript
-import { createScheduledWorkflow } from '@agent/sdk';
+import { createScheduledWorkflow } from '@agntk/core';
 
 const schedule = createScheduledWorkflow({
   name: 'daily-check',
@@ -189,7 +189,7 @@ await schedule.start();
 Auto-discover and inject SKILL.md files:
 
 ```typescript
-import { createAgent, discoverSkills } from '@agent/sdk';
+import { createAgent, discoverSkills } from '@agntk/core';
 
 const agent = createAgent({
   skills: { directories: ['.agents/skills'] },
@@ -203,7 +203,7 @@ const skills = await discoverSkills('./.agents/skills');
 Optional Langfuse integration for tracing:
 
 ```typescript
-import { initObservability } from '@agent/sdk';
+import { initObservability } from '@agntk/core';
 
 initObservability({
   langfuse: { publicKey: '...', secretKey: '...' },

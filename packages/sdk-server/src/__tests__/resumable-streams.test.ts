@@ -1,5 +1,5 @@
 /**
- * @agent/sdk-server - Resumable Streams Tests
+ * @agntk/server - Resumable Streams Tests
  *
  * Tests for the resumable stream feature (SDK-STREAMS-007).
  * Verifies x-workflow-run-id header behavior and event replay.

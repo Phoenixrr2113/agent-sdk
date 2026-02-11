@@ -1,15 +1,15 @@
 /**
- * @agent/sdk - Standalone Workflow Templates
+ * @agntk/core - Standalone Workflow Templates
  *
  * Composable workflow templates (withApproval, withSchedule) that work
  * with any Agent instance. No special DurableAgent required.
  */
 
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import type { Agent } from '../agent';
 import { checkWorkflowAvailability, parseDuration } from './durable-agent';
 
-const log = createLogger('@agent/sdk:workflow:templates');
+const log = createLogger('@agntk/core:workflow:templates');
 
 // ============================================================================
 // Types

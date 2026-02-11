@@ -8,7 +8,7 @@ import { MockLanguageModelV3, mockValues } from 'ai/test';
 import type { LanguageModel } from 'ai';
 import type { Agent } from '../agent';
 
-vi.mock('@agent/logger', () => ({
+vi.mock('@agntk/logger', () => ({
   createLogger: () => ({
     info: vi.fn(),
     debug: vi.fn(),

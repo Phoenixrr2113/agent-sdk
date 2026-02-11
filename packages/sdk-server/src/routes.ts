@@ -1,21 +1,21 @@
 /**
- * @agent/sdk-server - HTTP Routes
+ * @agntk/server - HTTP Routes
  * Hono routes for agent HTTP API with SSE streaming
  */
 
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
-import { createLogger, getLogEmitter } from '@agent/logger';
+import { createLogger, getLogEmitter } from '@agntk/logger';
 import { createLoggingMiddleware, createRateLimitMiddleware, createAuthMiddleware, createBodyLimitMiddleware } from './middleware';
 import { ConcurrencyQueue, QueueFullError, QueueTimeoutError } from './queue';
 import { StreamEventBuffer } from './stream-buffer';
 import type { AgentServerOptions, DurableAgentInstance } from './types';
-import { getHookRegistry, HookNotFoundError, HookNotPendingError } from '@agent/sdk';
+import { getHookRegistry, HookNotFoundError, HookNotPendingError } from '@agntk/core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const log = createLogger('@agent/sdk-server:routes');
+const log = createLogger('@agntk/server:routes');
 
 /**
  * Chat message format
@@ -541,7 +541,7 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
             log.info('Browser stream WebSocket connected');
 
             // Dynamically import to avoid hard dependency if browser tool isn't used
-            import('@agent/sdk').then(({ createBrowserStream }) => {
+            import('@agntk/core').then(({ createBrowserStream }) => {
               const streamConfig = {
                 fps: serverOptions.browserStream?.fps ?? 2,
                 quality: serverOptions.browserStream?.quality ?? 60,

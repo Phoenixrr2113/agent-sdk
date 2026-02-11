@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Memory Extraction Pipeline
+ * @agntk/core - Memory Extraction Pipeline
  *
  * LLM-powered extraction implementing the Hindsight 4-network taxonomy:
  * - world_fact: Generic factual knowledge
@@ -11,9 +11,9 @@
  */
 
 import { generateText, type LanguageModel } from 'ai';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 
-const log = createLogger('@agent/sdk:extraction');
+const log = createLogger('@agntk/core:extraction');
 
 // ============================================================================
 // Types

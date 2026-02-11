@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Tool Provider
+ * @agntk/core - Tool Provider
  *
  * Central provider for creating and managing tool sets.
  * Adapted from packages/core/src/tools/provider.ts

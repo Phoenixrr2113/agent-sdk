@@ -3,9 +3,9 @@
  * 
  * Usage:
  * ```typescript
- * import { createLogger } from '@agent/logger';
+ * import { createLogger } from '@agntk/logger';
  * 
- * const log = createLogger('@agent/sdk:agent');
+ * const log = createLogger('@agntk/core:agent');
  * 
  * log.info('Agent created', { agentId: '123' });
  * log.debug('Building tools', { preset: 'standard' });
@@ -83,7 +83,7 @@ export function createLogger(namespace: string, options: LoggerOptions = {}): Lo
         transport.write(entry);
       } catch (err) {
         // Don't let transport errors break the application
-        console.error(`[@agent/logger] Transport "${transport.name}" failed:`, err);
+        console.error(`[@agntk/logger] Transport "${transport.name}" failed:`, err);
       }
     }
 

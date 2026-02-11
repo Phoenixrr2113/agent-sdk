@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Vectra Memory Store
+ * @agntk/core - Vectra Memory Store
  * 
  * Portable in-memory vector database using Vectra.
  * Zero native dependencies, file-based persistence.
@@ -8,7 +8,7 @@
 import { LocalIndex } from 'vectra';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import { createLogger } from '@agent/logger';
+import { createLogger } from '@agntk/logger';
 import { getConfig } from '../config';
 import {
   DEFAULT_EMBEDDING_URL,
@@ -19,7 +19,7 @@ import {
 } from '../constants';
 import type { MemoryOptions } from '../types/agent';
 
-const log = createLogger('@agent/sdk:memory');
+const log = createLogger('@agntk/core:memory');
 
 // ============================================================================
 // Types

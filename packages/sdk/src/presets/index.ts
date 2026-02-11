@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Presets Module Index
+ * @agntk/core - Presets Module Index
  */
 
 export {

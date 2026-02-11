@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Workflow Tests (Phase 2: Durability)
+ * @agntk/core - Workflow Tests (Phase 2: Durability)
  *
  * Tests for:
  * - DurableAgent wrapper (SDK-DURABLE-006)

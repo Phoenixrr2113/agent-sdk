@@ -1,5 +1,5 @@
 /**
- * @agent/sdk - Eval Assertions Library
+ * @agntk/core - Eval Assertions Library
  *
  * Built-in assertions for agent eval suites.
  */
