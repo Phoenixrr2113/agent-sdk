@@ -46,39 +46,19 @@ function buildAgentOptions(
   config: ResolvedCLIConfig,
   environment: EnvironmentContext,
 ): AgentOptions {
-  const envPrompt = formatEnvironmentPrompt(environment);
-
-  // Build system prompt with environment context
-  const systemPromptParts: string[] = [];
-  systemPromptParts.push(envPrompt);
-
-  // If workspace-specific context exists, add it
-  // (Memory loading will be added in P2-MEM-005)
-
   const agentOptions: AgentOptions = {
     role: config.role as AgentOptions['role'],
     maxSteps: config.maxSteps,
     toolPreset: config.toolPreset as ToolPresetLevel,
     workspaceRoot: config.workspace,
     enableMemory: config.memory,
+    systemPromptPrefix: formatEnvironmentPrompt(environment),
   };
 
   // If user provided a model string, pass it through
   if (config.model && config.provider) {
     agentOptions.modelProvider = config.provider as AgentOptions['modelProvider'];
     agentOptions.modelName = config.model;
-  }
-
-  // Prepend environment context to the system prompt
-  // The role's built-in system prompt will be used by default,
-  // and we augment it with environment context
-  if (systemPromptParts.length > 0) {
-    const envContext = systemPromptParts.join('\n\n');
-    // We don't override the whole system prompt — we let the role handle it
-    // and inject environment context via a wrapper
-    agentOptions.systemPrompt = undefined; // let role default apply
-    // TODO: When we add a `systemPromptPrefix` option to AgentOptions, use that instead
-    // For now, environment context is baked into the role prompt
   }
 
   return agentOptions;

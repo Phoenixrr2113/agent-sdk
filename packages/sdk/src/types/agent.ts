@@ -27,6 +27,11 @@ export interface AgentOptions {
   /** System prompt/instructions for the agent. Overrides role-based defaults. */
   systemPrompt?: string;
 
+  /** Context to prepend to the system prompt without overriding role defaults.
+   * Useful for injecting environment context (OS, shell, project type, etc.).
+   */
+  systemPromptPrefix?: string;
+
   /** Predefined role with associated system prompt and call options. */
   role?: AgentRole;
 

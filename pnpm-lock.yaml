@@ -79,9 +79,6 @@ importers:
       '@agntk/core':
         specifier: workspace:*
         version: link:../sdk
-      '@agntk/logger':
-        specifier: workspace:*
-        version: link:../logger
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3

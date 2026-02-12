@@ -132,7 +132,10 @@ export function createAgent(options: AgentOptions = {}): Agent {
   const roleConfig = getRole(role);
   
   // Resolve system prompt
-  const finalSystemPrompt = systemPrompt ?? roleConfig.systemPrompt;
+  const baseSystemPrompt = systemPrompt ?? roleConfig.systemPrompt;
+  const finalSystemPrompt = options.systemPromptPrefix
+    ? `${options.systemPromptPrefix}\n\n${baseSystemPrompt}`
+    : baseSystemPrompt;
   
   // Load and inject skills
   let augmentedSystemPrompt = finalSystemPrompt;
