@@ -5,8 +5,8 @@
   "type": "module",
   "description": "Agent SDK documentation site",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
+    "dev": "node ../../scripts/sync-readme-to-docs.mjs && astro dev",
+    "build": "node ../../scripts/sync-readme-to-docs.mjs && astro build",
     "preview": "astro preview"
   },
   "dependencies": {

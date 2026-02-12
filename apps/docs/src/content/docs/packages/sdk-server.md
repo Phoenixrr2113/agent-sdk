@@ -1,96 +1,38 @@
 ---
-title: SDK Server
-description: Hono-based HTTP server with REST, SSE, and WebSocket endpoints
+title: "SDK Server"
+description: "Hono HTTP server — REST + SSE + WebSocket endpoints"
 ---
 
-# SDK Server (`@agntk/server`)
-
 Hono-based HTTP server with REST, SSE streaming, and WebSocket endpoints.
-
-## Basic Setup
 
 ```typescript
 import { createAgentServer } from '@agntk/server';
 import { createAgent } from '@agntk/core';
 
-const agent = createAgent({
-  role: 'coder',
-  toolPreset: 'standard'
-});
-
-const server = createAgentServer({
-  agent,
-  port: 3001
-});
-
+const agent = createAgent({ role: 'coder', toolPreset: 'standard' });
+const server = createAgentServer({ agent, port: 3000 });
 server.start();
-// Server running at http://localhost:3001
 ```
 
 ## Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/health` | Health check — returns `{ status: 'ok' }` |
-| `GET` | `/status` | Server status with version info |
+| `GET` | `/health` | Health check |
+| `GET` | `/status` | Agent info (role, tools, model) |
+| `GET` | `/queue` | Concurrency queue stats |
+| `GET` | `/config` | Read config file |
+| `PUT` | `/config` | Update config file |
+| `GET` | `/logs` | SSE stream of log entries |
 | `POST` | `/generate` | Synchronous generation |
 | `POST` | `/stream` | SSE streaming generation |
-| `POST` | `/hooks/:id/resume` | Resume a suspended workflow hook |
+| `POST` | `/chat` | SSE streaming via `agent.stream()` |
+| `GET` | `/hooks` | List workflow hooks (filterable by status) |
+| `GET` | `/hooks/:id` | Get specific hook details |
+| `POST` | `/hooks/:id/resume` | Resume a suspended hook |
+| `POST` | `/hooks/:id/reject` | Reject a suspended hook |
 | `WS` | `/ws/browser-stream` | Real-time browser viewport streaming |
 
-## Request Format
+**Middleware**: CORS, body size limits (1MB), rate limiting (100 req/min on generation endpoints), optional API key auth, optional concurrency queue.
 
-```typescript
-// POST /generate or /stream
-{
-  "prompt": "What is 2+2?",
-  // OR use messages array:
-  "messages": [
-    { "role": "user", "content": "What is 2+2?" }
-  ],
-  "sessionId": "optional-session-id"
-}
-```
-
-## Server Options
-
-```typescript
-import { createAgentServer } from '@agntk/server';
-
-const server = createAgentServer({
-  agent,
-  port: 3001,
-  // Middleware is available but optional
-});
-```
-
-## Example: Curl Requests
-
-### Health Check
-
-```bash
-curl http://localhost:3001/health
-```
-
-### Synchronous Generation
-
-```bash
-curl -X POST http://localhost:3001/generate \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "What is 2+2?"}'
-```
-
-### Streaming Generation
-
-```bash
-curl -X POST http://localhost:3001/stream \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "Tell me a story"}' \
-  --no-buffer
-```
-
-## Next Steps
-
-- [SDK Client](/packages/sdk-client) — Connect to this server from a client
-- [SDK Core](/packages/sdk) — Learn about agent configuration
-
+---

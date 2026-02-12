@@ -36,16 +36,16 @@ export default defineConfig({
           label: 'Packages',
           items: [
             { label: 'SDK Core', link: '/packages/sdk' },
+            { label: 'CLI', link: '/packages/cli' },
             { label: 'SDK Server', link: '/packages/sdk-server' },
             { label: 'SDK Client', link: '/packages/sdk-client' },
             { label: 'Logger', link: '/packages/logger' },
-            { label: 'Brain', link: '/packages/brain' },
           ],
         },
         {
           label: 'Configuration',
           items: [
-            { label: 'YAML Config System', link: '/configuration/yaml-config' },
+            { label: 'Config System', link: '/configuration/yaml-config' },
           ],
         },
       ],

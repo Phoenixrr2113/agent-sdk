@@ -45,7 +45,7 @@ agent-sdk/
 │   ├── sdk-server/    # @agntk/server — HTTP server
 │   ├── sdk-client/    # @agntk/client — Client library
 │   ├── logger/        # @agntk/logger — Structured logging
-│   └── brain/         # @agntk/brain — Knowledge graph
+│   └── agntk/         # agntk — npx wrapper
 ├── apps/
 │   └── docs/          # Documentation site
 └── tests/
@@ -53,14 +53,6 @@ agent-sdk/
 ```
 
 ## Optional Dependencies
-
-### FalkorDB (for Knowledge Graph)
-
-If you plan to use `@agntk/brain`, you'll need FalkorDB running locally:
-
-```bash
-docker run -p 6379:6379 falkordb/falkordb
-```
 
 ### Temporal (for Durable Workflows)
 

@@ -33,6 +33,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Sync README to docs
+        run: node scripts/sync-readme-to-docs.mjs
+
       - name: Build docs
         run: pnpm --filter docs build
 

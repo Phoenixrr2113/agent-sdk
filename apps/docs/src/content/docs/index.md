@@ -1,60 +1,52 @@
 ---
 title: Welcome
 description: Agent SDK Documentation
-template: splash
-hero:
-  title: Agent SDK
-  tagline: A modular AI agent framework built on Vercel AI SDK. Zero-config agents with real tools, durable workflows, knowledge graphs, and HTTP interfaces.
-  image:
-    dark: ../../assets/logo-dark.svg
-    light: ../../assets/logo-light.svg
-  actions:
-    - text: Get Started
-      link: /agntk/getting-started/introduction
-      icon: right-arrow
-    - text: View on GitHub
-      link: https://github.com/Phoenixrr2113/agntk
-      icon: external
-      variant: minimal
 ---
 
-## Quick Start
+# Agent SDK
 
-```typescript
-import { createAgent } from '@agntk/core';
+A modular AI agent framework built on [Vercel AI SDK](https://ai-sdk.dev). Zero-config agents with real tools, durable workflows, and HTTP interfaces.
 
-const agent = createAgent({
-  role: 'coder',
-  toolPreset: 'standard',
-  workspaceRoot: process.cwd(),
-});
-
-const result = await agent.generate({
-  prompt: 'Read package.json and list the dependencies'
-});
-
-console.log(result.text);
-```
-
-## Core Packages
+## Packages
 
 | Package | Description |
 |---------|-------------|
-| `@agntk/core` | Core agent factory -- tools, roles, config, streaming, durability, hooks, scheduling |
-| `@agntk/cli` | CLI agent -- one-shot prompts, interactive REPL, persistent memory |
-| `@agntk/server` | Hono HTTP server -- REST + SSE + WebSocket endpoints |
-| `@agntk/client` | Client library -- HTTP, SSE streams, WebSocket, session management |
-| `@agntk/logger` | Structured logging -- namespace filtering, file/SSE transports, formatters |
-| `@agntk/brain` | Knowledge graph -- FalkorDB, code parsing, NLP entity extraction |
+| `@agntk/core` | Core agent factory — tools, roles, config, streaming, durability, hooks, scheduling |
+| `@agntk/cli` | CLI agent — one-shot prompts, interactive REPL, persistent memory |
+| `agntk` | Thin CLI wrapper — enables `npx agntk` usage |
+| `@agntk/server` | Hono HTTP server — REST + SSE + WebSocket endpoints |
+| `@agntk/client` | Client library — HTTP, SSE streams, WebSocket, session management |
+| `@agntk/logger` | Structured logging — namespace filtering, file/SSE transports, formatters |
 
-## Explore the Docs
+## Quick Start
 
-- **[Introduction](/agntk/getting-started/introduction)** -- What Agent SDK is and why
-- **[Installation](/agntk/getting-started/installation)** -- Get set up in minutes
-- **[Quick Start](/agntk/getting-started/quick-start)** -- Build your first agent
-- **[SDK Core](/agntk/packages/sdk)** -- Agents, tools, and configuration
-- **[Server](/agntk/packages/sdk-server)** -- Serve agents over HTTP
-- **[Client](/agntk/packages/sdk-client)** -- Connect to remote agents
-- **[Logger](/agntk/packages/logger)** -- Structured logging
-- **[Brain](/agntk/packages/brain)** -- Knowledge graph
-- **[Config](/agntk/configuration/yaml-config)** -- YAML configuration system
+```bash
+pnpm install
+pnpm build
+pnpm test
+```
+
+---
+
+## Documentation
+
+- **[Getting Started](/agntk/getting-started/introduction)** — Introduction and setup
+- **[Installation](/agntk/getting-started/installation)** — Install Agent SDK
+- **[Quick Start](/agntk/getting-started/quick-start)** — Build your first agent
+- **[SDK Core](/agntk/packages/sdk)** — Agents, tools, and configuration
+- **[CLI](/agntk/packages/cli)** — Command-line interface
+- **[SDK Server](/agntk/packages/sdk-server)** — Serve agents over HTTP
+- **[SDK Client](/agntk/packages/sdk-client)** — Connect to a remote agent server
+- **[Logger](/agntk/packages/logger)** — Structured logging
+- **[Configuration](/agntk/configuration/yaml-config)** — Configuration system
+
+## Requirements
+
+- Node.js >= 20
+- pnpm >= 9
+- Workflow DevKit (optional, for durable workflows)
+- Langfuse + @vercel/otel (optional, for observability)
+
+## License
+
+MIT
