@@ -83,8 +83,18 @@ vi.mock('../workflow/utils', () => ({
   checkWorkflowAvailability: async () => false,
 }));
 
+vi.mock('../observability', () => ({
+  initObservability: vi.fn(async () => true),
+  createTelemetrySettings: vi.fn((opts?: Record<string, unknown>) => ({
+    isEnabled: true,
+    functionId: opts?.functionId,
+    metadata: opts?.metadata,
+  })),
+}));
+
 // --- Import after mocks ---
 import { createAgent, createCoderAgent, createResearcherAgent, createAnalystAgent } from '../agent';
+import { initObservability, createTelemetrySettings } from '../observability';
 
 /**
  * Helper: create a MockLanguageModelV3 for passing directly as `model` option.
@@ -257,6 +267,66 @@ describe('createAgent', () => {
       const agent = createAgent();
       expect(agent.getToolLoopAgent()).toBeDefined();
     });
+  });
+});
+
+describe('telemetry integration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should create agent with telemetry settings when telemetry provided', () => {
+    const agent = createAgent({
+      telemetry: {
+        functionId: 'my-agent',
+        metadata: { env: 'test' },
+      },
+    });
+
+    expect(agent).toBeDefined();
+    expect(agent.getToolLoopAgent()).toBeDefined();
+
+    // Verify createTelemetrySettings was called with the right args
+    expect(vi.mocked(createTelemetrySettings)).toHaveBeenCalledWith({
+      functionId: 'my-agent',
+      metadata: { env: 'test' },
+    });
+  });
+
+  it('should default functionId to agent:<agentId> when not provided', () => {
+    const agent = createAgent({
+      agentId: 'test-id-42',
+      telemetry: {},
+    });
+
+    expect(agent).toBeDefined();
+    expect(vi.mocked(createTelemetrySettings)).toHaveBeenCalledWith({
+      functionId: 'agent:test-id-42',
+      metadata: undefined,
+    });
+  });
+
+  it('should not call createTelemetrySettings when telemetry is not provided', () => {
+    createAgent();
+    expect(vi.mocked(createTelemetrySettings)).not.toHaveBeenCalled();
+  });
+
+  it('should call initObservability lazily on first generate()', async () => {
+    const agent = createAgent({
+      model: createTestModel('ok'),
+      toolPreset: 'none',
+      maxSteps: 1,
+      telemetry: {
+        provider: { provider: 'langfuse' },
+      },
+    });
+
+    // Not called at creation time
+    expect(vi.mocked(initObservability)).not.toHaveBeenCalled();
+
+    // Called on first generate()
+    await agent.generate({ prompt: 'test' });
+    expect(vi.mocked(initObservability)).toHaveBeenCalledWith({ provider: 'langfuse' });
   });
 });
 

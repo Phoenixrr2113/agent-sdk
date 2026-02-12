@@ -1,6 +1,6 @@
 /**
  * @fileoverview One-shot execution runner for agntk CLI.
- * Takes a resolved config + prompt, creates an agent, streams output to stdout.
+ * Takes a resolved config + prompt, creates an agent, and streams output progressively to stdout.
  *
  * This is the "happy path": npx agntk "organize this folder by date"
  */
@@ -165,24 +165,31 @@ export async function runOneShot(
       statusOutput.write(`[agntk] Sending prompt...\n`);
     }
 
-    // Use generate() for one-shot mode (simpler, returns full result)
-    const result = await agent.generate({ prompt });
+    // Stream output progressively so text appears as the model generates it
+    const streamResult = await agent.stream({ prompt });
 
-    // Write final text to stdout
-    if (result.text) {
-      output.write(result.text);
-      // Ensure trailing newline
-      if (!result.text.endsWith('\n')) {
-        output.write('\n');
+    // Write text chunks as they arrive
+    for await (const chunk of streamResult.fullStream) {
+      if (chunk.type === 'text-delta') {
+        output.write(chunk.text);
       }
     }
 
-    const stepCount = result.steps?.length ?? 0;
+    // Get final results (already resolved since we consumed the full stream)
+    const finalText = await streamResult.text;
+    const steps = await streamResult.steps;
+    const stepCount = steps?.length ?? 0;
+
+    // Ensure trailing newline
+    if (finalText && !finalText.endsWith('\n')) {
+      output.write('\n');
+    }
 
     if (config.verbose) {
       statusOutput.write(`[agntk] Completed in ${stepCount} step(s)\n`);
-      if (result.totalUsage) {
-        const usage = result.totalUsage as Record<string, unknown>;
+      const totalUsage = await streamResult.totalUsage;
+      if (totalUsage) {
+        const usage = totalUsage as Record<string, unknown>;
         statusOutput.write(
           `[agntk] Tokens: ${usage.inputTokens ?? 0} in / ${usage.outputTokens ?? 0} out\n`,
         );
@@ -190,7 +197,7 @@ export async function runOneShot(
     }
 
     return {
-      text: result.text ?? '',
+      text: finalText ?? '',
       steps: stepCount,
       success: true,
     };

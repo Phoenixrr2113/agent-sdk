@@ -10,6 +10,7 @@ import type { ReflectionConfig } from '../reflection';
 import type { ApprovalConfig } from '../tools/approval';
 import type { GuardrailsConfig } from '../guardrails/types';
 import type { StreamEvent, StreamEventCallback } from './streaming';
+import type { ObservabilityConfig } from '../observability/types';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Main AgentOptions Interface
@@ -208,6 +209,36 @@ export interface AgentOptions {
 
   /** Callback for streaming events. */
   onEvent?: StreamEventCallback;
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Telemetry / Observability
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** Telemetry configuration for OpenTelemetry-based tracing.
+   * When provided, initializes observability and passes telemetry settings
+   * to the underlying AI SDK ToolLoopAgent.
+   *
+   * Requires `langfuse-vercel` and `@vercel/otel` as optional peer dependencies.
+   * Gracefully degrades (no-op) if not installed.
+   *
+   * @example
+   * ```typescript
+   * const agent = createAgent({
+   *   telemetry: {
+   *     provider: { provider: 'langfuse' },
+   *     functionId: 'my-agent',
+   *   },
+   * });
+   * ```
+   */
+  telemetry?: {
+    /** Observability provider config (e.g., Langfuse keys/URL). */
+    provider?: ObservabilityConfig;
+    /** Identifier for this agent function in traces. Defaults to `agent:<agentId>`. */
+    functionId?: string;
+    /** Additional metadata to include in traces. */
+    metadata?: Record<string, unknown>;
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

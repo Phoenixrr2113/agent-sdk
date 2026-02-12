@@ -4,17 +4,26 @@ import { runOneShot, type RunOptions } from '../runner';
 import type { ResolvedCLIConfig } from '../config';
 import type { EnvironmentContext } from '../environment';
 
+// Helper to create a mock StreamTextResult
+function createMockStreamResult(prompt: string) {
+  const responseText = `Response to: ${prompt}`;
+  return {
+    fullStream: (async function* () {
+      yield { type: 'text-delta' as const, text: responseText };
+    })(),
+    text: Promise.resolve(responseText),
+    steps: Promise.resolve([{ toolCalls: [], toolResults: [] }]),
+    totalUsage: Promise.resolve({ inputTokens: 100, outputTokens: 50, totalTokens: 150 }),
+  };
+}
+
 // Mock @agntk/core
 vi.mock('@agntk/core', () => ({
   createAgent: vi.fn(() => ({
     agentId: 'test-agent-123',
     role: 'generic',
-    generate: vi.fn(async ({ prompt }: { prompt: string }) => ({
-      text: `Response to: ${prompt}`,
-      steps: [{ toolCalls: [], toolResults: [] }],
-      totalUsage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
-    })),
-    stream: vi.fn(),
+    generate: vi.fn(),
+    stream: vi.fn(async ({ prompt }: { prompt: string }) => createMockStreamResult(prompt)),
     getToolLoopAgent: vi.fn(),
     getSystemPrompt: vi.fn(() => 'test prompt'),
   })),
@@ -161,10 +170,10 @@ describe('runOneShot', () => {
     vi.mocked(createAgent).mockReturnValueOnce({
       agentId: 'test-err',
       role: 'generic' as const,
-      generate: vi.fn(async () => {
+      generate: vi.fn(),
+      stream: vi.fn(async () => {
         throw new Error('Model rate limited');
       }),
-      stream: vi.fn(),
       getToolLoopAgent: vi.fn(),
       getSystemPrompt: vi.fn(() => ''),
     } as any);

@@ -6,7 +6,7 @@
  */
 
 import { generateId, ToolLoopAgent, stepCountIs } from 'ai';
-import type { Tool, ToolSet } from 'ai';
+import type { Tool, ToolSet, TelemetrySettings as AiTelemetrySettings } from 'ai';
 import { createLogger } from '@agntk/logger';
 import type { AgentOptions, AgentRole, ToolPreset } from './types/agent';
 import { usageLimitStop } from './usage-limits';
@@ -24,6 +24,7 @@ import { wrapWithGuardrails } from './guardrails/runner';
 import { MarkdownMemoryStore } from './memory/store';
 import { loadMemoryContext } from './memory/loader';
 import { createMemoryTools } from './memory/tools';
+import { initObservability, createTelemetrySettings } from './observability';
 
 // ============================================================================
 // Logger
@@ -122,6 +123,7 @@ export function createAgent(options: AgentOptions = {}): Agent {
     maxSteps = 10,
     enableSubAgents = false,
     workspaceRoot = process.cwd(),
+    telemetry,
   } = options;
 
   log.info('Creating agent', { agentId, role, maxSteps, enableSubAgents });
@@ -278,10 +280,19 @@ export function createAgent(options: AgentOptions = {}): Agent {
     log.debug('Reflection enabled', { strategy: reflectionConfig!.strategy });
   }
 
+  // Build telemetry settings (sync — just creates the config object)
+  const telemetrySettings = telemetry
+    ? createTelemetrySettings({
+        functionId: telemetry.functionId ?? `agent:${agentId}`,
+        metadata: telemetry.metadata,
+      })
+    : undefined;
+
   // Create the ToolLoopAgent
   log.debug('Creating ToolLoopAgent', {
     promptLength: augmentedSystemPrompt.length,
     toolCount: Object.keys(tools).length,
+    telemetry: !!telemetrySettings,
   });
 
   const toolLoopAgent = new ToolLoopAgent({
@@ -290,6 +301,7 @@ export function createAgent(options: AgentOptions = {}): Agent {
     tools,
     stopWhen: stopConditions,
     ...(prepareStep ? { prepareStep } : {}),
+    ...(telemetrySettings ? { experimental_telemetry: telemetrySettings as AiTelemetrySettings } : {}),
   });
 
   // Create a child logger for this agent instance
@@ -324,18 +336,42 @@ export function createAgent(options: AgentOptions = {}): Agent {
     return memoryInitPromise;
   }
 
+  // Lazy telemetry init — registers OTel provider before first LLM call
+  let telemetryInitPromise: Promise<void> | null = null;
+
+  function ensureTelemetryInit(): Promise<void> {
+    if (!telemetry?.provider) return Promise.resolve();
+    if (telemetryInitPromise) return telemetryInitPromise;
+
+    telemetryInitPromise = initObservability(telemetry.provider)
+      .then((ok) => {
+        if (ok) {
+          agentLog.info('Telemetry initialized', { provider: telemetry.provider!.provider });
+        }
+      })
+      .catch((err) => {
+        agentLog.warn('Telemetry initialization failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+
+    return telemetryInitPromise;
+  }
+
   // Create the agent instance
   const agent: Agent = {
     agentId,
     role,
 
-    init: () => ensureMemoryContext(),
+    init: async () => {
+      await Promise.all([ensureMemoryContext(), ensureTelemetryInit()]);
+    },
 
     getToolLoopAgent: () => toolLoopAgent,
     getSystemPrompt: () => augmentedSystemPrompt,
 
     stream: async (input) => {
-      await ensureMemoryContext();
+      await Promise.all([ensureMemoryContext(), ensureTelemetryInit()]);
       agentLog.info('stream() called', { promptLength: input.prompt.length });
       const done = agentLog.time('stream');
       const result = toolLoopAgent.stream({ prompt: input.prompt });
@@ -343,7 +379,7 @@ export function createAgent(options: AgentOptions = {}): Agent {
     },
 
     generate: async (input) => {
-      await ensureMemoryContext();
+      await Promise.all([ensureMemoryContext(), ensureTelemetryInit()]);
       agentLog.info('generate() called', {
         promptLength: input.prompt.length,
         prompt: input.prompt.slice(0, 500) + (input.prompt.length > 500 ? '...' : ''),

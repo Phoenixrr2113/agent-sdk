@@ -32,6 +32,9 @@ export interface LangfuseConfig {
 
 /**
  * Telemetry settings to pass to AI SDK calls.
+ * This is a simplified subset of the AI SDK's TelemetrySettings.
+ * The full AI SDK type uses AttributeValue from @opentelemetry/api,
+ * but we accept Record<string, unknown> for a simpler API.
  */
 export interface TelemetrySettings {
   isEnabled: boolean;

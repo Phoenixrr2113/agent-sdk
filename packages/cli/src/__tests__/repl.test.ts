@@ -4,17 +4,27 @@ import { runRepl, type ReplOptions } from '../repl';
 import type { ResolvedCLIConfig } from '../config';
 import type { EnvironmentContext } from '../environment';
 
+// Helper to create a mock StreamTextResult
+function createMockStreamResult(prompt: string) {
+  const lastLine = prompt.split('\n').pop()?.replace('User: ', '') ?? prompt;
+  const responseText = `REPL response to: ${lastLine}`;
+  return {
+    fullStream: (async function* () {
+      yield { type: 'text-delta' as const, text: responseText };
+    })(),
+    text: Promise.resolve(responseText),
+    steps: Promise.resolve([{ toolCalls: [], toolResults: [] }]),
+    totalUsage: Promise.resolve({ inputTokens: 50, outputTokens: 25, totalTokens: 75 }),
+  };
+}
+
 // Mock @agntk/core
 vi.mock('@agntk/core', () => ({
   createAgent: vi.fn(() => ({
     agentId: 'repl-agent-123',
     role: 'generic',
-    generate: vi.fn(async ({ prompt }: { prompt: string }) => ({
-      text: `REPL response to: ${prompt.split('\n').pop()?.replace('User: ', '')}`,
-      steps: [{ toolCalls: [], toolResults: [] }],
-      totalUsage: { inputTokens: 50, outputTokens: 25, totalTokens: 75 },
-    })),
-    stream: vi.fn(),
+    generate: vi.fn(),
+    stream: vi.fn(async ({ prompt }: { prompt: string }) => createMockStreamResult(prompt)),
     getToolLoopAgent: vi.fn(),
     getSystemPrompt: vi.fn(() => 'test prompt'),
   })),

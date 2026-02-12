@@ -188,24 +188,33 @@ export async function runRepl(options: ReplOptions): Promise<ReplResult> {
 
       try {
         output.write('\n');
-        const result = await agent.generate({ prompt: contextPrompt });
 
-        const responseText = result.text ?? '';
-        if (responseText) {
-          output.write(responseText);
-          if (!responseText.endsWith('\n')) {
-            output.write('\n');
+        // Stream output progressively
+        const streamResult = await agent.stream({ prompt: contextPrompt });
+
+        for await (const chunk of streamResult.fullStream) {
+          if (chunk.type === 'text-delta') {
+            output.write(chunk.text);
           }
+        }
+
+        const responseText = (await streamResult.text) ?? '';
+        if (responseText && !responseText.endsWith('\n')) {
+          output.write('\n');
         }
 
         ctx.history.push({ role: 'assistant', content: responseText });
         exchanges++;
 
-        if (config.verbose && result.totalUsage) {
-          const usage = result.totalUsage as Record<string, unknown>;
-          output.write(
-            `\n[${usage.inputTokens ?? 0} in / ${usage.outputTokens ?? 0} out | ${result.steps?.length ?? 0} step(s)]\n`,
-          );
+        if (config.verbose) {
+          const totalUsage = await streamResult.totalUsage;
+          const steps = await streamResult.steps;
+          if (totalUsage) {
+            const usage = totalUsage as Record<string, unknown>;
+            output.write(
+              `\n[${usage.inputTokens ?? 0} in / ${usage.outputTokens ?? 0} out | ${steps?.length ?? 0} step(s)]\n`,
+            );
+          }
         }
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
