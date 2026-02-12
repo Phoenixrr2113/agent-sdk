@@ -1,6 +1,6 @@
 {
   "name": "@agntk/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "CLI for agntk — portable AI agent you install and point at problems",
   "bin": {
@@ -13,10 +13,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
-    }
+    },
+    "./cli": "./dist/cli.js"
   },
   "scripts": {
-    "build": "tsc && node ../../scripts/fix-esm-imports.mjs ./dist",
+    "build": "tsc && node ../../scripts/fix-esm-imports.mjs ./dist && chmod +x dist/cli.js",
     "dev": "tsc --watch",
     "test": "vitest",
     "clean": "rm -rf dist"

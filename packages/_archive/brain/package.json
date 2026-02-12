@@ -1,6 +1,7 @@
 {
   "name": "@agntk/brain",
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "description": "Knowledge graph and memory system for AI agents",
   "main": "./dist/index.js",

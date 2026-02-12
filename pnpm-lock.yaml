@@ -74,6 +74,12 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/agntk:
+    dependencies:
+      '@agntk/cli':
+        specifier: workspace:*
+        version: link:../cli
+
   packages/cli:
     dependencies:
       '@agntk/core':

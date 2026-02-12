@@ -1,0 +1,36 @@
+{
+  "name": "agntk",
+  "version": "0.1.1",
+  "type": "module",
+  "description": "Portable AI agent you install and point at problems",
+  "bin": {
+    "agntk": "./cli.mjs"
+  },
+  "dependencies": {
+    "@agntk/cli": "workspace:*"
+  },
+  "files": [
+    "cli.mjs",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agntk/agntk.git",
+    "directory": "packages/agntk"
+  },
+  "homepage": "https://github.com/agntk/agntk#readme",
+  "bugs": {
+    "url": "https://github.com/agntk/agntk/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "cli",
+    "agntk",
+    "npx"
+  ],
+  "license": "MIT"
+}

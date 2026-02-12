@@ -1,5 +1,5 @@
 {
-  "name": "agntk",
+  "name": "agntk-monorepo",
   "version": "0.1.0",
   "private": true,
   "description": "Agent SDK - AI agent tools and server for the AI SDK",
