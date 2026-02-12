@@ -7,7 +7,7 @@ description: Install Agent SDK in your project
 
 ## Prerequisites
 
-- **Node.js** >= 18
+- **Node.js** >= 20
 - **pnpm** >= 9 (or npm/yarn)
 
 ## Install from Monorepo
@@ -20,12 +20,19 @@ pnpm build
 pnpm test
 ```
 
-## Run Integration Tests
+## Environment Setup
 
-The demo app includes end-to-end tests that exercise all packages with real LLM calls:
+Set your API key to get started:
 
 ```bash
-pnpm --filter demo integration
+# Recommended: OpenRouter (routes to any model)
+export OPENROUTER_API_KEY=sk-or-...
+
+# Or use OpenAI directly
+export OPENAI_API_KEY=sk-...
+
+# For local models via Ollama
+export OLLAMA_ENABLED=true
 ```
 
 ## Project Structure
@@ -34,14 +41,15 @@ pnpm --filter demo integration
 agent-sdk/
 ├── packages/
 │   ├── sdk/           # @agntk/core — Core agent factory
+│   ├── cli/           # @agntk/cli — CLI agent
 │   ├── sdk-server/    # @agntk/server — HTTP server
 │   ├── sdk-client/    # @agntk/client — Client library
 │   ├── logger/        # @agntk/logger — Structured logging
 │   └── brain/         # @agntk/brain — Knowledge graph
 ├── apps/
-│   ├── demo/          # Integration tests and demos
 │   └── docs/          # Documentation site
-└── agent-sdk.config.yaml
+└── tests/
+    └── integration/   # Integration tests (156 tests)
 ```
 
 ## Optional Dependencies
@@ -62,4 +70,3 @@ For production durable workflows, set up a Temporal server. See the [Durable Age
 
 - [Quick Start](/getting-started/quick-start) — Build your first agent
 - [SDK Core](/packages/sdk) — Learn about agents and tools
-

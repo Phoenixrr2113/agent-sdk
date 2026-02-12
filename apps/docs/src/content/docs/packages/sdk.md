@@ -27,6 +27,7 @@ const agent = createAgent({
   // Identity
   role: 'coder',
   systemPrompt: 'You are...',
+  systemPromptPrefix: '...',
   agentId: 'my-agent-1',
 
   // Model
@@ -58,9 +59,8 @@ const agent = createAgent({
   // Memory
   enableMemory: true,
   memoryOptions: {
-    path: './memory-index',
-    topK: 5,
-    similarityThreshold: 0.7,
+    projectDir: './.agntk',
+    globalDir: '~/.agntk',
   },
 
   // Skills
@@ -84,8 +84,8 @@ const agent = createAgent({
 |--------|-------|
 | `none` | No tools |
 | `minimal` | `glob` |
-| `standard` | `glob`, `grep`, `shell`, `plan`, `deep_reasoning` |
-| `full` | `glob`, `grep`, `shell`, `plan`, `deep_reasoning`, `ast_grep_search`, `ast_grep_replace`, `browser` |
+| `standard` | `glob`, `grep`, `file_read`, `file_create`, `file_edit`, `shell`, `background`, `plan`, `deep_reasoning`, `search_skills` |
+| `full` | All standard tools + `ast_grep_search`, `ast_grep_replace`, `progress`, `browser` |
 
 Custom tools are merged with the preset:
 
@@ -108,30 +108,42 @@ Each role provides a tuned system prompt and recommended model tier:
 | `researcher` | standard | Information gathering |
 | `analyst` | standard | Data analysis |
 
+## Providers
+
+All providers use `@ai-sdk/openai-compatible` for unified access:
+
+| Provider | Default | Description |
+|----------|---------|-------------|
+| `openrouter` | ✅ | Routes to any model (Anthropic, Google, Meta, etc.) |
+| `openai` | | Direct OpenAI API |
+| `ollama` | | Local models via Ollama |
+| Custom | | Any OpenAI-compatible API via `customProviders` |
+
 ## Configuration
 
 The SDK uses a cascading config system:
 
-1. **YAML file** — `agent-sdk.config.yaml`
+1. **Config file** — `agntk.config.json`
 2. **Programmatic** — `configure()` at runtime
-3. **Defaults** — built-in fallbacks
+3. **Environment variables** — `MODEL_FAST`, `MODEL_STANDARD`, etc.
+4. **Defaults** — built-in fallbacks
 
 ```typescript
 import { loadConfig, configure, getConfig, resolveModel } from '@agntk/core';
 
-const config = loadConfig('./agent-sdk.config.yaml');
-configure({ models: { defaultProvider: 'anthropic' } });
+const config = loadConfig('./agntk.config.json');
+configure({ models: { defaultProvider: 'openrouter' } });
 const model = resolveModel({ tier: 'powerful' });
 ```
 
 ## Model Tiers
 
-| Tier | Purpose | Example |
-|------|---------|---------|
-| `fast` | Quick responses | Gemini Flash, GPT-4o-mini |
-| `standard` | Balanced | Gemini Flash, Claude Haiku |
-| `reasoning` | Complex logic | Claude Sonnet, o1-mini |
-| `powerful` | Best quality | Claude Opus, GPT-4o |
+| Tier | Purpose | OpenRouter Default |
+|------|---------|-------------------|
+| `fast` | Quick responses | `x-ai/grok-4.1-fast` |
+| `standard` | Balanced | `google/gemini-3-flash-preview` |
+| `reasoning` | Complex logic | `deepseek/deepseek-r1` |
+| `powerful` | Best quality | `z-ai/glm-4.7` |
 
 ## Durable Agents
 
@@ -209,4 +221,3 @@ initObservability({
   langfuse: { publicKey: '...', secretKey: '...' },
 });
 ```
-

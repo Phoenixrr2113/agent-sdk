@@ -66,10 +66,11 @@ interface StreamResult {
 |--------|------|---------|-------------|
 | `role` | `'generic' \| 'coder' \| 'researcher' \| 'analyst'` | `'generic'` | Predefined role with system prompt |
 | `systemPrompt` | `string` | Role default | Override system prompt |
+| `systemPromptPrefix` | `string` | None | Prepend context without replacing role prompt |
 | `agentId` | `string` | Auto-generated | Unique identifier |
 | `maxSteps` | `number` | `10` | Max tool-loop iterations |
 | `model` | `LanguageModel` | Auto-resolved | AI SDK model instance |
-| `modelProvider` | `string` | Config default | `'openrouter' \| 'openai' \| 'anthropic' \| 'google' \| 'ollama'` |
+| `modelProvider` | `string` | Config default | `'openrouter' \| 'openai' \| 'ollama'` (extensible) |
 | `modelName` | `string` | Tier default | Specific model name |
 | `toolPreset` | `string` | `'standard'` | `'none' \| 'minimal' \| 'standard' \| 'full'` |
 | `tools` | `Record<string, Tool>` | `{}` | Custom tools (merged with preset) |
@@ -78,7 +79,7 @@ interface StreamResult {
 | `enableSubAgents` | `boolean` | `false` | Adds `spawn_agent` tool |
 | `maxSpawnDepth` | `number` | `2` | Max sub-agent nesting |
 | `durable` | `boolean` | `false` | Wrap as DurableAgent |
-| `enableMemory` | `boolean` | `false` | Vectra vector memory |
+| `enableMemory` | `boolean` | `false` | Markdown-based persistent memory |
 | `brain` | `BrainInstance` | None | Knowledge graph (auto-injects tools) |
 | `skills` | `SkillsConfig` | None | Auto-discover SKILL.md files |
 | `workspaceRoot` | `string` | `process.cwd()` | Root for file operations |
@@ -92,8 +93,8 @@ interface StreamResult {
 |--------|-------|
 | `none` | No tools |
 | `minimal` | `glob` |
-| `standard` | `glob`, `grep`, `shell`, `plan`, `deep_reasoning` |
-| `full` | `glob`, `grep`, `shell`, `plan`, `deep_reasoning`, `ast_grep_search`, `ast_grep_replace`, `browser` |
+| `standard` | `glob`, `grep`, `file_read`, `file_create`, `file_edit`, `shell`, `background`, `plan`, `deep_reasoning`, `search_skills` |
+| `full` | All standard tools + `ast_grep_search`, `ast_grep_replace`, `progress`, `browser` |
 
 ```typescript
 import { createToolPreset } from '@agntk/core';
@@ -104,30 +105,33 @@ const tools = createToolPreset('standard', { workspaceRoot: '/my/project' });
 
 ## Configuration
 
-### YAML Config File
+### Config File
 
-Place `agent-sdk.config.yaml` in your project root:
+Place `agntk.config.json` in your project root:
 
-```yaml
-models:
-  defaultProvider: openrouter
-  tiers:
-    fast: google/gemini-2.0-flash-001
-    standard: google/gemini-2.0-flash-001
-    reasoning: anthropic/claude-sonnet-4
-    powerful: anthropic/claude-opus-4
-
-roles:
-  debugger:
-    systemPrompt: You are a debugging specialist.
-    recommendedModel: reasoning
-    defaultTools: [shell, grep, glob]
-
-tools:
-  shell:
-    timeout: 30000
-  glob:
-    maxFiles: 100
+```json
+{
+  "models": {
+    "defaultProvider": "openrouter",
+    "tiers": {
+      "fast": "x-ai/grok-4.1-fast",
+      "standard": "google/gemini-3-flash-preview",
+      "reasoning": "deepseek/deepseek-r1",
+      "powerful": "anthropic/claude-sonnet-4"
+    }
+  },
+  "roles": {
+    "debugger": {
+      "systemPrompt": "You are a debugging specialist.",
+      "recommendedModel": "reasoning",
+      "defaultTools": ["shell", "grep", "glob"]
+    }
+  },
+  "tools": {
+    "shell": { "timeout": 30000 },
+    "glob": { "maxFiles": 100 }
+  }
+}
 ```
 
 ### Programmatic
@@ -135,12 +139,23 @@ tools:
 ```typescript
 import { loadConfig, configure, getConfig, defineConfig, resolveModel } from '@agntk/core';
 
-loadConfig('./agent-sdk.config.yaml');
-configure({ models: { defaultProvider: 'anthropic' } });
+loadConfig('./agntk.config.json');
+configure({ models: { defaultProvider: 'openrouter' } });
 
 const model = resolveModel({ tier: 'powerful' });
 const config = getConfig();
 ```
+
+## Providers
+
+All providers use `@ai-sdk/openai-compatible` for unified access:
+
+| Provider | Default | Description |
+|----------|---------|-------------|
+| `openrouter` | ✅ | Routes to any model (Anthropic, Google, Meta, etc.) |
+| `openai` | | Direct OpenAI API |
+| `ollama` | | Local models via Ollama |
+| Custom | | Any OpenAI-compatible API via `customProviders` config |
 
 ## Model Tiers
 
@@ -194,21 +209,6 @@ parseDuration('2h');      // 7200000
 formatDuration(7200000);  // "2h"
 ```
 
-## Brain Integration
-
-```typescript
-import { createBrain } from '@agntk/brain';
-
-const brain = await createBrain({
-  graph: { host: 'localhost', port: 6379, graphName: 'my_graph' },
-});
-
-const agent = createAgent({ brain, toolPreset: 'none' });
-// Agent now has: queryKnowledge, remember, recall, extractEntities
-
-await brain.close();
-```
-
 ## Skills
 
 ```typescript
@@ -220,49 +220,6 @@ const agent = createAgent({ skills: { directories: ['.agents/skills'] } });
 // Manual:
 const skills = await discoverSkills('./.agents/skills');
 const prompt = buildSkillsSystemPrompt(skills);
-```
-
-## System Prompts
-
-```typescript
-import { systemPrompt, rolePrompts, buildSystemContext } from '@agntk/core';
-
-console.log(systemPrompt);        // Default system prompt
-console.log(rolePrompts.coder);   // Coder-specific prompt
-
-const ctx = buildSystemContext({ workspaceRoot: '/my/project', role: 'coder' });
-```
-
-## Exports
-
-```typescript
-// Core
-export { createAgent } from '@agntk/core';
-
-// Config
-export { loadConfig, configure, getConfig, defineConfig, resolveModel } from '@agntk/core';
-
-// Presets
-export { createToolPreset, toolPresets, roleConfigs } from '@agntk/core';
-
-// Prompts
-export { systemPrompt, rolePrompts, buildSystemContext } from '@agntk/core';
-
-// Skills
-export { discoverSkills, buildSkillsSystemPrompt } from '@agntk/core';
-
-// Workflow
-export { createDurableAgent, defineHook, getHookRegistry, createScheduledWorkflow } from '@agntk/core';
-export { parseDuration, formatDuration, wrapToolsAsDurable } from '@agntk/core';
-
-// Memory
-export { createMemoryStore, createMemoryTools } from '@agntk/core';
-
-// Observability
-export { initObservability, isObservabilityEnabled, createTelemetrySettings } from '@agntk/core';
-
-// Streaming
-export { streamTransient, withTransientStreaming } from '@agntk/core';
 ```
 
 ## License

@@ -7,6 +7,7 @@ A modular AI agent framework built on [Vercel AI SDK](https://ai-sdk.dev). Zero-
 | Package | Description |
 |---------|-------------|
 | `@agntk/core` | Core agent factory — tools, roles, config, streaming, durability, hooks, scheduling |
+| `@agntk/cli` | CLI agent — one-shot prompts, interactive REPL, persistent memory |
 | `@agntk/server` | Hono HTTP server — REST + SSE + WebSocket endpoints |
 | `@agntk/client` | Client library — HTTP, SSE streams, WebSocket, session management |
 | `@agntk/logger` | Structured logging — namespace filtering, file/SSE transports, formatters |
@@ -18,9 +19,6 @@ A modular AI agent framework built on [Vercel AI SDK](https://ai-sdk.dev). Zero-
 pnpm install
 pnpm build
 pnpm test
-
-# Run integration tests (exercises all packages with real LLM calls)
-pnpm --filter demo integration
 ```
 
 ---
@@ -62,11 +60,12 @@ const agent = createAgent({
   // ── Identity ──────────────────────────────────────────────
   role: 'coder',                // Predefined role (sets system prompt + model tier)
   systemPrompt: 'You are...',   // Override role-based system prompt
+  systemPromptPrefix: '...',    // Prepend context without replacing role prompt
   agentId: 'my-agent-1',       // Custom identifier
 
   // ── Model ─────────────────────────────────────────────────
   model: myModelInstance,       // AI SDK LanguageModel (highest priority)
-  modelProvider: 'openrouter',  // 'openrouter' | 'ollama' | 'openai' | 'anthropic' | 'google'
+  modelProvider: 'openrouter',  // 'openrouter' | 'ollama' | 'openai' (extensible via customProviders)
   modelName: 'gpt-4o',         // Specific model within provider
 
   // ── Tools ─────────────────────────────────────────────────
@@ -91,11 +90,10 @@ const agent = createAgent({
   },
 
   // ── Memory ────────────────────────────────────────────────
-  enableMemory: true,           // Vectra-based vector memory
+  enableMemory: true,           // Markdown-based persistent memory
   memoryOptions: {
-    path: './memory-index',
-    topK: 5,
-    similarityThreshold: 0.7,
+    projectDir: './.agntk',
+    globalDir: '~/.agntk',
   },
 
   // ── Brain (Knowledge Graph) ───────────────────────────────
@@ -125,8 +123,8 @@ const agent = createAgent({
 |--------|-------|
 | `none` | No tools |
 | `minimal` | `glob` |
-| `standard` | `glob`, `grep`, `shell`, `plan`, `deep_reasoning` |
-| `full` | `glob`, `grep`, `shell`, `plan`, `deep_reasoning`, `ast_grep_search`, `ast_grep_replace`, `browser` |
+| `standard` | `glob`, `grep`, `file_read`, `file_create`, `file_edit`, `shell`, `background`, `plan`, `deep_reasoning`, `search_skills` |
+| `full` | All standard tools + `ast_grep_search`, `ast_grep_replace`, `progress`, `browser` |
 
 Custom tools are always merged with the preset:
 
@@ -148,8 +146,6 @@ Each role provides a tuned system prompt and recommended model tier:
 | `coder` | powerful | Software engineering — reads/writes code, runs shell commands |
 | `researcher` | standard | Information gathering and analysis |
 | `analyst` | standard | Data analysis and reporting |
-
-Roles are extensible via config YAML (see [Configuration](#configuration)).
 
 ### Streaming
 
@@ -176,62 +172,83 @@ const text = await stream.text;
 
 The SDK uses a cascading config system:
 
-1. **YAML file** — `agent-sdk.config.yaml` in your project root
+1. **Config file** — `agntk.config.json` in your project root
 2. **Programmatic** — `configure()` at runtime
-3. **Defaults** — built-in fallbacks
+3. **Environment variables** — `MODEL_FAST`, `MODEL_STANDARD`, etc.
+4. **Defaults** — built-in fallbacks
 
-```yaml
-# agent-sdk.config.yaml
-models:
-  defaultProvider: openrouter
-  tiers:
-    fast: google/gemini-2.0-flash-001
-    standard: google/gemini-2.0-flash-001
-    reasoning: anthropic/claude-sonnet-4
-    powerful: anthropic/claude-opus-4
-
-roles:
-  debugger:
-    systemPrompt: |
-      You are a debugging specialist for {{projectName}}.
-    recommendedModel: reasoning
-    defaultTools: [shell, grep, glob]
-
-templates:
-  variables:
-    projectName: my-project
-
-tools:
-  shell:
-    timeout: 30000
-  glob:
-    maxFiles: 100
-
-maxSteps: 10
+```json
+{
+  "models": {
+    "defaultProvider": "openrouter",
+    "tiers": {
+      "fast": "x-ai/grok-4.1-fast",
+      "standard": "google/gemini-3-flash-preview",
+      "reasoning": "deepseek/deepseek-r1",
+      "powerful": "anthropic/claude-sonnet-4"
+    }
+  },
+  "roles": {
+    "debugger": {
+      "systemPrompt": "You are a debugging specialist.",
+      "recommendedModel": "reasoning",
+      "defaultTools": ["shell", "grep", "glob"]
+    }
+  },
+  "tools": {
+    "shell": { "timeout": 30000 },
+    "glob": { "maxFiles": 100 }
+  },
+  "maxSteps": 10
+}
 ```
 
 ```typescript
 import { loadConfig, configure, getConfig, resolveModel } from '@agntk/core';
 
-// Load from YAML
-const config = loadConfig('./agent-sdk.config.yaml');
+// Load from file
+const config = loadConfig('./agntk.config.json');
 
 // Override programmatically
-configure({ models: { defaultProvider: 'anthropic' } });
+configure({ models: { defaultProvider: 'openrouter' } });
 
 // Resolve models by tier
 const model = resolveModel({ tier: 'powerful' });
 const fastModel = resolveModel({ tier: 'fast', provider: 'openrouter' });
 ```
 
+### Providers
+
+All providers use `@ai-sdk/openai-compatible` for unified access:
+
+| Provider | Default | Description |
+|----------|---------|-------------|
+| `openrouter` | ✅ | Routes to any model — Anthropic, Google, Meta, etc. |
+| `openai` | | Direct OpenAI API |
+| `ollama` | | Local models via Ollama |
+| Custom | | Any OpenAI-compatible API via `customProviders` config |
+
+```bash
+# Primary (recommended)
+export OPENROUTER_API_KEY=sk-or-...
+
+# Or use OpenAI directly
+export OPENAI_API_KEY=sk-...
+
+# For local models
+export OLLAMA_ENABLED=true
+```
+
 ### Model Tiers
 
-| Tier | Purpose | Example |
-|------|---------|---------|
-| `fast` | Quick responses, low cost | Gemini Flash, GPT-4o-mini |
-| `standard` | Balanced quality/cost | Gemini Flash, Claude Haiku |
-| `reasoning` | Complex logic, planning | Claude Sonnet, o1-mini |
-| `powerful` | Best quality, highest cost | Claude Opus, GPT-4o |
+| Tier | Purpose | OpenRouter Default |
+|------|---------|-------------------|
+| `fast` | Quick responses, low cost | `x-ai/grok-4.1-fast` |
+| `standard` | Balanced quality/cost | `google/gemini-3-flash-preview` |
+| `reasoning` | Complex logic, planning | `deepseek/deepseek-r1` |
+| `powerful` | Best quality, highest cost | `z-ai/glm-4.7` |
+
+Override per-tier models via environment variables: `MODEL_FAST`, `MODEL_STANDARD`, `MODEL_REASONING`, `MODEL_POWERFUL`.
 
 ### Durable Agents
 
@@ -320,24 +337,6 @@ const skills = await discoverSkills('./.agents/skills');
 const skillPrompt = buildSkillsSystemPrompt(skills);
 ```
 
-### System Prompts
-
-```typescript
-import { systemPrompt, rolePrompts, buildSystemContext } from '@agntk/core';
-
-// Default system prompt
-console.log(systemPrompt);
-
-// Per-role prompts
-console.log(rolePrompts.coder);
-
-// Build context string
-const context = buildSystemContext({
-  workspaceRoot: '/my/project',
-  role: 'coder',
-});
-```
-
 ### Observability
 
 Optional Langfuse integration for tracing:
@@ -352,6 +351,26 @@ if (isObservabilityEnabled()) {
 }
 
 const settings = createTelemetrySettings({ agentId: 'my-agent', role: 'coder' });
+```
+
+---
+
+## CLI: `@agntk/cli`
+
+Portable CLI agent for terminal use:
+
+```bash
+# One-shot prompt
+agntk "organize this folder by date"
+
+# Interactive REPL
+agntk -i --memory
+
+# With specific role
+agntk --role coder "fix the failing tests"
+
+# Pipe input
+cat error.log | agntk "explain these errors"
 ```
 
 ---
@@ -415,32 +434,6 @@ server.start();
 | `POST` | `/hooks/:id/resume` | Resume a suspended workflow hook |
 | `WS` | `/ws/browser-stream` | Real-time browser viewport streaming |
 
-### Request Format
-
-```typescript
-// POST /generate or /stream
-{
-  "prompt": "What is 2+2?",
-  // OR use messages array:
-  "messages": [
-    { "role": "user", "content": "What is 2+2?" }
-  ],
-  "sessionId": "optional-session-id"
-}
-```
-
-### Server Options
-
-```typescript
-import { createAgentServer, createRateLimitMiddleware, createAuthMiddleware } from '@agntk/server';
-
-const server = createAgentServer({
-  agent,
-  port: 3001,
-  // Middleware is available but optional
-});
-```
-
 ---
 
 ## Client: `@agntk/client`
@@ -456,7 +449,6 @@ const client = new AgentHttpClient('http://localhost:3001');
 const result = await client.generate({
   messages: [{ role: 'user', content: 'Hello!' }],
 });
-console.log(result);
 
 // Streaming generate (SSE)
 for await (const event of client.generateStream({
@@ -465,62 +457,7 @@ for await (const event of client.generateStream({
   if (event.type === 'text-delta') {
     process.stdout.write(event.textDelta);
   }
-  if (event.type === 'finish') {
-    console.log('\nDone:', event.text);
-  }
 }
-```
-
-### Stream Event Types
-
-```typescript
-type StreamEvent =
-  | { type: 'text-delta'; textDelta: string }
-  | { type: 'tool-call'; toolCallId: string; toolName: string; args: unknown }
-  | { type: 'tool-result'; toolCallId: string; toolName: string; result: unknown }
-  | { type: 'step-start'; stepIndex: number }
-  | { type: 'step-finish'; stepIndex: number; finishReason: string }
-  | { type: 'finish'; text: string; usage?: TokenUsage }
-  | { type: 'error'; error: string };
-```
-
-### Resumable Streams
-
-Streams support reconnection for durable agents:
-
-```typescript
-const gen = client.generateStream(request);
-
-for await (const event of gen) {
-  // Process events...
-}
-
-// After disconnect, get metadata for reconnection:
-const metadata = client.lastStreamMetadata;
-
-// Reconnect from where you left off:
-const resumed = client.generateStream(request, {
-  workflowRunId: metadata?.workflowRunId,
-  lastEventId: metadata?.lastEventId,
-});
-```
-
-### Other Clients
-
-```typescript
-import { AgentClient, ChatClient, AgentWebSocketClient, BrowserStreamClient } from '@agntk/client';
-
-// High-level chat client with session management
-const chat = new ChatClient(httpClient, { sessionId: 'abc' });
-await chat.stream(request, {
-  onTextDelta: (text) => console.log(text),
-});
-
-// WebSocket client for real-time communication
-const ws = new AgentWebSocketClient({ url: 'ws://localhost:3001/ws' });
-
-// Browser viewport streaming
-const browser = new BrowserStreamClient({ url: 'ws://localhost:3001/ws/browser-stream' });
 ```
 
 ---
@@ -536,79 +473,7 @@ const log = createLogger('@myapp:feature');
 log.info('Request processed', { userId: '123', durationMs: 45 });
 log.warn('Rate limit approaching');
 log.error('Failed to connect', { error: err.message });
-log.debug('Cache hit', { key: 'user:123' });
-
-// Timing helper
-const done = log.time('db-query');
-await queryDatabase();
-done(); // Logs with duration
 ```
-
-### Namespace Filtering
-
-```bash
-# Enable via environment variable
-DEBUG=@agntk/core:* node app.js
-DEBUG=@agntk/*,-@agntk/core:verbose node app.js
-```
-
-```typescript
-import { enable, disable, resetConfig } from '@agntk/logger';
-
-enable('@myapp:*');
-disable('@myapp:verbose');
-resetConfig();  // Clear all patterns
-```
-
-### Transports
-
-```typescript
-import { createConsoleTransport, createFileTransport, createSSETransport, addTransport } from '@agntk/logger';
-
-// Console (default)
-addTransport(createConsoleTransport({ colorize: true }));
-
-// File output
-addTransport(createFileTransport({ path: './logs/agent.log' }));
-
-// SSE for real-time UI
-const sse = createSSETransport();
-```
-
-### Formatters
-
-```typescript
-import { formatPretty, formatJSON, formatSSE } from '@agntk/logger';
-
-const entry = { level: 'info', namespace: '@app', message: 'hello', timestamp: Date.now(), data: {} };
-
-formatPretty(entry); // "INF [@app] hello"
-formatJSON(entry);   // {"level":"info","namespace":"@app",...}
-formatSSE(entry);    // "data: {...}\n\n"
-```
-
----
-
-## Workflow Observability
-
-Durable agents record steps visible in the workflow inspector:
-
-```bash
-# Launch the workflow inspector UI
-pnpm inspect
-
-# Or directly:
-npx workflow inspect runs --web
-```
-
-| Step Name | Description |
-|-----------|-------------|
-| `llmGenerate` | Standard LLM generation call |
-| `llmDraft` | Draft generation (approval workflow) |
-| `webhookApproval` | Webhook suspension point (zero compute) |
-| `llmFinalize` | Final generation after approval |
-| `durableSleep` | Durable delay (zero compute) |
-| `tool-exec-{name}` | Individual tool executions |
 
 ---
 
@@ -618,150 +483,16 @@ npx workflow inspect runs --web
 agent-sdk/
 ├── packages/
 │   ├── sdk/           # @agntk/core — Core agent factory
+│   ├── cli/           # @agntk/cli — CLI agent
 │   ├── sdk-server/    # @agntk/server — HTTP server
 │   ├── sdk-client/    # @agntk/client — Client library
 │   ├── logger/        # @agntk/logger — Structured logging
 │   └── brain/         # @agntk/brain — Knowledge graph
 ├── apps/
-│   ├── demo/          # Integration tests and demos
-│   └── web/           # Next.js dashboard
-└── agent-sdk.config.yaml
+│   └── docs/          # Documentation site (Starlight)
+└── tests/
+    └── integration/   # Integration tests (156 tests)
 ```
-
-## Integration Test Reference
-
-Run with `pnpm --filter demo integration`. Full output from a passing run:
-
-<details>
-<summary>35/35 tests passing — click to expand full output</summary>
-
-```
-════════════════════════════════════════════════════════════════════
-  🧪 REAL INTEGRATION TESTS — ALL PACKAGES
-════════════════════════════════════════════════════════════════════
-
-════════════════════════════════════════════════════════════════════
-  🤖 TEST 1: Self-Testing Agent (all tools via generate)
-════════════════════════════════════════════════════════════════════
-
-       Tools called: [glob, shell, plan, deep_reasoning, browser, grep, ast_grep_search]
-       Total steps: 2
-       Response length: 692 chars
-  ✅ Agent exercises all tools
-
-════════════════════════════════════════════════════════════════════
-  🌊 TEST 2: Streaming (agent.stream)
-════════════════════════════════════════════════════════════════════
-
-       Chunks received: 133
-       Chunk types: [start, start-step, reasoning-start, reasoning-delta,
-                     tool-input-start, tool-input-delta, tool-call,
-                     reasoning-end, tool-result, finish-step,
-                     text-start, text-delta, text-end, finish]
-       Final text length: 107
-  ✅ agent.stream() with tool use
-
-════════════════════════════════════════════════════════════════════
-  🎭 TEST 3: All Roles (generate)
-════════════════════════════════════════════════════════════════════
-
-       generic: "4" (prompt: 328 chars)
-  ✅ generic role generates response
-       coder: "4" (prompt: 789 chars)
-  ✅ coder role generates response
-       researcher: "4" (prompt: 768 chars)
-  ✅ researcher role generates response
-       analyst: "4" (prompt: 718 chars)
-  ✅ analyst role generates response
-
-════════════════════════════════════════════════════════════════════
-  🔒 TEST 4: Durable Agent
-════════════════════════════════════════════════════════════════════
-
-       ✓ DurableAgent created with durableGenerate, withApproval, scheduled
-  ✅ createAgent({ durable: true }) creates DurableAgent
-       Response: "durable-ok"
-  ✅ Durable agent generate() still works (passthrough)
-       ✓ Tools wrapped for durability
-  ✅ wrapToolsAsDurable() wraps real tools
-       2h = 7200000ms, back = "2h"
-  ✅ parseDuration / formatDuration
-
-════════════════════════════════════════════════════════════════════
-  🧠 TEST 5: Brain Integration
-════════════════════════════════════════════════════════════════════
-
-  ✅ createBrain() — connected to FalkorDB
-       Injected tools: [queryKnowledge, remember, recall, extractEntities]
-       Tools used: [remember, remember, remember, remember, recall, remember]
-  ✅ Agent with brain uses remember + recall
-       ✓ Disconnected
-  ✅ brain.close()
-
-════════════════════════════════════════════════════════════════════
-  🌐 TEST 6: Server + Client Full-Stack
-════════════════════════════════════════════════════════════════════
-
-  ✅ GET /health
-  ✅ GET /status
-       Response: "client-ok"
-  ✅ AgentHttpClient.generate()
-       Events: 2, types: [text-delta, ]
-       Streamed text: 9 chars
-  ✅ AgentHttpClient.generateStream()
-
-════════════════════════════════════════════════════════════════════
-  📝 TEST 7: Logger
-════════════════════════════════════════════════════════════════════
-
-  INF [@test] integration test entry key="value"
-  ✅ Logger writes to console transport
-       JSON keys: [level, namespace, message, timestamp, data]
-  ✅ formatJSON() produces valid JSON
-  ✅ formatPretty() produces readable output
-  ✅ formatSSE() produces SSE format
-  ✅ Namespace utilities
-       After reset — patterns: 0
-  ✅ enable() / disable() / resetConfig() lifecycle
-  ✅ createNoopLogger() works silently
-  ✅ flush()
-
-════════════════════════════════════════════════════════════════════
-  ⚙️ TEST 8: SDK Infrastructure (config, prompts, skills, hooks, schedulers)
-════════════════════════════════════════════════════════════════════
-
-       Provider: openrouter
-  ✅ Config — loadConfig + configure + getConfig
-       ✓ All 4 tiers resolve
-  ✅ resolveModel() for all tiers
-       systemPrompt: 2995 chars, context built
-  ✅ System prompts and context
-       Discovered: 2 skills — [code-review, refactoring]
-  ✅ Skills — discoverSkills() finds SKILL.md files
-       Prompt: 848 chars, contains both skills with body content
-  ✅ Skills — buildSkillsSystemPrompt() produces injected prompt
-       Agent prompt: 1176 chars, skills injected ✓
-  ✅ Skills — createAgent({ skills }) injects into system prompt
-       Hook "test-approval" defined, registry has 0 entries
-  ✅ Hooks — defineHook + registry
-       Workflow: "test-daily-check"
-  ✅ Schedulers — createScheduledWorkflow
-       Observability enabled: false
-  ✅ Observability — check status
-       Workflow runtime available: true
-  ✅ Workflow availability check
-
-════════════════════════════════════════════════════════════════════
-  📊 FINAL RESULTS
-════════════════════════════════════════════════════════════════════
-
-  ✅ Passed:  35
-  ❌ Failed:  0
-  ⏭️  Skipped: 0
-  📋 Total:   35
-```
-
-</details>
 
 ## Requirements
 

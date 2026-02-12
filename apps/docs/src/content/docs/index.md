@@ -17,6 +17,7 @@ Agent SDK provides a complete toolkit for building AI agents that can:
 - **Stream responses** — real-time text and tool execution events
 - **Serve over HTTP** — REST, SSE, and WebSocket endpoints via Hono
 - **Discover skills** — auto-inject SKILL.md files into agent prompts
+- **Persist memory** — markdown-based memory that survives across sessions
 
 ## Quick Start
 
@@ -41,6 +42,7 @@ console.log(result.text);
 | Package | Description |
 |---------|-------------|
 | `@agntk/core` | Core agent factory — tools, roles, config, streaming, durability, hooks, scheduling |
+| `@agntk/cli` | CLI agent — one-shot prompts, interactive REPL, persistent memory |
 | `@agntk/server` | Hono HTTP server — REST + SSE + WebSocket endpoints |
 | `@agntk/client` | Client library — HTTP, SSE streams, WebSocket, session management |
 | `@agntk/logger` | Structured logging — namespace filtering, file/SSE transports, formatters |
@@ -56,11 +58,11 @@ console.log(result.text);
 - **[SDK Client](/packages/sdk-client)** — Connect to a remote agent server
 - **[Logger](/packages/logger)** — Structured logging
 - **[Brain](/packages/brain)** — Knowledge graph
-- **[Configuration](/configuration/yaml-config)** — YAML configuration system
+- **[Configuration](/configuration/yaml-config)** — Configuration system
 
 ## Requirements
 
-- Node.js >= 18
+- Node.js >= 20
 - pnpm >= 9
 - FalkorDB (optional, for `@agntk/brain`)
 - Temporal (optional, for durable workflows)
@@ -68,4 +70,3 @@ console.log(result.text);
 ## License
 
 MIT
-
