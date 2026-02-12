@@ -29,6 +29,7 @@ jobs:
       - run: pnpm build
 
       - uses: changesets/action@v1
+        id: changesets
         with:
           version: pnpm version-packages
           publish: pnpm release
@@ -37,4 +38,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+          VERSION=$(node -p "require('./packages/sdk/package.json').version")
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --generate-notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
