@@ -197,33 +197,3 @@ export function resolveModel(options: ModelResolutionOptions = {}): LanguageMode
   return createModelForProvider(effectiveProvider, effectiveModel);
 }
 
-// ============================================================================
-// Model Info Helpers
-// ============================================================================
-
-export function getModelInfo(tier: ModelTier): { provider: ModelProvider; name: string } {
-  const isOllama = process.env['OLLAMA_ENABLED'] === 'true';
-  const provider: ModelProvider = isOllama ? 'ollama' : 'openrouter';
-  const name = isOllama
-    ? (getOllamaEnvModel(tier) || DEFAULT_MODELS.ollama[tier])
-    : (getEnvModel(tier) || DEFAULT_MODELS.openrouter[tier]);
-  return { provider, name };
-}
-
-export function listAvailableTiers(): ModelTier[] {
-  return ['fast', 'standard', 'reasoning', 'powerful'];
-}
-
-export function listAvailableProviders(): string[] {
-  const builtIn = Object.keys(PROVIDER_CONFIGS);
-  const config = getConfig();
-  const custom = Object.keys(config.models?.customProviders ?? {});
-  return [...new Set([...builtIn, ...custom])];
-}
-
-/**
- * Reset provider instances (useful for testing).
- */
-export function resetProviders(): void {
-  providerInstances.clear();
-}

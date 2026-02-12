@@ -300,6 +300,8 @@ export function createAgent(options: AgentOptions = {}): Agent {
     instructions: augmentedSystemPrompt,
     tools,
     stopWhen: stopConditions,
+    // prepareCall: dynamically inject the current system prompt (may be updated by memory loading)
+    prepareCall: (opts) => ({ ...opts, instructions: augmentedSystemPrompt }),
     ...(prepareStep ? { prepareStep } : {}),
     ...(telemetrySettings ? { experimental_telemetry: telemetrySettings as AiTelemetrySettings } : {}),
   });
@@ -320,8 +322,7 @@ export function createAgent(options: AgentOptions = {}): Agent {
         const memoryContext = await loadMemoryContext(memoryStore!);
         if (memoryContext) {
           augmentedSystemPrompt = memoryContext + '\n\n' + augmentedSystemPrompt;
-          // Update the ToolLoopAgent instructions
-          (toolLoopAgent as unknown as { instructions: string }).instructions = augmentedSystemPrompt;
+          // prepareCall() will pick up the updated augmentedSystemPrompt on next generate/stream
           agentLog.debug('Memory context injected', { chars: memoryContext.length });
         }
       } catch (err) {
@@ -468,22 +469,6 @@ export function createAgent(options: AgentOptions = {}): Agent {
   log.info('Agent created', { agentId, role, durable: !!options.durable });
 
   return agent;
-}
-
-// ============================================================================
-// Convenience Functions
-// ============================================================================
-
-export function createCoderAgent(options: Omit<AgentOptions, 'role'> = {}): Agent {
-  return createAgent({ ...options, role: 'coder' });
-}
-
-export function createResearcherAgent(options: Omit<AgentOptions, 'role'> = {}): Agent {
-  return createAgent({ ...options, role: 'researcher' });
-}
-
-export function createAnalystAgent(options: Omit<AgentOptions, 'role'> = {}): Agent {
-  return createAgent({ ...options, role: 'analyst' });
 }
 
 export default createAgent;

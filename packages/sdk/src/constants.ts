@@ -6,16 +6,6 @@
  */
 
 // ============================================================================
-// Embedding
-// ============================================================================
-
-/** Default embedding API endpoint */
-export const DEFAULT_EMBEDDING_URL = 'https://api.openai.com/v1/embeddings';
-
-/** Default embedding model */
-export const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-small';
-
-// ============================================================================
 // Geolocation
 // ============================================================================
 
@@ -38,12 +28,3 @@ export const BROWSER_MAX_OUTPUT_LENGTH = 50_000;
 /** Max buffer size for browser CLI output (bytes) */
 export const BROWSER_MAX_BUFFER = 5 * 1024 * 1024;
 
-// ============================================================================
-// Memory
-// ============================================================================
-
-/** Default top-K results for memory recall */
-export const DEFAULT_MEMORY_TOP_K = 5;
-
-/** Default similarity threshold for memory recall */
-export const DEFAULT_MEMORY_SIMILARITY_THRESHOLD = 0.7;

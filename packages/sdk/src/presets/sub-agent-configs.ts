@@ -21,7 +21,7 @@ Be thorough but efficient. Don't over-engineer simple tasks.
 
 When you finish, write a clear summary of what you did: files changed, key decisions made, and any issues encountered.`,
     tools: ['glob', 'grep', 'shell', 'ast_grep_search'],
-    model: 'anthropic/claude-opus-4.6',
+    model: 'powerful', // resolved via tier-based model resolution
   },
 
   researcher: {
@@ -36,7 +36,7 @@ Cite sources and provide confidence levels for findings.
 
 When you finish, write a clear summary of your findings: key facts, sources, confidence levels, and recommendations.`,
     tools: ['web'],
-    model: 'google/gemini-2.0-flash-001',
+    model: 'fast', // resolved via tier-based model resolution
   },
 
   analyst: {
@@ -51,7 +51,7 @@ Present findings clearly with actionable insights.
 
 When you finish, write a clear summary of your analysis: key findings, trade-offs identified, and your recommendations.`,
     tools: ['glob', 'grep', 'reasoning'],
-    model: 'anthropic/claude-opus-4.6',
+    model: 'powerful', // resolved via tier-based model resolution
   },
 
   generic: {
@@ -61,7 +61,7 @@ Be autonomous but ask for clarification when genuinely uncertain.
 
 When you finish, write a clear summary of what you accomplished and any important details.`,
     tools: ['glob', 'grep', 'shell', 'web'],
-    model: 'anthropic/claude-opus-4.6',
+    model: 'standard', // resolved via tier-based model resolution
   },
 };
 

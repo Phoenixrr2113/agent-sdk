@@ -93,7 +93,7 @@ vi.mock('../observability', () => ({
 }));
 
 // --- Import after mocks ---
-import { createAgent, createCoderAgent, createResearcherAgent, createAnalystAgent } from '../agent';
+import { createAgent } from '../agent';
 import { initObservability, createTelemetrySettings } from '../observability';
 
 /**
@@ -330,19 +330,3 @@ describe('telemetry integration', () => {
   });
 });
 
-describe('convenience factories', () => {
-  it('createCoderAgent creates agent with coder role', () => {
-    const agent = createCoderAgent();
-    expect(agent.role).toBe('coder');
-  });
-
-  it('createResearcherAgent creates agent with researcher role', () => {
-    const agent = createResearcherAgent();
-    expect(agent.role).toBe('researcher');
-  });
-
-  it('createAnalystAgent creates agent with analyst role', () => {
-    const agent = createAnalystAgent();
-    expect(agent.role).toBe('analyst');
-  });
-});

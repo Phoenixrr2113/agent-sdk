@@ -11,7 +11,7 @@ const log = createLogger('@agntk/core:templates');
 // Types
 // ============================================================================
 
-export interface TemplateContext {
+interface TemplateContext {
   [key: string]: string | number | boolean | undefined;
 }
 
@@ -22,7 +22,7 @@ export interface TemplateContext {
 /**
  * Apply template variables to a string.
  * Replaces {{variableName}} with the value from context.
- * 
+ *
  * @example
  * applyTemplate('Hello {{name}}!', { name: 'World' })
  * // => 'Hello World!'
@@ -32,7 +32,7 @@ export function applyTemplate(template: string, context: TemplateContext = {}): 
   const config = getConfig();
   const configVars = (config as Record<string, unknown>).templates as { variables?: TemplateContext } | undefined;
   const mergedContext = { ...configVars?.variables, ...context };
-  
+
   return template.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
     const value = mergedContext[varName];
     if (value === undefined) {
@@ -41,19 +41,4 @@ export function applyTemplate(template: string, context: TemplateContext = {}): 
     }
     return String(value);
   });
-}
-
-/**
- * Check if a string contains template variables.
- */
-export function hasTemplateVars(text: string): boolean {
-  return /\{\{\w+\}\}/.test(text);
-}
-
-/**
- * Extract template variable names from a string.
- */
-export function getTemplateVars(template: string): string[] {
-  const matches = template.matchAll(/\{\{(\w+)\}\}/g);
-  return [...new Set([...matches].map(m => m[1]))];
 }

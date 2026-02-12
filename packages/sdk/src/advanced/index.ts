@@ -78,9 +78,6 @@ export type {
   StreamingMessage,
 } from '../types/streaming';
 
-export { withTransientStreaming, streamTransient } from '../streaming/transient';
-export type { AgentDataParts } from '../streaming/data-parts';
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // Tool Lifecycle Types
 // ═══════════════════════════════════════════════════════════════════════════════
