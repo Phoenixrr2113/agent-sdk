@@ -106,7 +106,7 @@ describe('createSpawnAgentTool', () => {
     const mockCreateAgent = vi.fn().mockReturnValue({
       stream: () => ({
         fullStream: (async function* () {
-          yield { type: 'text-delta', textDelta: 'Hello' };
+          yield { type: 'text-delta', text: 'Hello' };
         })(),
         text: Promise.resolve('Hello World'),
       }),
@@ -134,8 +134,8 @@ describe('createSpawnAgentTool', () => {
     const mockCreateAgent = vi.fn().mockReturnValue({
       stream: () => ({
         fullStream: (async function* () {
-          yield { type: 'text-delta', textDelta: 'Hello ' };
-          yield { type: 'text-delta', textDelta: 'World' };
+          yield { type: 'text-delta', text: 'Hello ' };
+          yield { type: 'text-delta', text: 'World' };
         })(),
         text: Promise.resolve('Hello World'),
       }),
@@ -160,7 +160,7 @@ describe('createSpawnAgentTool', () => {
     const mockCreateAgent = vi.fn().mockReturnValue({
       stream: () => ({
         fullStream: (async function* () {
-          yield { type: 'text-delta', textDelta: fullResponse };
+          yield { type: 'text-delta', text: fullResponse };
         })(),
         text: Promise.resolve(fullResponse),
       }),

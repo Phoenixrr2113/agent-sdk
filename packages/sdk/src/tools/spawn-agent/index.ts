@@ -32,7 +32,7 @@ export interface SpawnAgentOptions {
     maxSpawnDepth?: number;
   }) => {
     stream: (input: { prompt: string }) => {
-      fullStream: AsyncIterable<{ type: string; textDelta?: string }>;
+      fullStream: AsyncIterable<{ type: string; text?: string }>;
       text: Promise<string>;
     };
   };
@@ -151,13 +151,13 @@ async function executeSpawnAgent(
 
     // Stream sub-agent output
     for await (const chunk of stream.fullStream) {
-      if (chunk.type === 'text-delta' && chunk.textDelta) {
+      if (chunk.type === 'text-delta' && chunk.text) {
         if (onStream) {
           onStream({
             type: 'sub-agent-stream',
             agentId,
             role,
-            text: chunk.textDelta,
+            text: chunk.text,
             status: 'streaming',
           });
         }

@@ -15,6 +15,11 @@
 
 export { createAgent } from './agent';
 export type { Agent } from './agent';
+
+// V2 Agent — zero-config, fully equipped
+export { createAgentV2 } from './agent-v2';
+export type { AgentV2, AgentOptionsV2, AgentV2StreamResult } from './types/agent-v2';
+
 export type {
   AgentOptions,
   AgentRole,
