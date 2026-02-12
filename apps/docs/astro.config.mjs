@@ -2,12 +2,14 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
 export default defineConfig({
+  site: 'https://phoenixrr2113.github.io',
+  base: '/agntk',
   integrations: [
     starlight({
       title: 'Agent SDK',
       description: 'A modular AI agent framework built on Vercel AI SDK',
       social: [
-        { icon: 'github', label: 'GitHub', href: 'https://github.com/Phoenixrr2113/agent-sdk' },
+        { icon: 'github', label: 'GitHub', href: 'https://github.com/Phoenixrr2113/agntk' },
       ],
       sidebar: [
         {
