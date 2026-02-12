@@ -129,7 +129,11 @@ export async function runOneShot(
       steps: 0,
       success: false,
       error:
-        'No API key found. Set OPENROUTER_API_KEY or OPENAI_API_KEY.',
+        'No API key found.\n\n' +
+        '  1. Get a free key at https://openrouter.ai/keys\n' +
+        '  2. Add to your shell profile (~/.zshrc or ~/.bashrc):\n\n' +
+        '     export OPENROUTER_API_KEY=sk-or-...\n\n' +
+        '  Then restart your terminal or run: source ~/.zshrc',
     };
   }
 

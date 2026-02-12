@@ -84,7 +84,7 @@ interface ConfigFileData {
 }
 
 const CONFIG_FILENAMES = [
-  'agent-sdk.config.json',
+  'agntk.config.json',
   '.agntkrc.json',
 ];
 
