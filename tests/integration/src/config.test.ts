@@ -25,12 +25,11 @@ describe('Configuration', () => {
       expect(DEFAULT_MODELS.openrouter).toBeDefined();
       expect(DEFAULT_MODELS.ollama).toBeDefined();
       expect(DEFAULT_MODELS.openai).toBeDefined();
-      expect(DEFAULT_MODELS.anthropic).toBeDefined();
     });
 
     it('should have all tiers for each provider', () => {
       const tiers = ['fast', 'standard', 'reasoning', 'powerful'];
-      for (const provider of ['openrouter', 'ollama', 'openai', 'anthropic'] as const) {
+      for (const provider of ['openrouter', 'ollama', 'openai'] as const) {
         for (const tier of tiers) {
           expect(DEFAULT_MODELS[provider][tier as keyof typeof DEFAULT_MODELS.openrouter]).toBeDefined();
         }

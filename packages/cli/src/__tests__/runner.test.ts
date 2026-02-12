@@ -50,7 +50,7 @@ function makeConfig(overrides: Partial<ResolvedCLIConfig> = {}): ResolvedCLIConf
     interactive: false,
     role: 'generic',
     model: null,
-    provider: 'anthropic',
+    provider: 'openrouter',
     apiKey: 'sk-test-key',
     memory: false,
     init: false,
@@ -129,7 +129,7 @@ describe('runOneShot', () => {
 
     const status = statusCapture.output();
     expect(status).toContain('[agntk] Role: generic');
-    expect(status).toContain('[agntk] Provider: anthropic');
+    expect(status).toContain('[agntk] Provider: openrouter');
     expect(status).toContain('[agntk] Agent created');
     expect(status).toContain('[agntk] Completed in 1 step(s)');
   });
@@ -198,8 +198,8 @@ describe('runOneShot', () => {
 
     await runOneShot('test', {
       config: makeConfig({
-        model: 'claude-sonnet-4',
-        provider: 'anthropic',
+        model: 'anthropic/claude-sonnet-4',
+        provider: 'openrouter',
       }),
       environment: makeEnvironment(),
       output: capture.stream,
@@ -207,8 +207,8 @@ describe('runOneShot', () => {
 
     expect(createAgent).toHaveBeenCalledWith(
       expect.objectContaining({
-        modelProvider: 'anthropic',
-        modelName: 'claude-sonnet-4',
+        modelProvider: 'openrouter',
+        modelName: 'anthropic/claude-sonnet-4',
       }),
     );
   });

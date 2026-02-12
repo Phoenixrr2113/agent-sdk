@@ -36,7 +36,7 @@ function makeConfig(overrides: Partial<ResolvedCLIConfig> = {}): ResolvedCLIConf
     interactive: true,
     role: 'generic',
     model: null,
-    provider: 'anthropic',
+    provider: 'openrouter',
     apiKey: 'sk-test-key',
     memory: false,
     init: false,

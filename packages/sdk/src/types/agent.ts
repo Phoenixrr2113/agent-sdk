@@ -254,7 +254,7 @@ export interface AgentOptions {
 export type AgentRole = 'generic' | 'coder' | 'researcher' | 'analyst';
 
 /** Supported model providers. */
-export type ModelProvider = 'openrouter' | 'ollama' | 'openai' | 'anthropic' | 'google';
+export type ModelProvider = 'openrouter' | 'ollama' | 'openai' | (string & {});
 
 /** Predefined tool presets. */
 export type ToolPreset = 'none' | 'minimal' | 'standard' | 'full';

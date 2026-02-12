@@ -158,7 +158,7 @@ export function createAgent(options: AgentOptions = {}): Agent {
 
   const model = options.model ?? resolveModel({
     tier: (roleConfig.recommendedModel ?? 'standard') as 'fast' | 'standard' | 'reasoning' | 'powerful',
-    provider: options.modelProvider as 'openrouter' | 'ollama' | 'openai' | 'anthropic' | undefined,
+    provider: options.modelProvider as 'openrouter' | 'ollama' | 'openai' | undefined,
     modelName: options.modelName,
   });
 

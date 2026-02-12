@@ -129,7 +129,7 @@ export async function runOneShot(
       steps: 0,
       success: false,
       error:
-        'No API key found. Set one of: ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, or GOOGLE_API_KEY.',
+        'No API key found. Set OPENROUTER_API_KEY or OPENAI_API_KEY.',
     };
   }
 

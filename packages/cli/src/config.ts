@@ -52,11 +52,8 @@ interface ApiKeyResult {
 }
 
 const API_KEY_ENV_VARS: Array<{ env: string; provider: string }> = [
-  { env: 'ANTHROPIC_API_KEY', provider: 'anthropic' },
-  { env: 'OPENAI_API_KEY', provider: 'openai' },
   { env: 'OPENROUTER_API_KEY', provider: 'openrouter' },
-  { env: 'GOOGLE_API_KEY', provider: 'google' },
-  { env: 'GOOGLE_GENERATIVE_AI_API_KEY', provider: 'google' },
+  { env: 'OPENAI_API_KEY', provider: 'openai' },
 ];
 
 /**
@@ -139,7 +136,7 @@ export function resolveConfig(args: ParsedArgs): ResolvedCLIConfig {
   // Detect API key from env
   const apiKeyResult = detectApiKey();
 
-  // Parse model string (e.g., "anthropic:claude-sonnet-4")
+  // Parse model string (e.g., "openrouter:anthropic/claude-sonnet-4")
   let provider: string | null = apiKeyResult?.provider ?? null;
   let model = args.model ?? fileConfig.model ?? null;
 

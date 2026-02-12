@@ -25,7 +25,7 @@ describe('parseArgs', () => {
   });
 
   it('parses --model / -m with value', () => {
-    expect(parseArgs(['--model', 'anthropic:claude-sonnet-4']).model).toBe('anthropic:claude-sonnet-4');
+    expect(parseArgs(['--model', 'openrouter:anthropic/claude-sonnet-4']).model).toBe('openrouter:anthropic/claude-sonnet-4');
     expect(parseArgs(['-m', 'gpt-4']).model).toBe('gpt-4');
     expect(parseArgs([]).model).toBeNull();
   });

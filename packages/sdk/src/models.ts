@@ -39,11 +39,6 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     baseURL: 'https://api.openai.com/v1',
     apiKeyEnv: 'OPENAI_API_KEY',
   },
-  anthropic: {
-    name: 'anthropic',
-    baseURL: 'https://api.anthropic.com/v1',
-    apiKeyEnv: 'ANTHROPIC_API_KEY',
-  },
 };
 
 // ============================================================================
@@ -96,7 +91,7 @@ function getProvider(providerName: string): ReturnType<typeof createOpenAICompat
 // ============================================================================
 
 export type ModelTier = 'fast' | 'standard' | 'reasoning' | 'powerful';
-export type ModelProvider = 'openrouter' | 'ollama' | 'openai' | 'anthropic' | (string & {});
+export type ModelProvider = 'openrouter' | 'ollama' | 'openai' | (string & {});
 
 export interface ModelConfig {
   provider: ModelProvider;

@@ -30,12 +30,6 @@ export const DEFAULT_MODELS: Record<Provider, Record<ModelTier, string>> = {
     reasoning: 'o3',
     powerful: 'gpt-4o',
   },
-  anthropic: {
-    fast: 'anthropic/claude-haiku-4.5',
-    standard: 'anthropic/claude-sonnet-4.5',
-    reasoning: 'anthropic/claude-opus-4.6',
-    powerful: 'anthropic/claude-opus-4.6',
-  },
 };
 
 // ============================================================================

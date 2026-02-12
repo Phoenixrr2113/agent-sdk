@@ -33,10 +33,10 @@ describe('detectApiKey', () => {
     process.env = originalEnv;
   });
 
-  it('detects ANTHROPIC_API_KEY', () => {
-    process.env['ANTHROPIC_API_KEY'] = 'sk-ant-test';
+  it('detects OPENROUTER_API_KEY', () => {
+    process.env['OPENROUTER_API_KEY'] = 'sk-or-test';
     const result = detectApiKey();
-    expect(result).toEqual({ provider: 'anthropic', apiKey: 'sk-ant-test' });
+    expect(result).toEqual({ provider: 'openrouter', apiKey: 'sk-or-test' });
   });
 
   it('detects OPENAI_API_KEY', () => {
@@ -45,24 +45,22 @@ describe('detectApiKey', () => {
     expect(result).toEqual({ provider: 'openai', apiKey: 'sk-openai-test' });
   });
 
-  it('prefers ANTHROPIC over OPENAI when both set', () => {
-    process.env['ANTHROPIC_API_KEY'] = 'sk-ant';
+  it('prefers OPENROUTER over OPENAI when both set', () => {
+    process.env['OPENROUTER_API_KEY'] = 'sk-or';
     process.env['OPENAI_API_KEY'] = 'sk-oai';
     const result = detectApiKey();
-    expect(result?.provider).toBe('anthropic');
+    expect(result?.provider).toBe('openrouter');
   });
 
   it('returns null when no API keys are set', () => {
-    delete process.env['ANTHROPIC_API_KEY'];
     delete process.env['OPENAI_API_KEY'];
     delete process.env['OPENROUTER_API_KEY'];
-    delete process.env['GOOGLE_API_KEY'];
     const result = detectApiKey();
     expect(result).toBeNull();
   });
 
   it('ignores empty API keys', () => {
-    process.env['ANTHROPIC_API_KEY'] = '';
+    process.env['OPENROUTER_API_KEY'] = '';
     const result = detectApiKey();
     expect(result).toBeNull();
   });
@@ -73,7 +71,7 @@ describe('resolveConfig', () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    process.env['OPENROUTER_API_KEY'] = 'sk-test';
   });
 
   afterEach(() => {
@@ -105,16 +103,16 @@ describe('resolveConfig', () => {
 
   it('parses provider:model format', () => {
     const config = resolveConfig(makeArgs({
-      model: 'anthropic:claude-sonnet-4',
+      model: 'openrouter:anthropic/claude-sonnet-4',
     }));
-    expect(config.provider).toBe('anthropic');
-    expect(config.model).toBe('claude-sonnet-4');
+    expect(config.provider).toBe('openrouter');
+    expect(config.model).toBe('anthropic/claude-sonnet-4');
   });
 
   it('detects API key from env', () => {
     const config = resolveConfig(makeArgs());
     expect(config.apiKey).toBe('sk-test');
-    expect(config.provider).toBe('anthropic');
+    expect(config.provider).toBe('openrouter');
   });
 
   it('uses cwd as default workspace', () => {

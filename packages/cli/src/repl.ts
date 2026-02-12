@@ -107,7 +107,7 @@ export async function runRepl(options: ReplOptions): Promise<ReplResult> {
   // Validate API key
   if (!config.apiKey) {
     output.write(
-      'Error: No API key found. Set one of: ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, or GOOGLE_API_KEY.\n',
+      'Error: No API key found. Set OPENROUTER_API_KEY or OPENAI_API_KEY.\n',
     );
     return { exchanges: 0, success: false, error: 'No API key' };
   }
