@@ -87,8 +87,6 @@ interface ConfigFileData {
 }
 
 const CONFIG_FILENAMES = [
-  'agent-sdk.config.yaml',
-  'agent-sdk.config.yml',
   'agent-sdk.config.json',
   '.agntkrc.json',
 ];
@@ -115,11 +113,6 @@ export function loadConfigFile(workspace: string, explicitPath?: string | null):
     if (existsSync(filePath)) {
       try {
         const content = readFileSync(filePath, 'utf-8');
-        // Only JSON support for now — YAML support can be added later
-        if (filename.endsWith('.json')) {
-          return JSON.parse(content) as ConfigFileData;
-        }
-        // For YAML files, try JSON parse first (works for simple cases)
         return JSON.parse(content) as ConfigFileData;
       } catch {
         // Silently skip unparseable files

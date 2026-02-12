@@ -107,13 +107,14 @@ function createStandardPreset(workspaceRoot: string, planConfig?: PlanToolConfig
 }
 
 /**
- * Full preset: All standard tools + AST-grep for structural code search.
+ * Full preset: All standard tools + AST-grep, progress tracking, and browser.
  * Good for complex, multi-agent tasks.
  */
 function createFullPreset(workspaceRoot: string, planConfig?: PlanToolConfig) {
   return {
     ...createStandardPreset(workspaceRoot, planConfig),
     ...createAstGrepTools(),
+    ...createProgressTools(workspaceRoot),
     browser: createBrowserTool(),
   };
 }
@@ -140,16 +141,7 @@ export const toolPresets = {
   },
 
   full: {
-    description: 'All standard tools plus AST-grep and browser automation',
+    description: 'All standard tools plus AST-grep, progress tracking, and browser automation',
     tools: ['glob', 'grep', 'shell', 'background', 'file_read', 'file_write', 'file_edit', 'file_create', 'progress_read', 'progress_update', 'search_skills', 'plan', 'deep_reasoning', 'ast_grep_search', 'ast_grep_replace', 'browser'],
   },
 } as const;
-
-/**
- * Get tool names included in a preset.
- */
-export function getPresetToolNames(preset: ToolPresetLevel): string[] {
-  if (preset === 'none') return [];
-  const presetDef = toolPresets[preset];
-  return 'tools' in presetDef ? [...presetDef.tools] : [];
-}

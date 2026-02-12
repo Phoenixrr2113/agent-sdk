@@ -23,7 +23,6 @@
   },
   "dependencies": {
     "@agntk/core": "workspace:*",
-    "@agntk/logger": "workspace:*",
     "dotenv": "^17.2.3"
   },
   "devDependencies": {

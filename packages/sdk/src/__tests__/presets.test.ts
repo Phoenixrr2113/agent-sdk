@@ -6,7 +6,6 @@ import { describe, it, expect } from 'vitest';
 import {
   createToolPreset,
   toolPresets,
-  getPresetToolNames,
 } from '../presets/tools';
 
 describe('Tool Presets', () => {
@@ -30,23 +29,6 @@ describe('Tool Presets', () => {
 
     it('should have full preset definition', () => {
       expect(toolPresets.full.tools).toContain('ast_grep_search');
-    });
-  });
-
-  describe('getPresetToolNames', () => {
-    it('should return empty for none', () => {
-      expect(getPresetToolNames('none')).toEqual([]);
-    });
-
-    it('should return tool names for minimal', () => {
-      const names = getPresetToolNames('minimal');
-      expect(names).toContain('glob');
-    });
-
-    it('should return more tools for standard', () => {
-      const minimal = getPresetToolNames('minimal');
-      const standard = getPresetToolNames('standard');
-      expect(standard.length).toBeGreaterThan(minimal.length);
     });
   });
 
