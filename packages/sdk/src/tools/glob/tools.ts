@@ -42,9 +42,10 @@ const globInputSchema = z.object({
 export const globTool = tool({
   description:
     'Fast file pattern matching. ' +
-    'Uses ripgrep when available, falls back to find. ' +
     'Supports glob patterns like "**/*.js" or "src/**/*.ts". ' +
-    'Returns matching file paths sorted by modification time.',
+    'Returns matching file paths sorted by modification time. ' +
+    'Automatically excludes node_modules, .git, dist, .turbo, .next, .cache, and coverage. ' +
+    'Use maxDepth=1 to list only immediate directory contents.',
   inputSchema: globInputSchema,
   execute: async (args) => {
     const config = getGlobConfig();

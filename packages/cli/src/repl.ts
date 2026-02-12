@@ -181,20 +181,62 @@ export async function runRepl(options: ReplOptions): Promise<ReplResult> {
       // Send to agent
       ctx.history.push({ role: 'user', content: trimmed });
 
-      // Build prompt with context (include recent history for multi-turn)
-      const contextPrompt = ctx.history
-        .map((h) => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`)
-        .join('\n\n');
+      const maxHistoryPairs = 10; // keep last 10 user/assistant pairs
+      const recentHistory = ctx.history.length > maxHistoryPairs * 2
+        ? ctx.history.slice(-maxHistoryPairs * 2)
+        : ctx.history;
+
+      const historyLines = recentHistory.map((h) =>
+        h.role === 'user' ? `[User]: ${h.content}` : `[Assistant]: ${h.content}`
+      );
+      const contextPrompt = [
+        '<conversation_history>',
+        ...historyLines.slice(0, -1), // all but current user message
+        '</conversation_history>',
+        '',
+        recentHistory[recentHistory.length - 1]!.content, // current user message as the actual prompt
+      ].join('\n');
 
       try {
         output.write('\n');
 
-        // Stream output progressively
+        // Stream output progressively (show tool calls + results + text)
         const streamResult = await agent.stream({ prompt: contextPrompt });
+        let afterToolResult = false;
 
         for await (const chunk of streamResult.fullStream) {
-          if (chunk.type === 'text-delta') {
-            output.write(chunk.text);
+          if (chunk.type === 'tool-call') {
+            const toolChunk = chunk as Record<string, unknown>;
+            const argsStr = toolChunk.input ? JSON.stringify(toolChunk.input) : '';
+            output.write(`\n⚡ ${toolChunk.toolName as string}(${argsStr})\n`);
+            afterToolResult = false;
+          } else if (chunk.type === 'tool-result') {
+            const resultChunk = chunk as Record<string, unknown>;
+            const raw = typeof resultChunk.output === 'string'
+              ? resultChunk.output
+              : JSON.stringify(resultChunk.output);
+            let displayOutput = raw;
+            try {
+              const parsed = JSON.parse(raw);
+              if (parsed && typeof parsed.output === 'string') {
+                displayOutput = parsed.output;
+              }
+            } catch {
+              // Use raw output as-is
+            }
+            const maxLen = 2000;
+            if (displayOutput.length > maxLen) {
+              displayOutput = displayOutput.slice(0, maxLen) + `\n... (${displayOutput.length} chars total)`;
+            }
+            output.write(`${displayOutput}\n`);
+            afterToolResult = true;
+          } else if (chunk.type === 'text-delta') {
+            const textChunk = chunk as Record<string, unknown>;
+            if (afterToolResult) {
+              output.write('\n');
+              afterToolResult = false;
+            }
+            output.write(textChunk.text as string);
           }
         }
 

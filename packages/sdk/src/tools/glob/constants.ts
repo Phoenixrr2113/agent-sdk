@@ -8,5 +8,11 @@ export const DEFAULT_MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
 export const RG_FILES_FLAGS = [
   '--files',
   '--color=never',
-  '--glob=!.git/*',
+  '--glob=!**/.git/**',
+  '--glob=!**/node_modules/**',
+  '--glob=!**/.turbo/**',
+  '--glob=!**/dist/**',
+  '--glob=!**/.next/**',
+  '--glob=!**/.cache/**',
+  '--glob=!**/coverage/**',
 ] as const;

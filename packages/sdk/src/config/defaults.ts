@@ -13,10 +13,10 @@ export const DEFAULT_PROVIDER: Provider = 'openrouter';
 
 export const DEFAULT_MODELS: Record<Provider, Record<ModelTier, string>> = {
   openrouter: {
-    fast: 'openai/gpt-oss-120b',
+    fast: 'x-ai/grok-4.1-fast',
     standard: 'google/gemini-3-flash-preview',
-    reasoning: 'deepseek/deepseek-v3.2',
-    powerful: 'moonshotai/kimi-k2.5',
+    reasoning: 'deepseek/deepseek-r1',
+    powerful: 'z-ai/glm-4.7',
   },
   ollama: {
     fast: 'qwen3:4b',

@@ -29,16 +29,26 @@ function buildRgArgs(options: GlobOptions): string[] {
   if (options.hidden) args.push('--hidden');
   if (options.noIgnore) args.push('--no-ignore');
 
-  args.push(`--glob=${options.pattern}`);
+  const pat = options.pattern;
+  if (pat !== '*' && pat !== '**/*' && pat !== '**') {
+    args.push(`--glob=${pat}`);
+  }
 
   return args;
 }
+
+// Directories excluded from all glob searches (regardless of hidden flag)
+const EXCLUDED_DIRS = ['node_modules', '.turbo', 'dist', '.next', '.cache', 'coverage', '.git'];
 
 function buildFindArgs(options: GlobOptions): string[] {
   const args: string[] = ['.'];
 
   const maxDepth = Math.min(options.maxDepth ?? DEFAULT_MAX_DEPTH, DEFAULT_MAX_DEPTH);
   args.push('-maxdepth', String(maxDepth));
+
+  // Prune common noise directories
+  const pruneExprs = EXCLUDED_DIRS.map((dir) => ['-name', dir, '-prune', '-o']).flat();
+  args.push('(', ...pruneExprs, '-true', ')');
 
   args.push('-type', 'f');
   args.push('-name', options.pattern);

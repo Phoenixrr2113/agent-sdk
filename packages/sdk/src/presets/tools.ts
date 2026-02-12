@@ -98,7 +98,6 @@ function createStandardPreset(workspaceRoot: string, planConfig?: PlanToolConfig
     ...createGlobTool(),
     ...createGrepTool(),
     ...createFileTools(workspaceRoot),
-    ...createProgressTools(workspaceRoot),
     ...createSearchSkillsTool(),
     shell,
     background: createBackgroundTool(),
@@ -136,8 +135,8 @@ export const toolPresets = {
   },
 
   standard: {
-    description: 'Glob, grep, shell, background, file tools, progress tracking, search_skills, plan, deep_reasoning',
-    tools: ['glob', 'grep', 'shell', 'background', 'file_read', 'file_write', 'file_edit', 'file_create', 'progress_read', 'progress_update', 'search_skills', 'plan', 'deep_reasoning'],
+    description: 'Glob, grep, shell, background, file tools, search_skills, plan, deep_reasoning',
+    tools: ['glob', 'grep', 'shell', 'background', 'file_read', 'file_write', 'file_edit', 'file_create', 'search_skills', 'plan', 'deep_reasoning'],
   },
 
   full: {

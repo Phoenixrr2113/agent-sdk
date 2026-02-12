@@ -168,10 +168,45 @@ export async function runOneShot(
     // Stream output progressively so text appears as the model generates it
     const streamResult = await agent.stream({ prompt });
 
-    // Write text chunks as they arrive
+    // Track whether we need a leading newline before text (after tool output)
+    let afterToolResult = false;
+
+    // Write text chunks and tool activity as they arrive
     for await (const chunk of streamResult.fullStream) {
-      if (chunk.type === 'text-delta') {
-        output.write(chunk.text);
+      if (chunk.type === 'tool-call') {
+        const toolChunk = chunk as Record<string, unknown>;
+        const argsStr = toolChunk.input ? JSON.stringify(toolChunk.input) : '';
+        statusOutput.write(`\n⚡ ${toolChunk.toolName as string}(${argsStr})\n`);
+        afterToolResult = false;
+      } else if (chunk.type === 'tool-result') {
+        const resultChunk = chunk as Record<string, unknown>;
+        const raw = typeof resultChunk.output === 'string'
+          ? resultChunk.output
+          : JSON.stringify(resultChunk.output);
+        // Parse tool output — tools return JSON with { success, output }
+        let displayOutput = raw;
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed.output === 'string') {
+            displayOutput = parsed.output;
+          }
+        } catch {
+          // Use raw output as-is
+        }
+        // Truncate very long output for display
+        const maxLen = 2000;
+        if (displayOutput.length > maxLen) {
+          displayOutput = displayOutput.slice(0, maxLen) + `\n... (${displayOutput.length} chars total)`;
+        }
+        statusOutput.write(`${displayOutput}\n`);
+        afterToolResult = true;
+      } else if (chunk.type === 'text-delta') {
+        const textChunk = chunk as Record<string, unknown>;
+        if (afterToolResult) {
+          output.write('\n');
+          afterToolResult = false;
+        }
+        output.write(textChunk.text as string);
       }
     }
 

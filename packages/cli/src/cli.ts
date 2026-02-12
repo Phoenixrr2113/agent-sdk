@@ -10,6 +10,9 @@
  *   cat error.log | npx agntk "explain these errors"
  */
 
+// Load .env files before anything else reads process.env
+import 'dotenv/config';
+
 import { getVersion } from './version.js';
 import { parseArgs } from './args.js';
 import { resolveConfig } from './config.js';

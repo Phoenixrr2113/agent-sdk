@@ -56,6 +56,7 @@ const API_KEY_ENV_VARS: Array<{ env: string; provider: string }> = [
   { env: 'OPENAI_API_KEY', provider: 'openai' },
   { env: 'OPENROUTER_API_KEY', provider: 'openrouter' },
   { env: 'GOOGLE_API_KEY', provider: 'google' },
+  { env: 'GOOGLE_GENERATIVE_AI_API_KEY', provider: 'google' },
 ];
 
 /**

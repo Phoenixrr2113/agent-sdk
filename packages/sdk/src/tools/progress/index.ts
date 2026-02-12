@@ -97,7 +97,7 @@ function writeProgressFile(workspaceRoot: string, data: ProgressData): void {
  */
 export function createProgressTools(workspaceRoot: string) {
   const progress_read = tool({
-    description: `Read the current progress tracking data (features, session logs). Use this at the start of a session to understand what has been completed and what remains.`,
+    description: `Read the progress tracking data (features, session logs) from progress.json. Only call this when the user asks about task progress or when resuming a multi-session project. Do NOT call this automatically at the start of every interaction.`,
     inputSchema: z.object({}),
     execute: async () => {
       log.debug('progress_read called');
