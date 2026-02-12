@@ -8,6 +8,18 @@ export default defineConfig({
     starlight({
       title: 'Agent SDK',
       description: 'A modular AI agent framework built on Vercel AI SDK',
+      logo: {
+        light: './src/assets/logo-light.svg',
+        dark: './src/assets/logo-dark.svg',
+        replacesTitle: false,
+      },
+      customCss: [
+        '@fontsource-variable/inter',
+        '@fontsource/jetbrains-mono/400.css',
+        '@fontsource/jetbrains-mono/500.css',
+        '@fontsource/jetbrains-mono/600.css',
+        './src/styles/custom.css',
+      ],
       social: [
         { icon: 'github', label: 'GitHub', href: 'https://github.com/Phoenixrr2113/agntk' },
       ],

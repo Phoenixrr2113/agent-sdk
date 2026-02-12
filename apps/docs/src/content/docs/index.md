@@ -1,23 +1,22 @@
 ---
 title: Welcome
 description: Agent SDK Documentation
+template: splash
+hero:
+  title: Agent SDK
+  tagline: A modular AI agent framework built on Vercel AI SDK. Zero-config agents with real tools, durable workflows, knowledge graphs, and HTTP interfaces.
+  image:
+    dark: ../../assets/logo-dark.svg
+    light: ../../assets/logo-light.svg
+  actions:
+    - text: Get Started
+      link: /agntk/getting-started/introduction
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/Phoenixrr2113/agntk
+      icon: external
+      variant: minimal
 ---
-
-# Agent SDK
-
-A modular AI agent framework built on [Vercel AI SDK](https://ai-sdk.dev). Zero-config agents with real tools, durable workflows, knowledge graphs, and HTTP interfaces.
-
-## What is Agent SDK?
-
-Agent SDK provides a complete toolkit for building AI agents that can:
-
-- **Execute tools** — shell commands, file operations, web browsing, and custom tools
-- **Maintain durability** — crash recovery and auto-retry with Temporal-style workflows
-- **Access knowledge** — FalkorDB-backed knowledge graphs with NLP entity extraction
-- **Stream responses** — real-time text and tool execution events
-- **Serve over HTTP** — REST, SSE, and WebSocket endpoints via Hono
-- **Discover skills** — auto-inject SKILL.md files into agent prompts
-- **Persist memory** — markdown-based memory that survives across sessions
 
 ## Quick Start
 
@@ -41,32 +40,21 @@ console.log(result.text);
 
 | Package | Description |
 |---------|-------------|
-| `@agntk/core` | Core agent factory — tools, roles, config, streaming, durability, hooks, scheduling |
-| `@agntk/cli` | CLI agent — one-shot prompts, interactive REPL, persistent memory |
-| `@agntk/server` | Hono HTTP server — REST + SSE + WebSocket endpoints |
-| `@agntk/client` | Client library — HTTP, SSE streams, WebSocket, session management |
-| `@agntk/logger` | Structured logging — namespace filtering, file/SSE transports, formatters |
-| `@agntk/brain` | Knowledge graph — FalkorDB, code parsing, NLP entity extraction |
+| `@agntk/core` | Core agent factory -- tools, roles, config, streaming, durability, hooks, scheduling |
+| `@agntk/cli` | CLI agent -- one-shot prompts, interactive REPL, persistent memory |
+| `@agntk/server` | Hono HTTP server -- REST + SSE + WebSocket endpoints |
+| `@agntk/client` | Client library -- HTTP, SSE streams, WebSocket, session management |
+| `@agntk/logger` | Structured logging -- namespace filtering, file/SSE transports, formatters |
+| `@agntk/brain` | Knowledge graph -- FalkorDB, code parsing, NLP entity extraction |
 
-## Documentation
+## Explore the Docs
 
-- **[Getting Started](/getting-started/introduction)** — Introduction and setup
-- **[Installation](/getting-started/installation)** — Install Agent SDK
-- **[Quick Start](/getting-started/quick-start)** — Build your first agent
-- **[SDK Core](/packages/sdk)** — Learn about agents, tools, and configuration
-- **[SDK Server](/packages/sdk-server)** — Serve agents over HTTP
-- **[SDK Client](/packages/sdk-client)** — Connect to a remote agent server
-- **[Logger](/packages/logger)** — Structured logging
-- **[Brain](/packages/brain)** — Knowledge graph
-- **[Configuration](/configuration/yaml-config)** — Configuration system
-
-## Requirements
-
-- Node.js >= 20
-- pnpm >= 9
-- FalkorDB (optional, for `@agntk/brain`)
-- Temporal (optional, for durable workflows)
-
-## License
-
-MIT
+- **[Introduction](/agntk/getting-started/introduction)** -- What Agent SDK is and why
+- **[Installation](/agntk/getting-started/installation)** -- Get set up in minutes
+- **[Quick Start](/agntk/getting-started/quick-start)** -- Build your first agent
+- **[SDK Core](/agntk/packages/sdk)** -- Agents, tools, and configuration
+- **[Server](/agntk/packages/sdk-server)** -- Serve agents over HTTP
+- **[Client](/agntk/packages/sdk-client)** -- Connect to remote agents
+- **[Logger](/agntk/packages/logger)** -- Structured logging
+- **[Brain](/agntk/packages/brain)** -- Knowledge graph
+- **[Config](/agntk/configuration/yaml-config)** -- YAML configuration system
