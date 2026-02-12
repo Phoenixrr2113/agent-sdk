@@ -33,6 +33,9 @@ import { checkWorkflowAvailability } from './workflow/utils';
 import { wrapToolsAsDurable } from './workflow/durable-tool';
 import { createReflectionPrepareStep } from './reflection';
 // import { applyApproval } from './tools/approval'; // Disabled until approval handler is wired up
+import { runGuardrails, handleGuardrailResults } from './guardrails/runner';
+import { contentFilter } from './guardrails/built-ins';
+import type { Guardrail } from './guardrails/types';
 import { MarkdownMemoryStore } from './memory/store';
 import { loadMemoryContext } from './memory/loader';
 import { createMemoryTools } from './memory/tools';
@@ -245,17 +248,9 @@ export function createAgentV2(options: AgentOptionsV2, _internal: InternalV2Opti
   // Without a handler, needsApproval: true silently blocks tool execution.
   log.debug('Approval disabled (no handler configured)');
 
-  // ── 6. Durability — auto-detect ───────────────────────────────────────
-  // Check if workflow package is available and wrap tools if so.
-  // This is async but we wrap eagerly — the wrapper is inert without the runtime.
-  tools = wrapToolsAsDurable(tools, { retryCount: 3 }) as ToolSet;
-  checkWorkflowAvailability().then((available) => {
-    if (available) {
-      log.info('Durable tool wrapping active (workflow package detected)');
-    } else {
-      log.debug('Workflow package not installed — durable wrapping is inert');
-    }
-  }).catch(() => { /* swallow */ });
+  // ── 6. Durability — auto-detect (deferred to init) ──────────────────
+  // Wrapping is only applied if the 'workflow' package is installed.
+  // Checked in ensureInit() since the detection is async.
 
   // ── 7. ModelRetry — always on ─────────────────────────────────────────
   tools = wrapAllToolsWithRetry(tools, 3) as ToolSet;
@@ -294,7 +289,13 @@ export function createAgentV2(options: AgentOptionsV2, _internal: InternalV2Opti
   });
   log.debug('Reflection enabled', { strategy: 'reflact' });
 
-  // ── 12. Telemetry — auto-detect ───────────────────────────────────────
+  // ── 12. Guardrails — always on (output: PII content filter) ──────────
+  // Default output guardrails run on the final text to catch PII leaks.
+  // Uses 'filter' mode: PII is silently redacted, not blocked.
+  const outputGuardrails: Guardrail[] = [contentFilter()];
+  log.debug('Output guardrails enabled', { guards: outputGuardrails.map((g) => g.name) });
+
+  // ── 13. Telemetry — auto-detect ──────────────────────────────────────
   const telemetryEnabled = detectTelemetry();
   const telemetrySettings = telemetryEnabled
     ? createTelemetrySettings({ functionId: `agent-v2:${name}` })
@@ -304,7 +305,7 @@ export function createAgentV2(options: AgentOptionsV2, _internal: InternalV2Opti
     log.debug('Telemetry will be initialized on first call');
   }
 
-  // ── 13. Build the ToolLoopAgent ───────────────────────────────────────
+  // ── 14. Build the ToolLoopAgent ───────────────────────────────────────
   const toolLoopAgent = new ToolLoopAgent({
     model,
     instructions: augmentedSystemPrompt,
@@ -359,6 +360,19 @@ export function createAgentV2(options: AgentOptionsV2, _internal: InternalV2Opti
         });
       }
 
+      // Apply durable wrapping if workflow runtime is available
+      try {
+        const workflowAvailable = await checkWorkflowAvailability();
+        if (workflowAvailable) {
+          tools = wrapToolsAsDurable(tools, { retryCount: 3 }) as ToolSet;
+          agentLog.info('Durable tool wrapping active (workflow package detected)');
+        } else {
+          agentLog.debug('Workflow package not installed — skipping durable wrapping');
+        }
+      } catch {
+        agentLog.debug('Workflow detection failed — skipping durable wrapping');
+      }
+
       // Initialize telemetry if detected
       if (telemetryEnabled) {
         try {
@@ -396,9 +410,36 @@ export function createAgentV2(options: AgentOptionsV2, _internal: InternalV2Opti
 
       const result = await toolLoopAgent.stream({ prompt: input.prompt });
 
+      // Apply output guardrails to the final text (async, runs after stream completes).
+      // Uses 'filter' mode — PII is silently redacted, agent is never blocked.
+      const guardedText = result.text.then(async (text: string) => {
+        if (!text || outputGuardrails.length === 0) return text;
+
+        try {
+          const { results, filteredText } = await runGuardrails(outputGuardrails, text, {
+            prompt: input.prompt,
+            phase: 'output',
+          });
+
+          const check = handleGuardrailResults(results, text, filteredText, 'output', 'filter');
+          if (check.blocked) {
+            agentLog.info('Output guardrails filtered content', {
+              guards: results.filter((r) => !r.passed).map((r) => r.name),
+            });
+            return check.text;
+          }
+        } catch (err) {
+          agentLog.warn('Output guardrails failed', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+
+        return text;
+      });
+
       return {
         fullStream: result.fullStream,
-        text: result.text,
+        text: guardedText,
         usage: result.totalUsage,
       };
     },
@@ -413,6 +454,7 @@ export function createAgentV2(options: AgentOptionsV2, _internal: InternalV2Opti
     durable: 'auto-detect',
     telemetry: telemetryEnabled,
     reflection: 'reflact',
+    guardrails: outputGuardrails.map((g) => g.name),
   });
 
   return agent;

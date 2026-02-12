@@ -117,16 +117,4 @@ export type { SkillSearchResult } from '../skills';
 
 export type { UsageSnapshot } from '../usage-limits';
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Pool (SpecialistPool)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-export { SpecialistPool, createPoolTools, createSpawnSpecialistTool, createListSpecialistsTool } from '../pool';
-export type {
-  SpecialistPoolConfig,
-  SpecialistConfig,
-  CachedSpecialist,
-  ConversationMessage,
-  SpecialistAgent,
-  HistoryStrategy,
-} from '../pool';
+// Pool (SpecialistPool) — removed: replaced by spawn-agent tool
