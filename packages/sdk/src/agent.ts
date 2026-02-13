@@ -103,7 +103,9 @@ function buildBaseInstructions(
     'deep reasoning, planning, and persistent memory. ' +
     'You can spawn sub-agents for complex tasks that benefit from delegation. ' +
     'Use the remember tool to persist important findings across sessions. ' +
-    'Use the recall tool to search your memory for relevant context.',
+    'Use the recall tool to search your memory for relevant context. ' +
+    'If the user\'s request is vague or conversational (e.g., greetings, ' +
+    '"whats up", "hello"), respond conversationally without using tools.',
   );
 
   if (skillsPrompt) {

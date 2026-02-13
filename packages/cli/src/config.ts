@@ -5,6 +5,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 
 // ============================================================================
 // API Key Detection
@@ -20,11 +21,48 @@ const API_KEY_ENV_VARS: Array<{ env: string; provider: string }> = [
   { env: 'OPENAI_API_KEY', provider: 'openai' },
 ];
 
+let dotenvFallbackLoaded = false;
+
+/**
+ * Load ~/.agntk/.env as a fallback for API key persistence.
+ * Uses override: false so explicit env vars (from `export`) always win.
+ */
+export function loadDotenvFallback(): void {
+  if (dotenvFallbackLoaded) return;
+  dotenvFallbackLoaded = true;
+
+  const globalEnvPath = join(homedir(), '.agntk', '.env');
+  if (!existsSync(globalEnvPath)) return;
+
+  try {
+    // Parse the .env file manually to avoid requiring dotenv at this level.
+    // dotenv/config already ran for cwd — this covers ~/.agntk/.env.
+    const content = readFileSync(globalEnvPath, 'utf-8');
+    for (const line of content.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx === -1) continue;
+      const key = trimmed.slice(0, eqIdx).trim();
+      const value = trimmed.slice(eqIdx + 1).trim();
+      // Don't override existing env vars
+      if (!process.env[key]) {
+        process.env[key] = value;
+      }
+    }
+  } catch {
+    // Silently ignore read errors
+  }
+}
+
 /**
  * Detect API key from environment variables.
+ * Loads ~/.agntk/.env as fallback before checking.
  * Returns the first found key with its provider.
  */
 export function detectApiKey(): ApiKeyResult | null {
+  loadDotenvFallback();
+
   for (const { env, provider } of API_KEY_ENV_VARS) {
     const key = process.env[env];
     if (key && key.trim().length > 0) {

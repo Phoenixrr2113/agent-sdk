@@ -4,19 +4,20 @@
  * @fileoverview CLI entry point for agntk — zero-config AI agent.
  *
  * Usage:
- *   npx agntk --name "my-agent" "do something"
- *   npx agntk --name "my-agent" --instructions "you are a deploy bot" "roll back staging"
- *   npx agntk --name "my-agent" -i
+ *   npx agntk "do something"
+ *   npx agntk whats up
+ *   npx agntk -n "my-agent" "fix the failing tests"
+ *   npx agntk -n "my-agent" --instructions "you are a deploy bot" "roll back staging"
+ *   npx agntk -n "my-agent" -i
  *   npx agntk list
- *   npx agntk "my-agent" "what were you working on?"
- *   cat error.log | npx agntk --name "debugger" "explain these errors"
+ *   cat error.log | npx agntk -n "debugger" "explain these errors"
  */
 
 // Load .env files before anything else reads process.env
 import 'dotenv/config';
 
 import { createInterface, type Interface } from 'node:readline';
-import { readdirSync, existsSync } from 'node:fs';
+import { readdirSync, existsSync, writeFileSync, unlinkSync, readFileSync, statSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { homedir } from 'node:os';
 import { getVersion } from './version.js';
@@ -40,13 +41,15 @@ interface Colors {
   green: (s: string) => string;
   red: (s: string) => string;
   magenta: (s: string) => string;
+  blue: (s: string) => string;
+  white: (s: string) => string;
   reset: string;
 }
 
 function createColors(enabled: boolean): Colors {
   if (!enabled) {
     const identity = (s: string) => s;
-    return { dim: identity, bold: identity, cyan: identity, yellow: identity, green: identity, red: identity, magenta: identity, reset: '' };
+    return { dim: identity, bold: identity, cyan: identity, yellow: identity, green: identity, red: identity, magenta: identity, blue: identity, white: identity, reset: '' };
   }
   return {
     dim: (s) => `\x1b[2m${s}\x1b[22m`,
@@ -56,7 +59,46 @@ function createColors(enabled: boolean): Colors {
     green: (s) => `\x1b[32m${s}\x1b[39m`,
     red: (s) => `\x1b[31m${s}\x1b[39m`,
     magenta: (s) => `\x1b[35m${s}\x1b[39m`,
+    blue: (s) => `\x1b[34m${s}\x1b[39m`,
+    white: (s) => `\x1b[97m${s}\x1b[39m`,
     reset: '\x1b[0m',
+  };
+}
+
+// ============================================================================
+// Spinner — braille-pattern loading indicator
+// ============================================================================
+
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+const CLEAR_LINE = '\x1b[2K\r';
+
+interface Spinner {
+  start: (label: string) => void;
+  stop: () => void;
+}
+
+function createSpinner(stream: NodeJS.WritableStream, colors: Colors, enabled: boolean): Spinner {
+  let interval: ReturnType<typeof setInterval> | null = null;
+  let frameIdx = 0;
+
+  return {
+    start(label: string) {
+      if (!enabled) return;
+      this.stop();
+      frameIdx = 0;
+      interval = setInterval(() => {
+        const frame = SPINNER_FRAMES[frameIdx % SPINNER_FRAMES.length]!;
+        stream.write(`${CLEAR_LINE}  ${colors.cyan(frame)} ${colors.dim(label)}`);
+        frameIdx++;
+      }, 80);
+    },
+    stop() {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+        stream.write(CLEAR_LINE);
+      }
+    },
   };
 }
 
@@ -147,24 +189,12 @@ function parseCLIArgs(argv: string[]): CLIArgs {
   }
 
   // Interpret positionals:
-  //   agntk "prompt"                     → name from --name flag, prompt from positional
-  //   agntk "agent-name" "prompt"        → first is agent name, second is prompt
-  if (positionals.length === 1 && !args.name) {
-    args.prompt = positionals[0]!;
-  } else if (positionals.length === 1 && args.name) {
-    args.prompt = positionals[0]!;
-  } else if (positionals.length === 2) {
-    if (!args.name) {
-      args.name = positionals[0]!;
-    }
-    args.prompt = positionals[1]!;
-  } else if (positionals.length > 2) {
-    if (!args.name) {
-      args.name = positionals[0]!;
-      args.prompt = positionals.slice(1).join(' ');
-    } else {
-      args.prompt = positionals.join(' ');
-    }
+  //   All positionals join into the prompt. Use --name/-n for agent name.
+  //   agntk "do something"              → prompt = "do something"
+  //   agntk whats up                    → prompt = "whats up"
+  //   agntk -n myagent fix the tests    → name = "myagent", prompt = "fix the tests"
+  if (positionals.length > 0) {
+    args.prompt = positionals.join(' ');
   }
 
   return args;
@@ -180,13 +210,13 @@ function printHelp(): void {
   agntk (${version}) — zero-config AI agent
 
   Usage:
-    agntk --name <name> "prompt"
-    agntk --name <name> -i
-    agntk <name> "prompt"
+    agntk "prompt"
+    agntk -n <name> "prompt"
+    agntk -n <name> -i
     agntk list
 
   Options:
-    -n, --name <name>        Agent name (required for new agents)
+    -n, --name <name>        Agent name (enables persistent memory)
     --instructions <text>    What the agent does (injected as system prompt)
     -i, --interactive        Interactive REPL mode
     --workspace <path>       Workspace root (default: cwd)
@@ -200,12 +230,17 @@ function printHelp(): void {
     list                     List all known agents
 
   Examples:
-    agntk --name "coder" "fix the failing tests"
-    agntk --name "ops" --instructions "you manage k8s deploys" "roll back staging"
-    agntk --name "coder" -i
-    agntk "coder" "what were you working on?"
+    agntk "fix the failing tests"
+    agntk whats up
+    agntk -n coder "fix the failing tests"
+    agntk -n ops --instructions "you manage k8s deploys" "roll back staging"
+    agntk -n coder -i
     agntk list
-    cat error.log | agntk --name "debugger" "explain"
+    cat error.log | agntk -n debugger "explain"
+
+  API Key:
+    Save permanently:  mkdir -p ~/.agntk && echo "OPENROUTER_API_KEY=sk-or-..." > ~/.agntk/.env
+    Or per session:    export OPENROUTER_API_KEY=sk-or-...
 `);
 }
 
@@ -213,9 +248,78 @@ function printHelp(): void {
 // List Agents
 // ============================================================================
 
+/** Check if a PID is still alive */
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Format a timestamp as relative time (e.g. "2m ago", "3d ago") */
+function relativeTime(date: Date): string {
+  const now = Date.now();
+  const diffMs = now - date.getTime();
+  const seconds = Math.floor(diffMs / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 4) return `${weeks}w ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
+}
+
+/** Get lock info for an agent — returns PID if running, null if idle */
+function getAgentLockInfo(agentDir: string): { pid: number; alive: boolean } | null {
+  const lockPath = join(agentDir, '.lock');
+  if (!existsSync(lockPath)) return null;
+  try {
+    const content = readFileSync(lockPath, 'utf-8').trim();
+    const pid = parseInt(content, 10);
+    if (isNaN(pid)) return null;
+    const alive = isPidAlive(pid);
+    if (!alive) {
+      try { unlinkSync(lockPath); } catch { /* ignore */ }
+      return null;
+    }
+    return { pid, alive };
+  } catch {
+    return null;
+  }
+}
+
+/** Acquire a lockfile for an agent */
+function acquireLock(name: string): void {
+  const lockPath = join(AGENTS_DIR, name, '.lock');
+  try {
+    writeFileSync(lockPath, String(process.pid), 'utf-8');
+  } catch {
+    // Agent dir may not exist yet — that's fine, it gets created by the SDK
+  }
+}
+
+/** Release a lockfile for an agent */
+function releaseLock(name: string): void {
+  const lockPath = join(AGENTS_DIR, name, '.lock');
+  try {
+    unlinkSync(lockPath);
+  } catch {
+    // Already cleaned up
+  }
+}
+
 function listAgents(): void {
+  const colors = createColors(process.stdout.isTTY ?? false);
+
   if (!existsSync(AGENTS_DIR)) {
-    console.log('No agents found. Create one with: agntk --name "my-agent" "do something"');
+    console.log(colors.dim('No agents found. Create one with: agntk --name "my-agent" "do something"'));
     return;
   }
 
@@ -223,18 +327,66 @@ function listAgents(): void {
   const agents = entries.filter((e) => e.isDirectory());
 
   if (agents.length === 0) {
-    console.log('No agents found. Create one with: agntk --name "my-agent" "do something"');
+    console.log(colors.dim('No agents found. Create one with: agntk --name "my-agent" "do something"'));
     return;
   }
 
-  console.log(`\nKnown agents (${agents.length}):\n`);
+  console.log(`\n${colors.bold(`Agents (${agents.length})`)}\n`);
+
+  // Calculate max name length for alignment
+  const maxNameLen = Math.max(...agents.map((a) => a.name.length));
+
   for (const agent of agents) {
-    const memoryPath = join(AGENTS_DIR, agent.name, 'memory.md');
-    const contextPath = join(AGENTS_DIR, agent.name, 'context.md');
+    const agentDir = join(AGENTS_DIR, agent.name);
+    const memoryPath = join(agentDir, 'memory.md');
+    const contextPath = join(agentDir, 'context.md');
     const hasMemory = existsSync(memoryPath);
     const hasContext = existsSync(contextPath);
-    const status = hasMemory || hasContext ? '●' : '○';
-    console.log(`  ${status} ${agent.name}${hasMemory ? ' (has memory)' : ''}`);
+
+    // Running detection
+    const lockInfo = getAgentLockInfo(agentDir);
+    const isRunning = lockInfo !== null;
+
+    // Last active — most recent mtime of any file in the agent dir
+    let lastActive: Date | null = null;
+    try {
+      const agentFiles = readdirSync(agentDir);
+      for (const f of agentFiles) {
+        if (f === '.lock') continue;
+        try {
+          const fStat = statSync(join(agentDir, f));
+          if (!lastActive || fStat.mtime > lastActive) {
+            lastActive = fStat.mtime;
+          }
+        } catch { /* skip */ }
+      }
+    } catch { /* skip */ }
+
+    // Build output line
+    const statusIcon = isRunning
+      ? colors.green('●')
+      : colors.dim('○');
+    const nameStr = isRunning
+      ? colors.green(colors.bold(agent.name))
+      : agent.name;
+    const padding = ' '.repeat(maxNameLen - agent.name.length + 2);
+
+    const parts: string[] = [];
+    if (isRunning) {
+      parts.push(colors.green(`running`) + colors.dim(` (pid ${lockInfo!.pid})`));
+    } else {
+      parts.push(colors.dim('idle'));
+    }
+    if (lastActive) {
+      parts.push(colors.dim(relativeTime(lastActive)));
+    }
+    if (hasMemory) {
+      parts.push(colors.cyan('🧠 memory'));
+    } else if (hasContext) {
+      parts.push(colors.dim('has context'));
+    }
+
+    console.log(`  ${statusIcon} ${nameStr}${padding}${parts.join(colors.dim('  ·  '))}`);
   }
   console.log('');
 }
@@ -244,7 +396,7 @@ function listAgents(): void {
 // ============================================================================
 
 /** Compact summary of tool args — show key names and short values */
-function summarizeArgs(input: unknown): string {
+function summarizeArgs(input: unknown, colors: Colors): string {
   if (!input || typeof input !== 'object') return '';
   const obj = input as Record<string, unknown>;
   const parts: string[] = [];
@@ -252,7 +404,7 @@ function summarizeArgs(input: unknown): string {
     if (val === undefined || val === null) continue;
     const str = typeof val === 'string' ? val : JSON.stringify(val);
     const display = str.length > 60 ? str.slice(0, 57) + '...' : str;
-    parts.push(`${key}=${display}`);
+    parts.push(`${colors.dim(key + '=')}${colors.yellow(display)}`);
   }
   return parts.join(' ');
 }
@@ -298,6 +450,7 @@ interface StreamConsumerOptions {
   level: OutputLevel;
   colors: Colors;
   maxSteps?: number;
+  isTTY?: boolean;
 }
 
 interface StreamStats {
@@ -315,6 +468,7 @@ async function consumeStream(
   const { output, status, level, colors } = opts;
   const quiet = level === 'quiet';
   const verbose = level === 'verbose';
+  const spinner = createSpinner(status, colors, !quiet && (opts.isTTY ?? false));
 
   const stats: StreamStats = {
     steps: 0,
@@ -342,7 +496,7 @@ async function consumeStream(
         stats.steps++;
         currentStepStart = Date.now();
         if (!quiet) {
-          status.write(`\n${colors.dim(`── step ${stats.steps} ──────────────────────────────────────`)}\n`);
+          status.write(`\n${colors.dim('──')} ${colors.blue(colors.bold(`step ${stats.steps}`))} ${colors.dim('──────────────────────────────────────')}\n`);
         }
         break;
       }
@@ -372,12 +526,12 @@ async function consumeStream(
 
           const parts = [
             colors.dim(`  ${formatDuration(elapsed)}`),
-            colors.dim(`${tokensIn}→${tokensOut} tok`),
+            `${colors.cyan(String(tokensIn))}${colors.dim('→')}${colors.cyan(String(tokensOut))} ${colors.dim('tok')}`,
           ];
           if (reason === 'tool-calls') {
             parts.push(colors.dim('→ tool loop'));
           } else if (reason === 'stop') {
-            parts.push(colors.green('done'));
+            parts.push(colors.green(colors.bold('done')));
           } else {
             parts.push(colors.yellow(reason));
           }
@@ -389,7 +543,7 @@ async function consumeStream(
       case 'reasoning-start': {
         if (!quiet) {
           inReasoning = true;
-          status.write(colors.dim('\n  ... '));
+          status.write(colors.magenta('\n  💭 '));
         }
         break;
       }
@@ -398,7 +552,7 @@ async function consumeStream(
         if (!quiet && inReasoning) {
           const text = (chunk.text as string) ?? '';
           const compacted = text.replace(/\n/g, ' ');
-          status.write(colors.dim(compacted));
+          status.write(colors.magenta(colors.dim(compacted)));
         }
         break;
       }
@@ -417,24 +571,26 @@ async function consumeStream(
           const toolName = chunk.toolName as string;
           if (verbose) {
             const argsStr = chunk.input ? JSON.stringify(chunk.input, null, 2) : '';
-            status.write(`\n  ${colors.cyan('>')} ${colors.bold(toolName)}\n`);
+            status.write(`\n  ${colors.cyan('▶')} ${colors.cyan(colors.bold(toolName))}\n`);
             if (argsStr) {
               const indented = argsStr.split('\n').map((l) => `     ${l}`).join('\n');
               status.write(`${colors.dim(indented)}\n`);
             }
           } else {
-            const argsSummary = summarizeArgs(chunk.input);
+            const argsSummary = summarizeArgs(chunk.input, colors);
             const display = argsSummary
-              ? `  ${colors.cyan('>')} ${colors.bold(toolName)} ${colors.dim(argsSummary)}`
-              : `  ${colors.cyan('>')} ${colors.bold(toolName)}`;
+              ? `  ${colors.cyan('▶')} ${colors.cyan(colors.bold(toolName))} ${argsSummary}`
+              : `  ${colors.cyan('▶')} ${colors.cyan(colors.bold(toolName))}`;
             status.write(`${display}\n`);
           }
+          spinner.start(`running ${toolName}...`);
         }
         afterToolResult = false;
         break;
       }
 
       case 'tool-result': {
+        spinner.stop();
         const toolOutputRaw = typeof chunk.output === 'string' ? chunk.output : JSON.stringify(chunk.output);
         try {
           const parsed = JSON.parse(toolOutputRaw);
@@ -452,7 +608,7 @@ async function consumeStream(
               displayOutput = displayOutput.slice(0, maxLen) + `\n... (${displayOutput.length} chars total)`;
             }
             const indented = displayOutput.split('\n').map((l) => `     ${l}`).join('\n');
-            status.write(`  ${colors.green('<')} ${colors.dim(toolName)} ${colors.dim('returned')}\n`);
+            status.write(`  ${colors.green('✔')} ${colors.green(colors.dim(toolName))} ${colors.dim('returned')}\n`);
             status.write(`${colors.dim(indented)}\n`);
           } else {
             const summary = summarizeOutput(chunk.output);
@@ -460,7 +616,7 @@ async function consumeStream(
             const truncated = firstLine.length > 100
               ? firstLine.slice(0, 97) + '...'
               : firstLine;
-            status.write(`  ${colors.green('<')} ${colors.dim(toolName + ': ' + truncated)}\n`);
+            status.write(`  ${colors.green('✔')} ${colors.green(colors.dim(toolName + ': '))}${colors.dim(truncated)}\n`);
           }
         }
         afterToolResult = true;
@@ -468,12 +624,13 @@ async function consumeStream(
       }
 
       case 'tool-error': {
+        spinner.stop();
         if (!quiet) {
           const toolName = chunk.toolName as string;
           const error = chunk.error instanceof Error
             ? chunk.error.message
             : String(chunk.error ?? 'unknown error');
-          status.write(`  ${colors.red('x')} ${colors.bold(toolName)} ${colors.red(error)}\n`);
+          status.write(`  ${colors.red('✖')} ${colors.red(colors.bold(toolName))} ${colors.red(error)}\n`);
         }
         afterToolResult = true;
         break;
@@ -556,6 +713,7 @@ async function consumeStream(
       }
 
       case 'finish': {
+        spinner.stop();
         if (!quiet) {
           const elapsed = Date.now() - stats.startTime;
           const totalUsage = chunk.totalUsage as { inputTokens?: number; outputTokens?: number } | undefined;
@@ -563,16 +721,21 @@ async function consumeStream(
             stats.inputTokens = totalUsage.inputTokens ?? stats.inputTokens;
             stats.outputTokens = totalUsage.outputTokens ?? stats.outputTokens;
           }
-          status.write(`\n${colors.dim(`── done ── ${stats.steps} step${stats.steps !== 1 ? 's' : ''}, ${stats.toolCalls} tool call${stats.toolCalls !== 1 ? 's' : ''}, ${stats.inputTokens}→${stats.outputTokens} tok, ${formatDuration(elapsed)} ──`)}\n`);
+          const stepLabel = `${stats.steps} step${stats.steps !== 1 ? 's' : ''}`;
+          const toolLabel = `${stats.toolCalls} tool call${stats.toolCalls !== 1 ? 's' : ''}`;
+          const tokLabel = `${colors.cyan(String(stats.inputTokens))}${colors.dim('→')}${colors.cyan(String(stats.outputTokens))} ${colors.dim('tok')}`;
+          const timeLabel = colors.dim(formatDuration(elapsed));
+          status.write(`\n${colors.dim('──')} ${colors.green(colors.bold('done'))} ${colors.dim('──')} ${colors.dim(stepLabel)} ${colors.dim('|')} ${colors.dim(toolLabel)} ${colors.dim('|')} ${tokLabel} ${colors.dim('|')} ${timeLabel} ${colors.dim('──')}\n`);
         }
         break;
       }
 
       case 'error': {
+        spinner.stop();
         const error = chunk.error instanceof Error
           ? chunk.error.message
           : String(chunk.error ?? 'unknown error');
-        status.write(`\n${colors.red('Error:')} ${error}\n`);
+        status.write(`\n${colors.red(colors.bold('✖ Error:'))} ${colors.red(error)}\n`);
         break;
       }
 
@@ -643,10 +806,17 @@ async function runOneShot(
     maxSteps: args.maxSteps,
   });
 
+  // Acquire lockfile
+  acquireLock(args.name!);
+  const cleanup = () => releaseLock(args.name!);
+  process.on('exit', cleanup);
+  process.on('SIGINT', () => { cleanup(); process.exit(130); });
+  process.on('SIGTERM', () => { cleanup(); process.exit(143); });
+
   if (args.outputLevel !== 'quiet') {
     const toolCount = agent.getToolNames().length;
     process.stderr.write(
-      `${colors.dim(`agntk | ${args.name} | ${toolCount} tools | workspace: ${args.workspace}`)}\n`,
+      `${colors.bold('agntk')} ${colors.dim('|')} ${colors.cyan(args.name!)} ${colors.dim('|')} ${colors.dim(`${toolCount} tools`)} ${colors.dim('|')} ${colors.dim(`workspace: ${args.workspace}`)}\n`,
     );
   }
 
@@ -658,6 +828,7 @@ async function runOneShot(
     level: args.outputLevel,
     colors,
     maxSteps: args.maxSteps,
+    isTTY: process.stderr.isTTY ?? false,
   });
 
   const finalText = await result.text;
@@ -690,18 +861,25 @@ async function runRepl(args: CLIArgs): Promise<void> {
     maxSteps: args.maxSteps,
   });
 
+  // Acquire lockfile
+  acquireLock(args.name!);
+  const cleanup = () => releaseLock(args.name!);
+  process.on('exit', cleanup);
+  process.on('SIGINT', () => { cleanup(); process.exit(130); });
+  process.on('SIGTERM', () => { cleanup(); process.exit(143); });
+
   const version = getVersion();
   const output = process.stdout;
   const toolCount = agent.getToolNames().length;
 
-  output.write(`\n${colors.bold('agntk')} ${colors.dim(`(${version})`)}\n`);
-  output.write(`${colors.cyan(args.name!)} ${colors.dim(`| ${toolCount} tools | memory: on`)}\n`);
+  output.write(`\n${colors.bold('⚡ agntk')} ${colors.dim(`(${version})`)}\n`);
+  output.write(`${colors.cyan(colors.bold(args.name!))} ${colors.dim('|')} ${colors.dim(`${toolCount} tools`)} ${colors.dim('|')} ${colors.green('memory: on')}\n`);
   output.write(`${colors.dim('Type /help for commands, /exit or Ctrl+C to quit.')}\n\n`);
 
   const rl: Interface = createInterface({
     input: process.stdin,
     output: process.stdout,
-    prompt: `${colors.cyan(args.name! + '>')} `,
+    prompt: `${colors.cyan(colors.bold(args.name! + ' ❯'))} `,
     terminal: true,
   });
 
@@ -769,6 +947,7 @@ async function runRepl(args: CLIArgs): Promise<void> {
         level: args.outputLevel,
         colors,
         maxSteps: args.maxSteps,
+        isTTY: process.stderr.isTTY ?? false,
       });
 
       const responseText = (await result.text) ?? '';
@@ -825,7 +1004,7 @@ async function runRepl(args: CLIArgs): Promise<void> {
       closed = true;
 
       const finish = () => {
-        output.write(`\n${colors.dim('Goodbye!')}\n`);
+        output.write(`\n${colors.dim('👋 Goodbye!')}\n`);
         resolvePromise();
       };
 
@@ -875,16 +1054,17 @@ async function main(): Promise<void> {
   if (!args.name) {
     if (!args.prompt && process.stdin.isTTY) {
       console.error(
-        'Error: No agent name provided.\n' +
-          'Usage: agntk --name "my-agent" "your prompt"\n' +
-          '       agntk --name "my-agent" -i\n' +
+        'Error: No prompt provided.\n' +
+        'Usage: agntk "your prompt"\n' +
+        '       agntk -n <name> "your prompt"\n' +
+        '       agntk -n <name> -i\n' +
           '       agntk list\n' +
           '       agntk -h',
       );
       process.exit(1);
     }
 
-    // Default name if only prompt was given
+    // Default name if no --name flag was given
     args.name = 'default';
   }
 
@@ -894,11 +1074,20 @@ async function main(): Promise<void> {
     console.error(
       'Error: No API key found.\n\n' +
         '  1. Get a key at https://openrouter.ai/keys\n' +
-        '  2. Add to your shell profile:\n\n' +
-        '     export OPENROUTER_API_KEY=sk-or-...\n\n' +
-        '  Then restart your terminal.',
+      '  2. Save it permanently:\n\n' +
+      '     mkdir -p ~/.agntk && echo "OPENROUTER_API_KEY=sk-or-..." > ~/.agntk/.env\n\n' +
+      '  Or export for this session only:\n\n' +
+      '     export OPENROUTER_API_KEY=sk-or-...\n',
     );
     process.exit(1);
+  }
+
+  // Warn if workspace is the home directory (likely unintentional)
+  if (args.workspace === homedir()) {
+    process.stderr.write(
+      'Warning: Workspace is your home directory.\n' +
+      '  Run from a project directory, or use --workspace <path>\n\n',
+    );
   }
 
   // Interactive mode
@@ -917,8 +1106,9 @@ async function main(): Promise<void> {
   if (!prompt) {
     console.error(
       'Error: No prompt provided.\n' +
-        'Usage: agntk --name "my-agent" "your prompt"\n' +
-        '       agntk --name "my-agent" -i\n' +
+      'Usage: agntk "your prompt"\n' +
+      '       agntk -n <name> "your prompt"\n' +
+      '       agntk -n <name> -i\n' +
         '       agntk -h',
     );
     process.exit(1);
