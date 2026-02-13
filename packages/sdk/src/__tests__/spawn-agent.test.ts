@@ -123,7 +123,7 @@ describe('createSpawnAgentTool', () => {
     expect(mockCreateAgent).toHaveBeenCalledWith(
       expect.objectContaining({
         role: 'coder',
-        maxSpawnDepth: 0, // Sub-agents should have depth 0
+        instructions: expect.any(String),
       })
     );
   });

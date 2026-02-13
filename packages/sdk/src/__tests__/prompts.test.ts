@@ -11,7 +11,7 @@ import {
 } from '../prompts/context';
 
 // systemPrompt / rolePrompts tests removed — prompts/templates.ts was deleted in Phase 4b.
-// Role prompts are now only in presets/roles.ts, tested via presets.test.ts.
+// Role presets were removed in the unified API refactor.
 
 describe('buildSystemContext', () => {
   it('should return context with required fields', async () => {

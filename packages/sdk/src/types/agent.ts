@@ -1,339 +1,105 @@
 /**
- * @fileoverview Core type definitions for AgentOptions and related configuration types.
- * These types define the interface for the createAgent() factory function.
+ * @fileoverview Core type definitions for the agent API.
+ *
+ * The agent is a fully-equipped worker. You give it a name, instructions,
+ * and a prompt. Everything else is auto-detected from the environment.
  */
 
-import type { LanguageModel, Tool, StepResult, ToolSet } from 'ai';
-import type { SkillsConfig } from '../skills/types';
+import type { LanguageModel, LanguageModelUsage, Tool } from 'ai';
 import type { UsageLimits } from '../usage-limits';
-import type { ReflectionConfig } from '../reflection';
-import type { ApprovalConfig } from '../tools/approval';
-import type { GuardrailsConfig } from '../guardrails/types';
-import type { StreamEvent, StreamEventCallback } from './streaming';
-import type { ObservabilityConfig } from '../observability/types';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Main AgentOptions Interface
+// AgentOptions
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Configuration options for creating an agent via createAgent().
+ * Configuration for creating an agent.
+ *
+ * Only `name` is required. Everything else has sensible defaults or
+ * is auto-detected from the environment.
  */
 export interface AgentOptions {
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Identity
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  /** System prompt/instructions for the agent. Overrides role-based defaults. */
-  systemPrompt?: string;
-
-  /** Context to prepend to the system prompt without overriding role defaults.
-   * Useful for injecting environment context (OS, shell, project type, etc.).
+  /**
+   * Display name for this agent.
+   * Used in logs, traces, multi-agent coordination, and persistent state.
+   * Persistent agent state is stored at `~/.agntk/agents/{name}/`.
    */
-  systemPromptPrefix?: string;
+  name: string;
 
-  /** Predefined role with associated system prompt and call options. */
-  role?: AgentRole;
+  /**
+   * What this agent does. Natural language context injected as the system prompt.
+   * This is NOT a role — it's the agent's understanding of its job.
+   */
+  instructions?: string;
 
-  /** Unique identifier for the agent instance. */
-  agentId?: string;
+  /**
+   * Where the agent operates. Root for file tools, skill discovery, memory.
+   * Default: process.cwd()
+   */
+  workspaceRoot?: string;
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Execution
-  // ─────────────────────────────────────────────────────────────────────────────
+  // ── Escape hatches (power users only) ──────────────────────────────
 
-  /** Maximum number of tool execution steps. Default: 10 */
+  /**
+   * Override the auto-selected model.
+   * Most users should never touch this — the agent picks the best
+   * available model from your API keys.
+   */
+  model?: LanguageModel;
+
+  /**
+   * Safety limit on tool-loop iterations. Default: 25
+   */
   maxSteps?: number;
 
-  /** Token and request caps. Throws UsageLimitExceeded when exceeded.
-   * @example
-   * ```typescript
-   * const agent = createAgent({
-   *   usageLimits: { maxRequests: 20, maxTotalTokens: 100_000 },
-   * });
-   * ```
+  /**
+   * Token/request caps. Throws UsageLimitExceeded when hit.
    */
   usageLimits?: UsageLimits;
 
-  /** Condition to stop agent execution. */
-  stopWhen?: 'task_complete' | 'max_steps' | StopFunction;
-
-  /** Reflection strategy injected between tool steps.
-   * 'reflact' injects goal-state reflection after every step.
-   * 'periodic' injects reflection every N steps (configurable via frequency).
-   * 'none' preserves default behavior (no reflection).
-   * @example
-   * ```typescript
-   * const agent = createAgent({
-   *   reflection: { strategy: 'reflact' },
-   * });
-   * ```
+  /**
+   * Additional tools to merge with the agent's built-in tools.
+   * Useful for testing with mock tools or adding custom capabilities.
    */
-  reflection?: ReflectionConfig;
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Model
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  /** Language model instance. Takes precedence over provider/name. */
-  model?: LanguageModel;
-
-  /** Model provider to use for automatic model resolution. */
-  modelProvider?: ModelProvider;
-
-  /** Model name/identifier within the provider. */
-  modelName?: string;
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Tools
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  /** Custom tools to add to the agent. Merged with preset tools. */
   tools?: Record<string, Tool>;
-
-  /** Predefined tool preset to use. Default: 'standard' */
-  toolPreset?: ToolPreset;
-
-  /** Specific tools to enable (whitelist). If set, only these tools are active. */
-  enableTools?: string[];
-
-  /** Specific tools to disable (blacklist). Removed from preset/custom tools. */
-  disableTools?: string[];
-
-  /** Maximum retries per tool when a ModelRetry error is thrown. Default: 3 */
-  maxToolRetries?: number;
-
-  /** Require human approval before executing dangerous tools.
-   * `true` enables approval for default dangerous tools (shell, browser, file_write, file_edit).
-   * Provide an ApprovalConfig object for fine-grained control.
-   * @example
-   * ```typescript
-   * const agent = createAgent({
-   *   approval: true, // enable for default dangerous tools
-   * });
-   * // or
-   * const agent = createAgent({
-   *   approval: { enabled: true, tools: ['shell'], timeout: 30000 },
-   * });
-   * ```
-   */
-  approval?: boolean | ApprovalConfig;
-
-  /** Guardrails for input/output validation.
-   * Input guardrails run before the agent; output guardrails run after.
-   * Both phases execute their guardrails in parallel with fast-fail.
-   * @example
-   * ```typescript
-   * const agent = createAgent({
-   *   guardrails: {
-   *     output: [contentFilter(), lengthLimit({ maxChars: 5000 })],
-   *     onBlock: 'retry',
-   *   },
-   * });
-   * ```
-   */
-  guardrails?: GuardrailsConfig;
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Sub-Agents
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  /** Enable spawn_agent tool for sub-agent delegation. Default: false */
-  enableSubAgents?: boolean;
-
-  /** Custom configurations for specific sub-agent roles. */
-  subAgentRoles?: Record<string, SubAgentConfig>;
-
-  /** Maximum depth of sub-agent spawning to prevent infinite recursion. Default: 2 */
-  maxSpawnDepth?: number;
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Streaming
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  /** Enable transient streaming for tool data (file contents, shell output, etc). Default: true */
-  enableTransientStreaming?: boolean;
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Workflow / Durability
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  /** Enable durable workflow wrapping for tool executions. Default: true */
-  durable?: boolean;
-
-  /** Configuration for workflow durability. */
-  workflowOptions?: WorkflowOptions;
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Memory
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  /** Enable persistent memory for the agent. Default: false
-   * When true, creates a MarkdownMemoryStore that reads/writes .agntk/ files.
-   * @example
-   * ```typescript
-   * const agent = createAgent({ enableMemory: true });
-   * ```
-   */
-  enableMemory?: boolean;
-
-  /** Configuration for memory system. */
-  memoryOptions?: MemoryOptions;
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Skills
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  /** Skills to inject into the agent's system prompt.
-   * Skills are discovered from SKILL.md files in configured directories.
-   * @example
-   * ```typescript
-   * const agent = createAgent({
-   *   skills: { directories: ['.agents/skills'] },
-   * });
-   * ```
-   */
-  skills?: SkillsConfig;
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Environment
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  /** Root directory for file operations. Used for path security. */
-  workspaceRoot?: string;
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Handlers / Callbacks
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  /** Handler for agent asking user questions. */
-  askUserHandler?: AskUserHandler;
-
-  /** Callback fired after each tool execution step. */
-  onStepFinish?: StepFinishCallback;
-
-  /** Callback for streaming events. */
-  onEvent?: StreamEventCallback;
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Telemetry / Observability
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  /** Telemetry configuration for OpenTelemetry-based tracing.
-   * When provided, initializes observability and passes telemetry settings
-   * to the underlying AI SDK ToolLoopAgent.
-   *
-   * Requires `langfuse-vercel` and `@vercel/otel` as optional peer dependencies.
-   * Gracefully degrades (no-op) if not installed.
-   *
-   * @example
-   * ```typescript
-   * const agent = createAgent({
-   *   telemetry: {
-   *     provider: { provider: 'langfuse' },
-   *     functionId: 'my-agent',
-   *   },
-   * });
-   * ```
-   */
-  telemetry?: {
-    /** Observability provider config (e.g., Langfuse keys/URL). */
-    provider?: ObservabilityConfig;
-    /** Identifier for this agent function in traces. Defaults to `agent:<agentId>`. */
-    functionId?: string;
-    /** Additional metadata to include in traces. */
-    metadata?: Record<string, unknown>;
-  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Supporting Types
+// Agent Instance
 // ═══════════════════════════════════════════════════════════════════════════════
-
-/** Predefined agent roles with associated configurations. */
-export type AgentRole = 'generic' | 'coder' | 'researcher' | 'analyst';
-
-/** Supported model providers. */
-export type ModelProvider = 'openrouter' | 'ollama' | 'openai' | (string & {});
-
-/** Predefined tool presets. */
-export type ToolPreset = 'none' | 'minimal' | 'standard' | 'full';
-
-/** Custom stop condition function. */
-export type StopFunction = (ctx: StopContext) => boolean;
-
-/** Context passed to stop condition function. */
-export interface StopContext {
-  steps: StepResult<ToolSet>[];
-  stepCount: number;
-}
-
-/** Handler for user interaction requests. */
-export type AskUserHandler = (question: string) => Promise<string>;
-
-/** Callback for step completion. */
-export type StepFinishCallback = (step: StepResult<ToolSet>, index: number) => void | Promise<void>;
 
 /**
- * Callback for streaming events.
- * Re-exported from types/streaming.ts — the canonical source with full type safety.
+ * An agent instance. Stream-only — no generate().
  */
-export type { StreamEvent, StreamEventCallback } from './streaming';
+export interface Agent {
+  /** The agent's name. */
+  readonly name: string;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-Agent Configuration
-// ─────────────────────────────────────────────────────────────────────────────
+  /** Initialize async resources (memory, telemetry). Called automatically by stream(). */
+  init(): Promise<void>;
 
-/** Configuration for a sub-agent role. */
-export interface SubAgentConfig {
-  /** Custom instructions for this sub-agent role. */
-  instructions?: string;
+  /**
+   * Stream a response. This is the only way to run an agent.
+   * Returns the AI SDK stream result.
+   */
+  stream(input: { prompt: string }): Promise<AgentStreamResult>;
 
-  /** Tools available to this sub-agent. */
-  tools?: string[];
+  /** Get the current system prompt (includes auto-injected context + memory). */
+  getSystemPrompt(): string;
 
-  /** Model name/identifier for this sub-agent. */
-  model?: string;
-
-  /** Maximum steps for the sub-agent. Default: 5 */
-  maxSteps?: number;
+  /** Get the list of all tool names available to this agent. */
+  getToolNames(): string[];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Workflow Configuration
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Configuration for workflow durability. */
-export interface WorkflowOptions {
-  /** Default retry count for failed tool executions. Default: 3 */
-  defaultRetryCount?: number;
-
-  /** Default timeout for tool executions. Format: "30s", "5m", "1h". Default: "5m" */
-  defaultTimeout?: string;
-
-  /** Whether independent tools should run in parallel. Default: true */
-  parallelIndependent?: boolean;
-
-  /** Storage backend for workflow state. Default: 'memory' */
-  storage?: 'vercel' | 'sqlite' | 'memory';
-
-  /** Workflow run ID for resumption. */
-  workflowRunId?: string;
+/**
+ * Stream result from an agent.
+ * Wraps the AI SDK ToolLoopAgent stream result with additional metadata.
+ */
+export interface AgentStreamResult {
+  /** Async iterable of stream chunks (text deltas, tool calls, tool results, etc.) */
+  fullStream: AsyncIterable<{ type: string; text?: string; [key: string]: unknown }>;
+  /** Promise-like that resolves to the final text output. */
+  text: PromiseLike<string>;
+  /** Promise-like that resolves to token usage. */
+  usage: PromiseLike<LanguageModelUsage>;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Memory Configuration
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Configuration for the markdown-based memory system. */
-export interface MemoryOptions {
-  /** Directory for project-local memory files. Default: '.agntk' */
-  projectDir?: string;
-
-  /** Directory for global (cross-project) memory files. Default: '~/.agntk' */
-  globalDir?: string;
-
-  /** Custom MemoryStore implementation. Overrides file-based defaults. */
-  store?: import('../memory/types').MemoryStore;
-}
-

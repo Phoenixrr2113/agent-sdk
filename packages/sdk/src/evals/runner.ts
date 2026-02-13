@@ -13,7 +13,7 @@ import type {
   EvalAgentResult,
   EvalReporter,
 } from './types';
-import type { Agent } from '../agent';
+import type { Agent } from '../types/agent';
 
 const log = createLogger('@agntk/core:evals');
 
@@ -122,22 +122,30 @@ async function runCase(
   try {
     // Run the agent with a timeout
     const timeout = evalCase.timeout ?? 30_000;
-    const agentResult = await Promise.race([
-      agent.generate({ prompt: evalCase.prompt }),
+    const streamResult = await Promise.race([
+      agent.stream({ prompt: evalCase.prompt }),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error(`Eval case timed out after ${timeout}ms`)), timeout),
       ),
     ]);
 
+    // Consume the stream to get the final text
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    for await (const _chunk of streamResult.fullStream) { /* drain */ }
+    const text = await streamResult.text;
+    const usage = await streamResult.usage;
+
     // Build eval result from agent result
     const evalResult: EvalAgentResult = {
-      text: agentResult.text ?? '',
-      steps: agentResult.steps ?? [],
-      totalUsage: agentResult.totalUsage ?? {
-        inputTokens: 0,
-        outputTokens: 0,
-        totalTokens: 0,
-      },
+      text: text ?? '',
+      steps: [],
+      totalUsage: usage
+        ? {
+            inputTokens: usage.inputTokens ?? 0,
+            outputTokens: usage.outputTokens ?? 0,
+            totalTokens: (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
+          }
+        : { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
     };
 
     // Run all assertions

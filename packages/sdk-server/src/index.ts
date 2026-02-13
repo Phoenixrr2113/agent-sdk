@@ -13,12 +13,11 @@ export {
   type AuthOptions,
 } from './middleware';
 
-export type { 
-  AgentServerOptions, 
+export type {
+  AgentServerOptions,
   AgentInstance,
   DurableAgentInstance,
   GenerateOptions,
-  GenerateResult,
   StreamResult,
   StreamChunk,
   UpgradeWebSocketFn,

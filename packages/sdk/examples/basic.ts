@@ -6,45 +6,36 @@
 import { createAgent } from '@agntk/core';
 
 async function main() {
-  // Create agent with standard tools
+  // Create agent with the unified API
   const agent = createAgent({
-    role: 'coder',
-    toolPreset: 'standard',
+    name: 'basic-example',
+    instructions: 'You are a helpful coding assistant.',
     workspaceRoot: process.cwd(),
     maxSteps: 20,
   });
 
-  // Simple generation
-  console.log('=== Simple Generation ===');
-  const result = await agent.generate({
+  // Streaming (primary API)
+  console.log('=== Streaming ===');
+  const result = await agent.stream({
     prompt: 'List the files in the current directory',
   });
-  console.log('Result:', result.text);
-  console.log('Steps:', result.steps.length);
 
-  // Streaming
-  console.log('\n=== Streaming ===');
-  const stream = agent.stream({
-    prompt: 'Read package.json and explain what this project does',
-  });
-
-  for await (const chunk of stream.fullStream) {
+  for await (const chunk of result.fullStream) {
     switch (chunk.type) {
       case 'text-delta':
-        process.stdout.write(chunk.textDelta);
+        process.stdout.write(chunk.text as string);
         break;
       case 'tool-call':
         console.log(`\n[Tool: ${chunk.toolName}]`);
         break;
-      case 'data-file-content':
-        console.log(`\n[File streamed: ${chunk.data.path}]`);
-        break;
     }
   }
 
-  // Get final result
-  const finalResult = await stream.finalResult;
-  console.log('\n\nFinal result received');
+  // Get final text and usage
+  const text = await result.text;
+  const usage = await result.usage;
+  console.log('\n\nFinal text length:', text.length);
+  console.log('Usage:', usage);
 }
 
 main().catch(console.error);

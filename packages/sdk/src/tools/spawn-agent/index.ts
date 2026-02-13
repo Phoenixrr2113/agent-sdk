@@ -22,14 +22,12 @@ export interface SpawnAgentOptions {
   currentDepth?: number;
 
   /**
-   * Agent factory function - must be provided to enable spawning
-   * This is called to create the sub-agent instance
+   * Agent factory function - must be provided to enable spawning.
+   * This is called to create the sub-agent instance.
    */
   createAgent?: (options: {
     role: string;
     instructions?: string;
-    tools?: string[];
-    maxSpawnDepth?: number;
   }) => {
     stream: (input: { prompt: string }) => {
       fullStream: AsyncIterable<{ type: string; text?: string }>;
@@ -143,8 +141,6 @@ async function executeSpawnAgent(
     const subAgent = createAgent({
       role,
       instructions: roleConfig.instructions,
-      tools: roleConfig.tools,
-      maxSpawnDepth: 0, // Sub-agents can't spawn further
     });
 
     const stream = subAgent.stream({ prompt: fullPrompt });

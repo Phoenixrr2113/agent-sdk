@@ -1,74 +1,53 @@
 /**
  * @fileoverview End-to-end tests for full agent lifecycle scenarios.
- * Tests complete workflows from agent creation through tool execution to final output.
+ * Tests complete workflows from agent creation through streaming to final output.
  * Uses MockLanguageModelV3 from ai/test per official AI SDK testing guidance.
  */
 
 import { describe, it, expect } from 'vitest';
-import { z } from 'zod';
-import { tool } from 'ai';
 import { createAgent } from '@agntk/core';
-import { contentFilter } from '@agntk/core/advanced';
-import { createMockModel, createMockToolModel } from './setup';
+import { createMockModel } from './setup';
 
 describe('E2E: Agent Lifecycle', () => {
-  describe('agent with guardrails and tools', () => {
-    it('should create agent, execute tools, apply guardrails, return safe output', async () => {
-      const model = createMockToolModel(
-        [{ id: 'call-1', name: 'get_data', args: { query: 'user info' } }],
-        'The user profile shows name: John, role: admin.',
-      );
-
-      const dataTool = tool({
-        description: 'Get data from database',
-        parameters: z.object({ query: z.string() }),
-        execute: async ({ query }) => ({
-          data: `Results for "${query}": name=John, role=admin`,
-        }),
-      });
-
+  describe('agent creation and streaming', () => {
+    it('should create agent with name and stream a response', async () => {
       const agent = createAgent({
-        model,
-        toolPreset: 'none',
-        tools: { get_data: dataTool },
+        name: 'lifecycle-agent',
+        model: createMockModel('The user profile shows name: John, role: admin.'),
+        instructions: 'You help with data lookups.',
         maxSteps: 3,
-        guardrails: {
-          output: [contentFilter()],
-          onBlock: 'filter',
-        },
       });
 
-      const result = await agent.generate({ prompt: 'Get user profile' });
+      expect(agent.name).toBe('lifecycle-agent');
 
-      // Output should be present and guardrails should have been applied
+      const result = await agent.stream({ prompt: 'Get user profile' });
       expect(result.text).toBeDefined();
-      expect(typeof result.text).toBe('string');
+      // Drain the stream before reading text
+      for await (const _chunk of result.fullStream) { /* drain */ }
+      const text = await result.text;
+      expect(typeof text).toBe('string');
     });
   });
 
-  describe('agent with custom system prompt and roles', () => {
-    it('should use coder role defaults', () => {
+  describe('agent with custom instructions', () => {
+    it('should include instructions in system prompt', () => {
       const agent = createAgent({
-        model: createMockModel('Here is the code...'),
-        role: 'coder',
-        toolPreset: 'none',
+        name: 'ts-expert',
+        model: createMockModel('TypeScript expert here.'),
+        instructions: 'You are a specialized TypeScript expert.',
       });
 
-      expect(agent.role).toBe('coder');
-      const systemPrompt = agent.getSystemPrompt();
-      expect(systemPrompt.length).toBeGreaterThan(0);
+      expect(agent.getSystemPrompt()).toContain('You are a specialized TypeScript expert.');
     });
 
-    it('should override role system prompt with custom one', () => {
-      const customPrompt = 'You are a specialized TypeScript expert.';
+    it('should include agent name in system prompt', () => {
       const agent = createAgent({
-        model: createMockModel('TypeScript expert here.'),
-        role: 'coder',
-        systemPrompt: customPrompt,
-        toolPreset: 'none',
+        name: 'code-reviewer',
+        model: createMockModel('Review output'),
+        instructions: 'You review code for best practices.',
       });
 
-      expect(agent.getSystemPrompt()).toContain(customPrompt);
+      expect(agent.getSystemPrompt()).toContain('code-reviewer');
     });
   });
 });

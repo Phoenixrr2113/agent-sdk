@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { StepResult, ToolSet } from 'ai';
 import type { EvalAgentResult, EvalReporter } from '../evals/types';
-import type { Agent } from '../agent';
+import type { Agent } from '../types/agent';
 
 vi.mock('@agntk/logger', () => ({
   createLogger: () => ({
@@ -62,18 +62,17 @@ function makeStep(toolCalls: Array<{ toolName: string }> = []): StepResult<ToolS
   } as unknown as StepResult<ToolSet>;
 }
 
-function createMockAgent(text = 'mock output', steps: StepResult<ToolSet>[] = []): Agent {
+function createMockAgent(text = 'mock output', _steps: StepResult<ToolSet>[] = []): Agent {
   return {
-    agentId: 'test-agent',
-    role: 'generic',
-    stream: vi.fn(),
-    generate: vi.fn().mockResolvedValue({
-      text,
-      steps,
-      totalUsage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+    name: 'test-agent',
+    init: vi.fn().mockResolvedValue(undefined),
+    stream: vi.fn().mockResolvedValue({
+      fullStream: (async function* () {})(),
+      text: Promise.resolve(text),
+      usage: Promise.resolve({ inputTokens: 100, outputTokens: 50, totalTokens: 150 }),
     }),
-    getToolLoopAgent: vi.fn(),
     getSystemPrompt: () => 'test prompt',
+    getToolNames: () => [],
   } as unknown as Agent;
 }
 
@@ -301,7 +300,7 @@ describe('createEvalSuite', () => {
 
   it('should handle agent errors gracefully', async () => {
     const agent = createMockAgent();
-    (agent.generate as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Model failed'));
+    (agent.stream as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Model failed'));
 
     const suite = createEvalSuite({
       name: 'error-suite',
@@ -323,12 +322,16 @@ describe('createEvalSuite', () => {
     let maxRunning = 0;
 
     const agent = createMockAgent();
-    (agent.generate as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+    (agent.stream as ReturnType<typeof vi.fn>).mockImplementation(async () => {
       running++;
       maxRunning = Math.max(maxRunning, running);
       await new Promise((r) => setTimeout(r, 50));
       running--;
-      return { text: 'ok', steps: [], totalUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } };
+      return {
+        fullStream: (async function* () {})(),
+        text: Promise.resolve('ok'),
+        usage: Promise.resolve({ inputTokens: 0, outputTokens: 0, totalTokens: 0 }),
+      };
     });
 
     const suite = createEvalSuite({
@@ -350,7 +353,7 @@ describe('createEvalSuite', () => {
 
   it('should handle timeout', async () => {
     const agent = createMockAgent();
-    (agent.generate as ReturnType<typeof vi.fn>).mockImplementation(
+    (agent.stream as ReturnType<typeof vi.fn>).mockImplementation(
       () => new Promise((r) => setTimeout(r, 5000)),
     );
 

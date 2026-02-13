@@ -4,7 +4,7 @@
  * Validates:
  * - MarkdownMemoryStore works end-to-end
  * - createMemoryTools produces usable tools
- * - createAgent with enableMemory: true includes memory tools
+ * - createAgent includes memory tools by default
  * - Memory context loading via loadMemoryContext
  */
 
@@ -21,7 +21,7 @@ import {
   createMemoryTools,
   createSearchSkillsTool,
   clearSkillsCache,
-} from '@agntk/core/tools';
+} from '@agntk/core/advanced';
 
 // ============================================================================
 // Helpers
@@ -165,31 +165,26 @@ describe('Memory', () => {
     });
   });
 
-  describe('createAgent with enableMemory', () => {
-    it('should create agent with memory tools', () => {
+  describe('createAgent (memory always on)', () => {
+    it('should create agent with memory tools included', () => {
       const agent = createAgent({
-        enableMemory: true,
-        memoryOptions: {
-          projectDir: join(workspaceDir, '.agntk'),
-          globalDir: join(globalDir, '.agntk'),
-        },
+        name: 'memory-test-agent',
         workspaceRoot: workspaceDir,
       });
 
       expect(agent).toBeDefined();
-      expect(agent.agentId).toBeDefined();
+      expect(agent.name).toBe('memory-test-agent');
       expect(typeof agent.init).toBe('function');
-      expect(typeof agent.generate).toBe('function');
       expect(typeof agent.stream).toBe('function');
+      // Memory tools should be included automatically
+      const toolNames = agent.getToolNames();
+      expect(toolNames).toContain('remember');
+      expect(toolNames).toContain('recall');
     });
 
     it('should have init method that resolves', async () => {
       const agent = createAgent({
-        enableMemory: true,
-        memoryOptions: {
-          projectDir: join(workspaceDir, '.agntk'),
-          globalDir: join(globalDir, '.agntk'),
-        },
+        name: 'memory-init-agent',
         workspaceRoot: workspaceDir,
       });
 

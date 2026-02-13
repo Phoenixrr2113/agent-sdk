@@ -196,17 +196,19 @@ describe('agent reflection integration', () => {
 
     // This should not throw
     const agent = createAgent({
+      name: 'reflection-test',
       reflection: { strategy: 'reflact' },
     });
 
     expect(agent).toBeDefined();
-    expect(agent.agentId).toBeDefined();
+    expect(agent.name).toBe('reflection-test');
   });
 
   it('should accept none strategy without error', async () => {
     const { createAgent } = await import('../agent');
 
     const agent = createAgent({
+      name: 'reflection-none-test',
       reflection: { strategy: 'none' },
     });
 
@@ -217,6 +219,7 @@ describe('agent reflection integration', () => {
     const { createAgent } = await import('../agent');
 
     const agent = createAgent({
+      name: 'reflection-periodic-test',
       reflection: { strategy: 'periodic', frequency: 5 },
     });
 

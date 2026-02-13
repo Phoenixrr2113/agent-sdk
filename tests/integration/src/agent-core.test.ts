@@ -8,86 +8,64 @@ import { createAgent } from '@agntk/core';
 import { createMockModel, createMockStreamModel } from './setup';
 
 describe('Agent Core', () => {
-  describe('createAgent + generate', () => {
-    it('should create an agent and generate a text response', async () => {
+  describe('createAgent + stream', () => {
+    it('should create an agent and stream a text response', async () => {
       const agent = createAgent({
+        name: 'core-test-agent',
         model: createMockModel('Hello from the agent!'),
-        systemPrompt: 'You are a helpful assistant.',
-        toolPreset: 'none',
+        instructions: 'You are a helpful assistant.',
         maxSteps: 1,
       });
 
-      const result = await agent.generate({ prompt: 'Say hello' });
-
-      expect(result.text).toBe('Hello from the agent!');
-      expect(result.steps).toBeDefined();
-      expect(Array.isArray(result.steps)).toBe(true);
+      const result = await agent.stream({ prompt: 'Say hello' });
+      // Drain the stream before reading text
+      for await (const _chunk of result.fullStream) { /* drain */ }
+      const text = await result.text;
+      expect(text).toBe('Hello from the agent!');
     });
 
-    it('should respect custom systemPrompt', async () => {
-      const customPrompt = 'You are a pirate assistant. Always say arrr.';
+    it('should include instructions in system prompt', () => {
+      const instructions = 'You are a pirate assistant. Always say arrr.';
       const agent = createAgent({
+        name: 'pirate-agent',
         model: createMockModel('Arrr, hello matey!'),
-        systemPrompt: customPrompt,
-        toolPreset: 'none',
+        instructions,
         maxSteps: 1,
       });
 
-      expect(agent.getSystemPrompt()).toContain(customPrompt);
-
-
-      const result = await agent.generate({ prompt: 'Greet me' });
-      expect(result.text).toBe('Arrr, hello matey!');
+      expect(agent.getSystemPrompt()).toContain(instructions);
     });
 
-    it('should have a unique agentId', () => {
+    it('should have unique names', () => {
       const agent1 = createAgent({
+        name: 'agent-alpha',
         model: createMockModel('a'),
-        toolPreset: 'none',
       });
       const agent2 = createAgent({
+        name: 'agent-beta',
         model: createMockModel('b'),
-        toolPreset: 'none',
       });
 
-      expect(agent1.agentId).toBeDefined();
-      expect(agent2.agentId).toBeDefined();
-      expect(agent1.agentId).not.toBe(agent2.agentId);
-    });
-
-    it('should accept a custom agentId', () => {
-      const agent = createAgent({
-        model: createMockModel('test'),
-        agentId: 'custom-id-123',
-        toolPreset: 'none',
-      });
-
-      expect(agent.agentId).toBe('custom-id-123');
-    });
-
-    it('should default role to generic', () => {
-      const agent = createAgent({
-        model: createMockModel('test'),
-        toolPreset: 'none',
-      });
-
-      expect(agent.role).toBe('generic');
+      expect(agent1.name).toBe('agent-alpha');
+      expect(agent2.name).toBe('agent-beta');
+      expect(agent1.name).not.toBe(agent2.name);
     });
   });
 
-  describe('createAgent + stream', () => {
+  describe('streaming interface', () => {
     it('should return a stream result from the agent', async () => {
       const agent = createAgent({
+        name: 'stream-test-agent',
         model: createMockStreamModel('Hello world from streaming'),
-        systemPrompt: 'You are a helpful assistant.',
-        toolPreset: 'none',
+        instructions: 'You are a helpful assistant.',
         maxSteps: 1,
       });
 
-      // Verify the stream method exists and returns a result
       expect(typeof agent.stream).toBe('function');
-      const stream = agent.stream({ prompt: 'Say hello' });
-      expect(stream).toBeDefined();
+      const result = await agent.stream({ prompt: 'Say hello' });
+      expect(result).toBeDefined();
+      expect(result.fullStream).toBeDefined();
+      expect(result.text).toBeDefined();
     });
   });
 });

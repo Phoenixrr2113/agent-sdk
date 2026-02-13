@@ -25,7 +25,7 @@ import {
   formatDuration,
   _resetWorkflowCache,
 } from '../workflow/utils';
-import type { Agent } from '../agent';
+import type { Agent } from '../types/agent';
 import type { Tool } from 'ai';
 
 // ============================================================================
@@ -42,16 +42,15 @@ function createMockTool(name: string): Tool {
 
 function createMockAgent(overrides: Partial<Agent> = {}): Agent {
   return {
-    agentId: 'test-agent-001',
-    role: 'generic',
-    stream: vi.fn().mockReturnValue(Promise.resolve({ fullStream: (async function* () { })(), text: 'streamed text' })),
-    generate: vi.fn().mockResolvedValue({
-      text: 'generated text',
-      totalUsage: { inputTokens: 10, outputTokens: 20, totalTokens: 30 },
-      steps: [],
+    name: 'test-agent-001',
+    init: vi.fn().mockResolvedValue(undefined),
+    stream: vi.fn().mockResolvedValue({
+      fullStream: (async function* () {})(),
+      text: Promise.resolve('streamed text'),
+      usage: Promise.resolve({ inputTokens: 10, outputTokens: 20, totalTokens: 30 }),
     }),
-    getToolLoopAgent: vi.fn().mockReturnValue({}),
     getSystemPrompt: vi.fn().mockReturnValue('You are a test agent.'),
+    getToolNames: vi.fn().mockReturnValue([]),
     ...overrides,
   } as Agent;
 }

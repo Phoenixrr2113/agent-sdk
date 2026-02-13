@@ -41,9 +41,9 @@ describe('E2E: Server + Client with Tools', () => {
     );
 
     const agent = createAgent({
+      name: 'e2e-calculator-agent',
       model,
-      systemPrompt: 'You are a calculator assistant.',
-      toolPreset: 'none',
+      instructions: 'You are a calculator assistant.',
       tools: { calculator: calculatorTool },
       maxSteps: 3,
     });
@@ -127,9 +127,9 @@ describe('E2E: Server with streaming-only agent', () => {
 
   beforeAll(() => {
     const agent = createAgent({
+      name: 'e2e-stream-agent',
       model: createMockStreamModel('Streaming response from the server agent'),
-      systemPrompt: 'You are a streaming test agent.',
-      toolPreset: 'none',
+      instructions: 'You are a streaming test agent.',
       maxSteps: 1,
     });
 

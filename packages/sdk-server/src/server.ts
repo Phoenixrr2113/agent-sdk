@@ -31,7 +31,7 @@ export interface AgentServer {
  * import { createAgentServer } from '@agntk/server';
  * import { createAgent } from '@agntk/core';
  * 
- * const agent = createAgent({ role: 'coder' });
+ * const agent = createAgent({ name: 'my-agent', instructions: 'You are a helpful coding assistant.' });
  * const server = createAgentServer({ agent, port: 3001 });
  * server.start();
  * ```
@@ -89,12 +89,11 @@ export function createAgentServer(options: AgentServerOptions = {}): AgentServer
  * ```typescript
  * import { quickStart } from '@agntk/server';
  * 
- * quickStart({ port: 3001, role: 'researcher' });
+ * quickStart({ port: 3001 });
  * ```
  */
 export async function quickStart(options: {
   port?: number;
-  role?: 'generic' | 'coder' | 'researcher' | 'analyst';
   workspaceRoot?: string;
 } = {}) {
   log.info('quickStart called', { options });

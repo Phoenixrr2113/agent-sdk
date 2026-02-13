@@ -1,10 +1,11 @@
 /**
- * @fileoverview Tests for createAgent — role-based creation, preset selection, memory toggle.
+ * @fileoverview Tests for createAgent — the unified, zero-config agent factory.
  * Uses MockLanguageModelV3 from ai/test per official AI SDK testing guidance.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MockLanguageModelV3 } from 'ai/test';
+import { simulateReadableStream } from 'ai';
 import type { LanguageModel } from 'ai';
 
 // Mock internal dependencies (NOT 'ai' itself)
@@ -28,8 +29,7 @@ vi.mock('@agntk/logger', () => ({
 }));
 
 vi.mock('../models', () => ({
-  resolveModel: (opts: Record<string, unknown>) => {
-    // Return a real MockLanguageModelV3 so ToolLoopAgent works
+  resolveModel: () => {
     return new MockLanguageModelV3({
       doGenerate: async () => ({
         content: [{ type: 'text' as const, text: 'mock response' }],
@@ -40,27 +40,31 @@ vi.mock('../models', () => ({
         },
         warnings: [],
       }),
+      doStream: async () => ({
+        stream: simulateReadableStream({
+          chunks: [
+            { type: 'text-start' as const, id: 'text-1' },
+            { type: 'text-delta' as const, id: 'text-1', delta: 'mock response' },
+            { type: 'text-end' as const, id: 'text-1' },
+            {
+              type: 'finish' as const,
+              finishReason: { unified: 'stop' as const, raw: undefined },
+              logprobs: undefined,
+              usage: {
+                inputTokens: { total: 10 },
+                outputTokens: { total: 20, text: 20, reasoning: 0 },
+              },
+            },
+          ],
+        }),
+      }),
     }) as unknown as LanguageModel;
-  },
-}));
-
-vi.mock('../presets/role-registry', () => ({
-  getRole: (name: string) => {
-    const roles: Record<string, { systemPrompt: string; recommendedModel: string }> = {
-      generic: { systemPrompt: 'You are a generic agent.', recommendedModel: 'standard' },
-      coder: { systemPrompt: 'You are a coder agent.', recommendedModel: 'powerful' },
-      researcher: { systemPrompt: 'You are a researcher.', recommendedModel: 'standard' },
-      analyst: { systemPrompt: 'You are an analyst.', recommendedModel: 'standard' },
-    };
-    return roles[name] ?? roles.generic;
   },
 }));
 
 vi.mock('../presets/tools', () => ({
   createToolPreset: (preset: string, _options?: Record<string, unknown>) => {
     if (preset === 'none') return {};
-    if (preset === 'minimal') return { glob: { description: 'glob' } };
-    if (preset === 'standard') return { glob: { description: 'glob' }, grep: { description: 'grep' }, shell: { description: 'shell' } };
     if (preset === 'full') return { glob: { description: 'glob' }, grep: { description: 'grep' }, shell: { description: 'shell' }, ast_grep_search: { description: 'ast' } };
     throw new Error(`Unknown tool preset: ${preset}`);
   },
@@ -75,12 +79,18 @@ vi.mock('../tools/model-retry', () => ({
 }));
 
 vi.mock('../skills', () => ({
-  loadSkills: () => [],
+  discoverSkills: () => [],
+  filterEligibleSkills: () => [],
+  loadSkillContent: (s: unknown) => s,
   buildSkillsSystemPrompt: () => '',
 }));
 
 vi.mock('../workflow/utils', () => ({
   checkWorkflowAvailability: async () => false,
+}));
+
+vi.mock('../workflow/durable-tool', () => ({
+  wrapToolsAsDurable: (tools: Record<string, unknown>) => tools,
 }));
 
 vi.mock('../observability', () => ({
@@ -92,9 +102,40 @@ vi.mock('../observability', () => ({
   })),
 }));
 
+vi.mock('../reflection', () => ({
+  createReflectionPrepareStep: () => undefined,
+}));
+
+vi.mock('../guardrails/built-ins', () => ({
+  contentFilter: () => ({ name: 'content-filter', check: async () => ({ passed: true, name: 'content-filter' }) }),
+}));
+
+vi.mock('../guardrails/runner', () => ({
+  runGuardrails: async () => ({ results: [], filteredText: '' }),
+  handleGuardrailResults: () => ({ blocked: false, text: '' }),
+}));
+
+vi.mock('../memory/store', () => ({
+  MarkdownMemoryStore: vi.fn().mockImplementation(() => ({
+    getProjectPath: () => '/tmp/test',
+    getGlobalPath: () => '/tmp/test-global',
+  })),
+}));
+
+vi.mock('../memory/loader', () => ({
+  loadMemoryContext: async () => null,
+}));
+
+vi.mock('../memory/tools', () => ({
+  createMemoryTools: () => ({}),
+}));
+
+vi.mock('../prompts/context', () => ({
+  buildDynamicSystemPrompt: async (prompt: string) => prompt,
+}));
+
 // --- Import after mocks ---
 import { createAgent } from '../agent';
-import { initObservability, createTelemetrySettings } from '../observability';
 
 /**
  * Helper: create a MockLanguageModelV3 for passing directly as `model` option.
@@ -110,6 +151,24 @@ function createTestModel(text = 'test response'): LanguageModel {
       },
       warnings: [],
     }),
+    doStream: async () => ({
+      stream: simulateReadableStream({
+        chunks: [
+          { type: 'text-start' as const, id: 'text-1' },
+          { type: 'text-delta' as const, id: 'text-1', delta: text },
+          { type: 'text-end' as const, id: 'text-1' },
+          {
+            type: 'finish' as const,
+            finishReason: { unified: 'stop' as const, raw: undefined },
+            logprobs: undefined,
+            usage: {
+              inputTokens: { total: 10 },
+              outputTokens: { total: 20, text: 20, reasoning: 0 },
+            },
+          },
+        ],
+      }),
+    }),
   }) as unknown as LanguageModel;
 }
 
@@ -118,215 +177,104 @@ describe('createAgent', () => {
     vi.clearAllMocks();
   });
 
-  describe('role-based creation', () => {
-    it('should create agent with default generic role', () => {
-      const agent = createAgent();
-      expect(agent.role).toBe('generic');
-      expect(agent.agentId).toBeDefined();
+  describe('basic creation', () => {
+    it('should create agent with just a name', () => {
+      const agent = createAgent({ name: 'test-agent' });
+      expect(agent.name).toBe('test-agent');
     });
 
-    it('should create agent with coder role', () => {
-      const agent = createAgent({ role: 'coder' });
-      expect(agent.role).toBe('coder');
-      expect(agent.getSystemPrompt()).toBe('You are a coder agent.');
-    });
-
-    it('should create agent with researcher role', () => {
-      const agent = createAgent({ role: 'researcher' });
-      expect(agent.role).toBe('researcher');
-      expect(agent.getSystemPrompt()).toBe('You are a researcher.');
-    });
-
-    it('should create agent with analyst role', () => {
-      const agent = createAgent({ role: 'analyst' });
-      expect(agent.role).toBe('analyst');
-      expect(agent.getSystemPrompt()).toBe('You are an analyst.');
-    });
-
-    it('should use custom systemPrompt over role default', () => {
+    it('should create agent with name and instructions', () => {
       const agent = createAgent({
-        role: 'coder',
-        systemPrompt: 'Custom instructions here.',
+        name: 'deploy-bot',
+        instructions: 'You manage deployments for our k8s cluster.',
       });
-      expect(agent.getSystemPrompt()).toBe('Custom instructions here.');
-    });
-  });
-
-  describe('preset selection', () => {
-    it('should use standard preset by default', () => {
-      const agent = createAgent();
-      expect(agent.getToolLoopAgent()).toBeDefined();
+      expect(agent.name).toBe('deploy-bot');
+      expect(agent.getSystemPrompt()).toContain('deploy-bot');
+      expect(agent.getSystemPrompt()).toContain('You manage deployments');
     });
 
-    it('should pass toolPreset through to createToolPreset', () => {
-      const agent = createAgent({ toolPreset: 'none' });
-      expect(agent.getToolLoopAgent()).toBeDefined();
-    });
-
-    it('should merge custom tools with preset', () => {
-      const customTool = { description: 'my custom tool' };
+    it('should include instructions in system prompt', () => {
       const agent = createAgent({
-        toolPreset: 'none',
-        tools: { myTool: customTool } as Record<string, unknown> as Record<string, import('ai').Tool>,
+        name: 'my-agent',
+        instructions: 'Custom instructions here.',
       });
-      expect(agent.getToolLoopAgent()).toBeDefined();
-    });
-
-    it('should filter tools with enableTools', () => {
-      const agent = createAgent({
-        toolPreset: 'standard',
-        enableTools: ['glob'],
-      });
-      expect(agent.getToolLoopAgent()).toBeDefined();
-    });
-
-    it('should remove tools with disableTools', () => {
-      const agent = createAgent({
-        toolPreset: 'standard',
-        disableTools: ['shell'],
-      });
-      expect(agent.getToolLoopAgent()).toBeDefined();
-    });
-  });
-
-  describe('sub-agents', () => {
-    it('should add spawn_agent tool when enableSubAgents is true', () => {
-      const agent = createAgent({ enableSubAgents: true });
-      expect(agent.getToolLoopAgent()).toBeDefined();
-    });
-  });
-
-  describe('brain integration', () => {
-    it('should add brain tools when brain instance is provided', () => {
-      const mockBrain = {
-        query: vi.fn().mockResolvedValue([]),
-        remember: vi.fn().mockResolvedValue(undefined),
-        recall: vi.fn().mockResolvedValue([]),
-        extract: vi.fn().mockResolvedValue({}),
-        close: vi.fn().mockResolvedValue(undefined),
-      };
-
-      const agent = createAgent({ brain: mockBrain });
-      expect(agent.getToolLoopAgent()).toBeDefined();
+      expect(agent.getSystemPrompt()).toContain('Custom instructions here.');
     });
   });
 
   describe('agent interface', () => {
-    it('should expose agentId, role, getToolLoopAgent, getSystemPrompt', () => {
-      const agent = createAgent({ role: 'coder' });
-      expect(agent.agentId).toBeDefined();
-      expect(agent.role).toBe('coder');
-      expect(typeof agent.getToolLoopAgent).toBe('function');
-      expect(typeof agent.getSystemPrompt).toBe('function');
+    it('should expose name, init, stream, getSystemPrompt, getToolNames', () => {
+      const agent = createAgent({ name: 'test-agent' });
+      expect(agent.name).toBe('test-agent');
+      expect(typeof agent.init).toBe('function');
       expect(typeof agent.stream).toBe('function');
-      expect(typeof agent.generate).toBe('function');
+      expect(typeof agent.getSystemPrompt).toBe('function');
+      expect(typeof agent.getToolNames).toBe('function');
     });
 
-    it('should call generate on the underlying ToolLoopAgent', async () => {
+    it('should return tool names', () => {
+      const agent = createAgent({ name: 'test-agent' });
+      const toolNames = agent.getToolNames();
+      expect(Array.isArray(toolNames)).toBe(true);
+      // Should have at least spawn_agent from the mock
+      expect(toolNames).toContain('spawn_agent');
+    });
+  });
+
+  describe('custom tools', () => {
+    it('should merge custom tools with built-in tools', () => {
+      const customTool = { description: 'my custom tool' };
       const agent = createAgent({
-        model: createTestModel('response to: hello'),
-        toolPreset: 'none',
-        maxSteps: 1,
+        name: 'test-agent',
+        tools: { myTool: customTool } as Record<string, unknown> as Record<string, import('ai').Tool>,
       });
-      const result = await agent.generate({ prompt: 'hello' });
-      expect(result.text).toBe('response to: hello');
+      expect(agent.getToolNames()).toContain('myTool');
+    });
+  });
+
+  describe('model override', () => {
+    it('should accept explicit model', () => {
+      const model = createTestModel('custom model response');
+      const agent = createAgent({
+        name: 'test-agent',
+        model,
+      });
+      expect(agent).toBeDefined();
     });
   });
 
   describe('maxSteps', () => {
-    it('should default maxSteps to 10', () => {
-      const agent = createAgent();
-      const tla = agent.getToolLoopAgent();
-      expect(tla).toBeDefined();
-    });
-
     it('should accept custom maxSteps', () => {
-      const agent = createAgent({ maxSteps: 25 });
-      const tla = agent.getToolLoopAgent();
-      expect(tla).toBeDefined();
+      const agent = createAgent({ name: 'test-agent', maxSteps: 50 });
+      expect(agent).toBeDefined();
     });
   });
 
   describe('usageLimits', () => {
     it('should accept usageLimits without error', () => {
       const agent = createAgent({
+        name: 'test-agent',
         usageLimits: { maxRequests: 20, maxTotalTokens: 100_000 },
       });
       expect(agent).toBeDefined();
-      expect(agent.getToolLoopAgent()).toBeDefined();
     });
+  });
 
-    it('should create agent with usage limits configured', () => {
+  describe('streaming', () => {
+    it('should call stream and return result', async () => {
       const agent = createAgent({
-        usageLimits: { maxRequests: 5 },
+        name: 'test-agent',
+        model: createTestModel('stream response'),
+        maxSteps: 1,
       });
-      expect(agent.getToolLoopAgent()).toBeDefined();
-    });
 
-    it('should create agent without usage limits', () => {
-      const agent = createAgent();
-      expect(agent.getToolLoopAgent()).toBeDefined();
+      const result = await agent.stream({ prompt: 'hello' });
+      expect(result.fullStream).toBeDefined();
+      expect(result.text).toBeDefined();
+      expect(result.usage).toBeDefined();
+
+      const text = await result.text;
+      expect(text).toBe('stream response');
     });
   });
 });
-
-describe('telemetry integration', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should create agent with telemetry settings when telemetry provided', () => {
-    const agent = createAgent({
-      telemetry: {
-        functionId: 'my-agent',
-        metadata: { env: 'test' },
-      },
-    });
-
-    expect(agent).toBeDefined();
-    expect(agent.getToolLoopAgent()).toBeDefined();
-
-    // Verify createTelemetrySettings was called with the right args
-    expect(vi.mocked(createTelemetrySettings)).toHaveBeenCalledWith({
-      functionId: 'my-agent',
-      metadata: { env: 'test' },
-    });
-  });
-
-  it('should default functionId to agent:<agentId> when not provided', () => {
-    const agent = createAgent({
-      agentId: 'test-id-42',
-      telemetry: {},
-    });
-
-    expect(agent).toBeDefined();
-    expect(vi.mocked(createTelemetrySettings)).toHaveBeenCalledWith({
-      functionId: 'agent:test-id-42',
-      metadata: undefined,
-    });
-  });
-
-  it('should not call createTelemetrySettings when telemetry is not provided', () => {
-    createAgent();
-    expect(vi.mocked(createTelemetrySettings)).not.toHaveBeenCalled();
-  });
-
-  it('should call initObservability lazily on first generate()', async () => {
-    const agent = createAgent({
-      model: createTestModel('ok'),
-      toolPreset: 'none',
-      maxSteps: 1,
-      telemetry: {
-        provider: { provider: 'langfuse' },
-      },
-    });
-
-    // Not called at creation time
-    expect(vi.mocked(initObservability)).not.toHaveBeenCalled();
-
-    // Called on first generate()
-    await agent.generate({ prompt: 'test' });
-    expect(vi.mocked(initObservability)).toHaveBeenCalledWith({ provider: 'langfuse' });
-  });
-});
-

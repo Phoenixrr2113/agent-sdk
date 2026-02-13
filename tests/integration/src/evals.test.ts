@@ -30,13 +30,13 @@ describe('Evaluation Framework', () => {
     });
 
     it('stepCount should check number of steps', () => {
-      const assertion = stepCount({ max: 5 });
+      const assertion = stepCount(1, 5);
       expect(assertion).toBeDefined();
       expect(assertion.name).toContain('stepCount');
     });
 
     it('tokenUsage should check token limits', () => {
-      const assertion = tokenUsage({ maxTotalTokens: 1000 });
+      const assertion = tokenUsage(1000);
       expect(assertion).toBeDefined();
       expect(assertion.name).toContain('tokenUsage');
     });
@@ -45,8 +45,8 @@ describe('Evaluation Framework', () => {
   describe('createEvalSuite', () => {
     it('should create an eval suite configuration', () => {
       const agent = createAgent({
+        name: 'eval-suite-test',
         model: createMockModel('test'),
-        toolPreset: 'none',
         maxSteps: 1,
       });
 
@@ -69,8 +69,8 @@ describe('Evaluation Framework', () => {
 
     it('should run eval cases against the configured agent', async () => {
       const agent = createAgent({
+        name: 'eval-run-test',
         model: createMockModel('Hello, world! The answer is 42.'),
-        toolPreset: 'none',
         maxSteps: 1,
       });
 
@@ -105,8 +105,8 @@ describe('Evaluation Framework', () => {
 
     it('should report failures when assertions do not match', async () => {
       const agent = createAgent({
+        name: 'eval-fail-test',
         model: createMockModel('No greeting here'),
-        toolPreset: 'none',
         maxSteps: 1,
       });
 
@@ -134,12 +134,12 @@ describe('Evaluation Framework', () => {
   describe('eval suite metrics', () => {
     it('should track pass/fail counts', async () => {
       const agent = createAgent({
+        name: 'eval-metrics-test',
         model: createMockMultiModel([
           'Hello world',
           'The answer is 42',
           'Goodbye universe',
         ]),
-        toolPreset: 'none',
         maxSteps: 1,
       });
 

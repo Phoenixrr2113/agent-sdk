@@ -1,65 +1,76 @@
 /**
- * @fileoverview Workflow integration example.
- * Demonstrates durable, resumable agent execution.
+ * @fileoverview Streaming agent example.
+ * Demonstrates the stream-only API with various use cases.
  */
 
 import { createAgent } from '@agntk/core';
-// import { createDurableAgent } from '@agntk/core/workflow';
 
-async function basicWorkflow() {
-  // Standard agent with durability enabled
+async function basicStream() {
   const agent = createAgent({
-    role: 'coder',
-    toolPreset: 'standard',
-    durable: true,
+    name: 'stream-example',
+    instructions: 'You are a helpful coding assistant.',
     workspaceRoot: process.cwd(),
-    workflowOptions: {
-      enabled: true,
-      // Tools marked as durable will be wrapped in workflow steps
-    },
   });
 
-  // When durable is true:
-  // - Tool executions are wrapped in workflow "use step" directives
-  // - Execution can resume from checkpoints on failure
-  // - Results are persisted for crash recovery
-
-  const result = await agent.generate({
-    prompt: 'Refactor the utils.ts file to use async/await',
+  // Stream a simple task
+  const result = await agent.stream({
+    prompt: 'Explain what this project does based on the package.json',
   });
 
-  console.log('Completed with durability');
-  console.log('Steps executed:', result.steps.length);
+  // Process stream chunks
+  for await (const chunk of result.fullStream) {
+    switch (chunk.type) {
+      case 'text-delta':
+        process.stdout.write(chunk.text as string);
+        break;
+      case 'tool-call':
+        console.log(`\n[Tool call: ${chunk.toolName}]`);
+        break;
+      case 'tool-result':
+        console.log(`[Tool result received]`);
+        break;
+    }
+  }
+
+  // Access final results
+  const text = await result.text;
+  const usage = await result.usage;
+  console.log('\n\nCompleted.');
+  console.log('Response length:', text.length);
+  console.log('Usage:', usage);
 }
 
-async function checkpointExample() {
-  // Example: Custom checkpoint handling
+async function multiStepStream() {
   const agent = createAgent({
-    role: 'coder',
-    durable: true,
-    workflowOptions: {
-      enabled: true,
-      onCheckpoint: async (stepId, state) => {
-        console.log(`Checkpoint: Step ${stepId}`);
-        // Custom persistence logic here
-      },
-      onResume: async (stepId) => {
-        console.log(`Resuming from step ${stepId}`);
-        // Return persisted state if available
-        return null;
-      },
-    },
+    name: 'multi-step-example',
+    instructions: 'You are a thorough code reviewer. Read files carefully before providing feedback.',
+    workspaceRoot: process.cwd(),
+    maxSteps: 30,
   });
 
-  await agent.generate({ prompt: 'Complex multi-step task...' });
+  const result = await agent.stream({
+    prompt: 'Read the main source files and suggest improvements',
+  });
+
+  let stepCount = 0;
+  for await (const chunk of result.fullStream) {
+    if (chunk.type === 'text-delta') {
+      process.stdout.write(chunk.text as string);
+    } else if (chunk.type === 'tool-call') {
+      stepCount++;
+      console.log(`\n[Step ${stepCount}: ${chunk.toolName}]`);
+    }
+  }
+
+  console.log(`\n\nTotal tool calls: ${stepCount}`);
 }
 
 async function main() {
-  console.log('=== Basic Workflow ===');
-  await basicWorkflow();
+  console.log('=== Basic Streaming ===');
+  await basicStream();
 
-  console.log('\n=== Checkpoint Example ===');
-  await checkpointExample();
+  console.log('\n\n=== Multi-step Streaming ===');
+  await multiStepStream();
 }
 
 main().catch(console.error);

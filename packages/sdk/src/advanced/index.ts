@@ -92,6 +92,46 @@ export { buildSystemContext, formatSystemContextBlock, buildDynamicSystemPrompt 
 export type { SystemContext } from '../prompts/context';
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Workflow Hooks & Durability
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export {
+  defineHook,
+  createWebhook,
+  resumeHook,
+  sleep,
+  getHookRegistry,
+  HookRegistry,
+  HookNotFoundError,
+  HookNotPendingError,
+  HookRejectedError,
+  FatalError,
+  RetryableError,
+} from '../workflow/hooks';
+export type {
+  Hook,
+  HookDefinition,
+  HookInstance,
+  HookStatus,
+  WebhookOptions,
+  WebhookResult,
+  SleepOptions,
+} from '../workflow/hooks';
+
+export {
+  wrapToolAsDurableStep,
+  wrapToolsAsDurable,
+  wrapSelectedToolsAsDurable,
+} from '../workflow/durable-tool';
+export type { DurabilityConfig } from '../workflow/durable-tool';
+
+export {
+  checkWorkflowAvailability,
+  parseDuration,
+  formatDuration,
+} from '../workflow/utils';
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Sub-Agent Configs
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -116,5 +156,19 @@ export type { SkillSearchResult } from '../skills';
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export type { UsageSnapshot } from '../usage-limits';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Memory Tools
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export { createMemoryTools } from '../memory/tools';
+export type { MemoryToolsOptions } from '../memory/tools';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Search Skills Tool
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export { createSearchSkillsTool, clearSkillsCache } from '../tools/search-skills';
+export type { SearchSkillsToolConfig } from '../tools/search-skills';
 
 // Pool (SpecialistPool) — removed: replaced by spawn-agent tool

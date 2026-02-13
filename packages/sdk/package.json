@@ -11,16 +11,6 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
-    "./workflow": {
-      "types": "./dist/workflow/index.d.ts",
-      "import": "./dist/workflow/index.js",
-      "default": "./dist/workflow/index.js"
-    },
-    "./tools": {
-      "types": "./dist/tools/index.d.ts",
-      "import": "./dist/tools/index.js",
-      "default": "./dist/tools/index.js"
-    },
     "./evals": {
       "types": "./dist/evals/index.d.ts",
       "import": "./dist/evals/index.js",
@@ -52,7 +42,7 @@
     "vitest": "^3.2.3"
   },
   "peerDependencies": {
-    "@vercel/otel": "*",
+    "@opentelemetry/sdk-trace-node": "*",
     "agent-browser": "*",
     "langfuse-vercel": "*",
     "workflow": "*"
@@ -64,7 +54,7 @@
     "langfuse-vercel": {
       "optional": true
     },
-    "@vercel/otel": {
+    "@opentelemetry/sdk-trace-node": {
       "optional": true
     },
     "agent-browser": {

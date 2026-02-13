@@ -11,7 +11,7 @@ import { createLoggingMiddleware, createRateLimitMiddleware, createAuthMiddlewar
 import { ConcurrencyQueue, QueueFullError, QueueTimeoutError } from './queue';
 import { StreamEventBuffer } from './stream-buffer';
 import type { AgentServerOptions, DurableAgentInstance } from './types';
-import { getHookRegistry, HookNotFoundError, HookNotPendingError } from '@agntk/core/workflow';
+import { getHookRegistry, HookNotFoundError, HookNotPendingError } from '@agntk/core/advanced';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -34,8 +34,6 @@ interface GenerateRequest {
   options?: {
     userId?: string;
     sessionId?: string;
-    complexity?: 'simple' | 'complex';
-    role?: 'coder' | 'researcher' | 'analyst';
     enabledTools?: string[];
     workspaceRoot?: string;
   };
@@ -112,13 +110,13 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
   // Status endpoint - agent info
   app.get('/status', (c) => {
     const agent = serverOptions.agent as {
-      role?: string;
+      name?: string;
       tools?: { name: string }[];
       model?: string;
     } | undefined;
 
     return c.json({
-      role: agent?.role ?? 'unknown',
+      name: agent?.name ?? 'unknown',
       tools: agent?.tools?.map(t => t.name) ?? [],
       model: agent?.model ?? 'unknown',
       version: '0.1.0',
@@ -219,19 +217,26 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
         }
       }
 
-      const agentInstance = agent as { 
-        generate: (opts: { prompt: string; options?: unknown }) => Promise<{ text: string; steps: unknown[] }>;
+      const agentInstance = agent as {
+        stream: (opts: { prompt: string; options?: unknown }) => Promise<{
+          fullStream: AsyncIterable<{ type: string; [key: string]: unknown }>;
+          text: Promise<string>;
+          usage: Promise<unknown>;
+        }>;
       };
 
       try {
-        const result = await agentInstance.generate({
+        const result = await agentInstance.stream({
           prompt,
           options: body.options,
         });
 
+        // Drain the stream to completion
+        for await (const _chunk of result.fullStream) { /* drain */ }
+        const text = await result.text;
+
         return c.json({
-          text: result.text,
-          steps: result.steps?.length ?? 0,
+          text,
           success: true,
         });
       } finally {
@@ -302,7 +307,11 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
       const runId = isDurable ? (durableAgent.workflowRunId ?? crypto.randomUUID()) : undefined;
 
       const agentInstance = agent as {
-        generate: (opts: { prompt: string; options?: unknown }) => Promise<{ text: string; steps?: unknown[] }>;
+        stream: (opts: { prompt: string; options?: unknown }) => Promise<{
+          fullStream: AsyncIterable<{ type: string; [key: string]: unknown }>;
+          text: Promise<string>;
+          usage: Promise<unknown>;
+        }>;
       };
 
       // Set run-id header if durable
@@ -313,38 +322,36 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
 
       return streamSSE(c, async (stream) => {
         try {
-          const result = await agentInstance.generate({ 
-            prompt, 
+          const result = await agentInstance.stream({
+            prompt,
             options: body.options,
           });
 
-          const text = result.text ?? '';
+          // Stream events from the agent's fullStream
+          for await (const chunk of result.fullStream) {
+            if (chunk.type === 'text-delta') {
+              const textDelta = (chunk as { textDelta?: string }).textDelta ?? '';
+              const eventData = JSON.stringify({ type: 'text-delta', textDelta });
+              const eventId = runId ? streamBuffer.store(runId, 'text-delta', eventData) : undefined;
 
-          // Stream text in chunks for smooth UX
-          const chunkSize = 10;
-          for (let i = 0; i < text.length; i += chunkSize) {
-            const chunk = text.slice(i, i + chunkSize);
-            const eventData = JSON.stringify({ type: 'text-delta', textDelta: chunk });
-            const eventId = runId ? streamBuffer.store(runId, 'text-delta', eventData) : undefined;
-
-            await stream.writeSSE({ 
-              id: eventId,
-              event: 'text-delta',
-              data: eventData,
-            });
-            // Small delay for visual effect
-            await new Promise(r => setTimeout(r, 20));
+              await stream.writeSSE({
+                id: eventId,
+                event: 'text-delta',
+                data: eventData,
+              });
+            }
           }
 
           // Send final
-          const doneData = JSON.stringify({ text, steps: result.steps?.length ?? 0 });
+          const text = await result.text;
+          const doneData = JSON.stringify({ text });
           if (runId) {
             streamBuffer.store(runId, 'done', doneData);
             streamBuffer.markCompleted(runId);
           }
 
-          await stream.writeSSE({ 
-            event: 'done', 
+          await stream.writeSSE({
+            event: 'done',
             data: doneData,
           });
         } catch (error) {
@@ -354,8 +361,8 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
           if (runId) {
             streamBuffer.store(runId, 'error', errorData);
           }
-          await stream.writeSSE({ 
-            event: 'error', 
+          await stream.writeSSE({
+            event: 'error',
             data: errorData,
           });
         }
@@ -383,15 +390,15 @@ export function createAgentRoutes(serverOptions: AgentServerOptions = {}) {
       }
 
       const agentInstance = agent as {
-        stream: (opts: { prompt: string; options?: unknown }) => {
+        stream: (opts: { prompt: string; options?: unknown }) => Promise<{
           fullStream: AsyncIterable<{ type: string; [key: string]: unknown }>;
           text: Promise<string>;
-        };
+        }>;
       };
 
       return streamSSE(c, async (stream) => {
-        const response = agentInstance.stream({ 
-          prompt, 
+        const response = await agentInstance.stream({
+          prompt,
           options: { ...body.options, sessionId: body.sessionId },
         });
 

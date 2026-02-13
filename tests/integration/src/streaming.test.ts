@@ -6,68 +6,45 @@
 
 import { describe, it, expect } from 'vitest';
 import { createAgent } from '@agntk/core';
-import { createMockStreamModel, createMockModel } from './setup';
+import { createMockStreamModel } from './setup';
 
 describe('Streaming', () => {
   describe('agent.stream()', () => {
-    it('should return a stream result object', () => {
+    it('should return a stream result object', async () => {
       const agent = createAgent({
+        name: 'stream-result-test',
         model: createMockStreamModel('Hello world from streaming agent'),
-        systemPrompt: 'You are a helpful assistant.',
-        toolPreset: 'none',
+        instructions: 'You are a helpful assistant.',
         maxSteps: 1,
       });
 
-      const result = agent.stream({ prompt: 'Say hello' });
+      const result = await agent.stream({ prompt: 'Say hello' });
       expect(result).toBeDefined();
-      expect(typeof result).toBe('object');
+      expect(result.fullStream).toBeDefined();
+      expect(result.text).toBeDefined();
+      expect(result.usage).toBeDefined();
     });
 
     it('should exist as a callable function on the agent', () => {
       const agent = createAgent({
+        name: 'stream-fn-test',
         model: createMockStreamModel('Streaming test'),
-        toolPreset: 'none',
         maxSteps: 1,
       });
 
       expect(typeof agent.stream).toBe('function');
     });
-  });
 
-  describe('agent.generate() vs stream()', () => {
-    it('should return text content via generate', async () => {
+    it('should resolve text from the stream', async () => {
       const agent = createAgent({
-        model: createMockModel('Hello world'),
-        toolPreset: 'none',
+        name: 'stream-text-test',
+        model: createMockStreamModel('Hello world'),
         maxSteps: 1,
       });
 
-      const result = await agent.generate({ prompt: 'Say hello' });
-      expect(result.text).toBe('Hello world');
-    });
-
-    it('should expose both stream and generate on same agent', () => {
-      const agent = createAgent({
-        model: createMockStreamModel('Dual mode'),
-        toolPreset: 'none',
-        maxSteps: 1,
-      });
-
-      expect(typeof agent.stream).toBe('function');
-      expect(typeof agent.generate).toBe('function');
-    });
-
-    it('should have getToolLoopAgent that returns the underlying agent', () => {
-      const agent = createAgent({
-        model: createMockStreamModel('Test'),
-        toolPreset: 'none',
-        maxSteps: 1,
-      });
-
-      const tla = agent.getToolLoopAgent();
-      expect(tla).toBeDefined();
-      expect(typeof tla.stream).toBe('function');
-      expect(typeof tla.generate).toBe('function');
+      const result = await agent.stream({ prompt: 'Say hello' });
+      const text = await result.text;
+      expect(text).toBe('Hello world');
     });
   });
 });

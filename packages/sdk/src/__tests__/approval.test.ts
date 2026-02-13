@@ -251,13 +251,14 @@ describe('resolveApprovalConfig', () => {
 describe('agent approval integration', () => {
   it('should accept approval: true in createAgent', async () => {
     const { createAgent } = await import('../agent');
-    const agent = createAgent({ approval: true });
+    const agent = createAgent({ name: 'approval-test', approval: true });
     expect(agent).toBeDefined();
   });
 
   it('should accept approval config object', async () => {
     const { createAgent } = await import('../agent');
     const agent = createAgent({
+      name: 'approval-config-test',
       approval: { enabled: true, tools: ['shell'], timeout: 5000 },
     });
     expect(agent).toBeDefined();
@@ -265,7 +266,7 @@ describe('agent approval integration', () => {
 
   it('should accept approval: false without error', async () => {
     const { createAgent } = await import('../agent');
-    const agent = createAgent({ approval: false });
+    const agent = createAgent({ name: 'approval-false-test', approval: false });
     expect(agent).toBeDefined();
   });
 });

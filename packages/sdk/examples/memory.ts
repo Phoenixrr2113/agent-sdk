@@ -1,68 +1,54 @@
 /**
  * @fileoverview Memory integration example.
  * Demonstrates semantic memory for context persistence.
+ *
+ * Memory is always enabled in createAgent — the agent automatically
+ * has access to remember, recall, and forget tools.
  */
 
 import { createAgent } from '@agntk/core';
 
 async function main() {
-  // Create agent with memory enabled
+  // Create agent — memory tools are included by default
   const agent = createAgent({
-    role: 'researcher',
-    toolPreset: 'full',
-    enableMemory: true,
-    memoryOptions: {
-      vectorStore: 'vectra',  // Local vector store
-      embeddingModel: 'text-embedding-3-small',
-      maxResults: 5,
-    },
+    name: 'memory-example',
+    instructions: 'You are a researcher. Store important findings in memory for future reference.',
     workspaceRoot: process.cwd(),
   });
 
   // First conversation - store information
   console.log('=== First Conversation ===');
-  const result1 = await agent.generate({
+  const result1 = await agent.stream({
     prompt: `Research the authentication patterns in this codebase.
 Store important findings in memory for future reference.`,
   });
-  console.log(result1.text);
+
+  // Drain stream to completion
+  for await (const chunk of result1.fullStream) {
+    if (chunk.type === 'text-delta') {
+      process.stdout.write(chunk.text as string);
+    }
+  }
+  console.log('\n');
 
   // Later conversation - recall from memory
-  console.log('\n=== Later Conversation ===');
-  const result2 = await agent.generate({
+  console.log('=== Later Conversation ===');
+  const result2 = await agent.stream({
     prompt: `What authentication patterns were found earlier?
 Use memory to recall previous research.`,
   });
-  console.log(result2.text);
+
+  for await (const chunk of result2.fullStream) {
+    if (chunk.type === 'text-delta') {
+      process.stdout.write(chunk.text as string);
+    }
+  }
+  console.log('\n');
 
   // Memory tools available:
-  // - memory_store: Store information semantically
-  // - memory_recall: Retrieve relevant memories
-  // - memory_forget: Remove memories matching a query
-}
-
-// Example: Custom memory configuration
-async function customMemory() {
-  const agent = createAgent({
-    enableMemory: true,
-    memoryOptions: {
-      vectorStore: 'vectra',
-      indexPath: './my-memory-index',  // Custom storage location
-      dimensions: 1536,
-      maxResults: 10,
-      minSimilarity: 0.7,  // Only return highly relevant results
-    },
-  });
-
-  // Agent can now store and recall semantic memories
-  await agent.generate({
-    prompt: 'Remember that the API uses JWT tokens for auth',
-  });
-
-  const recall = await agent.generate({
-    prompt: 'What do we know about authentication?',
-  });
-  console.log(recall.text);
+  // - remember: Store information for later recall
+  // - recall: Retrieve previously stored memories
+  // - forget: Remove memories matching a query
 }
 
 main().catch(console.error);

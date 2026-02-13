@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { 
-  subAgentConfigs, 
-  getSubAgentConfig, 
+import {
+  subAgentConfigs,
+  getSubAgentConfig,
   subAgentRoles,
   type SubAgentRole,
 } from '../presets/sub-agent-configs';
@@ -41,20 +41,9 @@ describe('subAgentConfigs', () => {
   });
 
   describe('coder config', () => {
-    it('should have instructions', () => {
+    it('should have instructions about code', () => {
       expect(subAgentConfigs.coder.instructions).toBeDefined();
       expect(subAgentConfigs.coder.instructions).toContain('code');
-    });
-
-    it('should include glob, grep and shell tools', () => {
-      expect(subAgentConfigs.coder.tools).toContain('glob');
-      expect(subAgentConfigs.coder.tools).toContain('grep');
-      expect(subAgentConfigs.coder.tools).toContain('shell');
-    });
-
-    it('should specify a model', () => {
-      expect(subAgentConfigs.coder.model).toBeDefined();
-      expect(typeof subAgentConfigs.coder.model).toBe('string');
     });
   });
 
@@ -63,10 +52,6 @@ describe('subAgentConfigs', () => {
       expect(subAgentConfigs.researcher.instructions).toBeDefined();
       expect(subAgentConfigs.researcher.instructions?.toLowerCase()).toContain('research');
     });
-
-    it('should include web tool', () => {
-      expect(subAgentConfigs.researcher.tools).toContain('web');
-    });
   });
 
   describe('analyst config', () => {
@@ -74,19 +59,11 @@ describe('subAgentConfigs', () => {
       expect(subAgentConfigs.analyst.instructions).toBeDefined();
       expect(subAgentConfigs.analyst.instructions?.toLowerCase()).toContain('analy');
     });
-
-    it('should include reasoning tool', () => {
-      expect(subAgentConfigs.analyst.tools).toContain('reasoning');
-    });
   });
 
   describe('generic config', () => {
     it('should have instructions', () => {
       expect(subAgentConfigs.generic.instructions).toBeDefined();
-    });
-
-    it('should have broad toolset', () => {
-      expect(subAgentConfigs.generic.tools?.length).toBeGreaterThan(2);
     });
   });
 });

@@ -45,7 +45,7 @@ export interface UsageSnapshot {
  * @example
  * ```typescript
  * try {
- *   await agent.generate({ prompt: 'do something' });
+ *   const result = await agent.stream({ prompt: 'do something' });
  * } catch (error) {
  *   if (error instanceof UsageLimitExceeded) {
  *     console.log(`Hit ${error.limitType}: ${error.currentValue}/${error.limitValue}`);

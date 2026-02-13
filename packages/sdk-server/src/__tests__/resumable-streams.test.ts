@@ -8,18 +8,33 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createAgentRoutes } from '../routes';
 
+/**
+ * Helper: create a mock agent that returns a stream result.
+ */
+function createMockStreamAgent(text: string, extra: Record<string, unknown> = {}) {
+  return {
+    stream: vi.fn().mockResolvedValue({
+      fullStream: (async function* () {
+        // Emit text-delta chunks
+        const chunkSize = 10;
+        for (let i = 0; i < text.length; i += chunkSize) {
+          yield { type: 'text-delta', textDelta: text.slice(i, i + chunkSize) };
+        }
+      })(),
+      text: Promise.resolve(text),
+      usage: Promise.resolve({ inputTokens: 10, outputTokens: 20 }),
+    }),
+    ...extra,
+  };
+}
+
 describe('Resumable Streams', () => {
   describe('x-workflow-run-id header', () => {
     it('should return x-workflow-run-id header for durable agents', async () => {
-      const mockDurableAgent = {
-        generate: vi.fn().mockResolvedValue({
-          text: 'Hello World',
-          steps: [],
-        }),
-        stream: vi.fn(),
+      const mockDurableAgent = createMockStreamAgent('Hello World', {
         workflowRunId: 'wf-run-123',
         isWorkflowActive: true,
-      };
+      });
 
       const routes = createAgentRoutes({ agent: mockDurableAgent });
 
@@ -35,13 +50,7 @@ describe('Resumable Streams', () => {
     });
 
     it('should NOT return x-workflow-run-id for non-durable agents', async () => {
-      const mockAgent = {
-        generate: vi.fn().mockResolvedValue({
-          text: 'Hello',
-          steps: [],
-        }),
-        stream: vi.fn(),
-      };
+      const mockAgent = createMockStreamAgent('Hello');
 
       const routes = createAgentRoutes({ agent: mockAgent });
 
@@ -59,15 +68,10 @@ describe('Resumable Streams', () => {
 
   describe('stream buffering', () => {
     it('should buffer SSE events for durable agent streams', async () => {
-      const mockDurableAgent = {
-        generate: vi.fn().mockResolvedValue({
-          text: 'Hi',
-          steps: [],
-        }),
-        stream: vi.fn(),
+      const mockDurableAgent = createMockStreamAgent('Hi', {
         workflowRunId: 'wf-buffer-test',
         isWorkflowActive: true,
-      };
+      });
 
       const routes = createAgentRoutes({ agent: mockDurableAgent });
 
@@ -92,15 +96,10 @@ describe('Resumable Streams', () => {
 
   describe('stream reconnection', () => {
     it('should replay buffered events when reconnecting with run-id', async () => {
-      const mockDurableAgent = {
-        generate: vi.fn().mockResolvedValue({
-          text: 'Hello World, this is a longer response for testing',
-          steps: [],
-        }),
-        stream: vi.fn(),
-        workflowRunId: 'wf-reconnect-test',
-        isWorkflowActive: true,
-      };
+      const mockDurableAgent = createMockStreamAgent(
+        'Hello World, this is a longer response for testing',
+        { workflowRunId: 'wf-reconnect-test', isWorkflowActive: true },
+      );
 
       const routes = createAgentRoutes({ agent: mockDurableAgent });
 
@@ -148,15 +147,10 @@ describe('Resumable Streams', () => {
     });
 
     it('should replay all events when reconnecting without Last-Event-ID', async () => {
-      const mockDurableAgent = {
-        generate: vi.fn().mockResolvedValue({
-          text: 'Test response for replay',
-          steps: [],
-        }),
-        stream: vi.fn(),
+      const mockDurableAgent = createMockStreamAgent('Test response for replay', {
         workflowRunId: 'wf-replay-all',
         isWorkflowActive: true,
-      };
+      });
 
       const routes = createAgentRoutes({ agent: mockDurableAgent });
 
@@ -189,13 +183,7 @@ describe('Resumable Streams', () => {
     });
 
     it('should handle reconnection for unknown run-id by starting new stream', async () => {
-      const mockAgent = {
-        generate: vi.fn().mockResolvedValue({
-          text: 'Fresh',
-          steps: [],
-        }),
-        stream: vi.fn(),
-      };
+      const mockAgent = createMockStreamAgent('Fresh');
 
       const routes = createAgentRoutes({ agent: mockAgent });
 
@@ -218,13 +206,7 @@ describe('Resumable Streams', () => {
 
   describe('non-durable fallback', () => {
     it('should work normally for standard (non-durable) agents', async () => {
-      const mockAgent = {
-        generate: vi.fn().mockResolvedValue({
-          text: 'Standard response',
-          steps: [],
-        }),
-        stream: vi.fn(),
-      };
+      const mockAgent = createMockStreamAgent('Standard response');
 
       const routes = createAgentRoutes({ agent: mockAgent });
 

@@ -18,9 +18,9 @@ describe('Server + Client', () => {
 
   beforeAll(() => {
     const agent = createAgent({
+      name: 'server-test-agent',
       model: createMockModel('Hello from server agent!'),
-      systemPrompt: 'You are a test agent running on a server.',
-      toolPreset: 'none',
+      instructions: 'You are a test agent running on a server.',
       maxSteps: 1,
     });
 

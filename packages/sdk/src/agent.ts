@@ -1,30 +1,45 @@
 /**
- * @agntk/core - Core Agent Factory
- * 
- * Creates agents using AI SDK's ToolLoopAgent pattern.
- * Provides opinionated defaults for tools, roles, and streaming.
+ * @agntk/core - Agent Factory
+ *
+ * A fully-equipped agent that shows up ready. No roles, no tool presets,
+ * no feature flags. You give it a name, tell it what it's doing, and
+ * point it at a task. It figures out the rest.
+ *
+ * Every capability is auto-detected from the environment:
+ * - Tools: ALL tools, always (plus any custom tools you pass)
+ * - Memory: always on, stored at ~/.agntk/agents/{name}/
+ * - Durability: auto-detected (workflow package installed → on)
+ * - Telemetry: auto-detected (LANGFUSE_PUBLIC_KEY set → on)
+ * - Skills: auto-discovered from standard directories
+ * - Sub-agents: always enabled with team coordination
+ * - Reflection: always on (reflact strategy)
+ * - Guardrails: always on (output: PII content filter)
+ * - Model: auto-selected from available API keys
  */
 
-import { generateId, ToolLoopAgent, stepCountIs } from 'ai';
-import type { Tool, ToolSet, TelemetrySettings as AiTelemetrySettings } from 'ai';
+import { resolve } from 'node:path';
+import { homedir } from 'node:os';
+import { ToolLoopAgent, stepCountIs } from 'ai';
+import type { ToolSet, TelemetrySettings as AiTelemetrySettings } from 'ai';
 import { createLogger } from '@agntk/logger';
-import type { AgentOptions, AgentRole, ToolPreset } from './types/agent';
+import type { AgentOptions, Agent, AgentStreamResult } from './types/agent';
 import { usageLimitStop } from './usage-limits';
 import { resolveModel } from './models';
-import { getRole } from './presets/role-registry';
-import { createToolPreset, type ToolPresetLevel } from './presets/tools';
+import { createToolPreset } from './presets/tools';
 import { createSpawnAgentTool } from './tools/spawn-agent';
 import { wrapAllToolsWithRetry } from './tools/model-retry';
-import { loadSkills, buildSkillsSystemPrompt } from './skills';
+import { discoverSkills, filterEligibleSkills, buildSkillsSystemPrompt, loadSkillContent } from './skills';
 import { checkWorkflowAvailability } from './workflow/utils';
 import { wrapToolsAsDurable } from './workflow/durable-tool';
 import { createReflectionPrepareStep } from './reflection';
-import { applyApproval, resolveApprovalConfig } from './tools/approval';
-import { wrapWithGuardrails } from './guardrails/runner';
+import { runGuardrails, handleGuardrailResults } from './guardrails/runner';
+import { contentFilter } from './guardrails/built-ins';
+import type { Guardrail } from './guardrails/types';
 import { MarkdownMemoryStore } from './memory/store';
 import { loadMemoryContext } from './memory/loader';
 import { createMemoryTools } from './memory/tools';
 import { initObservability, createTelemetrySettings } from './observability';
+import { buildDynamicSystemPrompt } from './prompts/context';
 
 // ============================================================================
 // Logger
@@ -33,158 +48,162 @@ import { initObservability, createTelemetrySettings } from './observability';
 const log = createLogger('@agntk/core:agent');
 
 // ============================================================================
-// Agent Instance Type
+// Constants
 // ============================================================================
 
-export interface Agent {
-  /** Unique identifier for this agent instance */
-  agentId: string;
-
-  /** Role of this agent */
-  role: AgentRole;
-
-  /** Initialize async resources (memory context loading). Called automatically by generate(). */
-  init: () => Promise<void>;
-
-  /** Stream a response (returns the ToolLoopAgent's stream result) */
-  stream: (input: { prompt: string }) => ReturnType<ToolLoopAgent['stream']>;
-
-  /** Generate a non-streaming response */
-  generate: (input: { prompt: string }) => ReturnType<ToolLoopAgent['generate']>;
-
-  /** Get the underlying ToolLoopAgent instance */
-  getToolLoopAgent: () => ToolLoopAgent;
-
-  /** Get the system prompt */
-  getSystemPrompt: () => string;
-}
+const DEFAULT_MAX_STEPS = 25;
+const SUB_AGENT_MAX_STEPS = 15;
+const DEFAULT_MAX_SPAWN_DEPTH = 2;
+const AGENT_STATE_BASE = '.agntk/agents';
 
 // ============================================================================
-// Tool Building
-// ============================================================================
-
-function buildTools(options: AgentOptions, workspaceRoot: string): ToolSet {
-  const { toolPreset = 'standard', tools = {}, enableTools, disableTools } = options;
-  
-  log.debug('Building tools', { preset: toolPreset, customTools: Object.keys(tools).length });
-
-  // Create preset tools using factory
-  let allTools: ToolSet = createToolPreset(toolPreset as ToolPresetLevel, {
-    workspaceRoot,
-  }) as ToolSet;
-  
-  // Add custom tools
-  Object.assign(allTools, tools);
-  
-  // Filter enabled tools
-  if (enableTools?.length) {
-    const enabledSet = new Set(enableTools);
-    allTools = Object.fromEntries(
-      Object.entries(allTools).filter(([name]) => enabledSet.has(name))
-    ) as ToolSet;
-  }
-  
-  // Remove disabled tools
-  if (disableTools?.length) {
-    for (const name of disableTools) {
-      delete allTools[name];
-    }
-  }
-  
-  log.debug('Tools ready', { tools: Object.keys(allTools) });
-
-  return allTools;
-}
-
-// ============================================================================
-// Create Agent Factory
+// Helpers
 // ============================================================================
 
 /**
- * Creates an agent with the given options.
- * 
+ * Resolve the persistent state directory for a named agent.
+ * ~/.agntk/agents/{name}/
+ */
+function resolveAgentStatePath(name: string): string {
+  const safeName = name.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+  return resolve(homedir(), AGENT_STATE_BASE, safeName);
+}
+
+/**
+ * Detect if telemetry should be enabled from env vars.
+ */
+function detectTelemetry(): boolean {
+  return !!(
+    process.env.LANGFUSE_PUBLIC_KEY &&
+    process.env.LANGFUSE_SECRET_KEY
+  );
+}
+
+/**
+ * Build the base instructions for the agent.
+ */
+function buildBaseInstructions(
+  name: string,
+  userInstructions?: string,
+  skillsPrompt?: string,
+): string {
+  const parts: string[] = [];
+
+  parts.push(`You are ${name}, a capable AI agent.`);
+
+  if (userInstructions) {
+    parts.push('');
+    parts.push(userInstructions);
+  }
+
+  parts.push('');
+  parts.push(
+    'You have access to a full suite of tools including file operations, ' +
+    'shell commands, code search (grep, glob, ast-grep), a browser, ' +
+    'deep reasoning, planning, and persistent memory. ' +
+    'You can spawn sub-agents for complex tasks that benefit from delegation. ' +
+    'Use the remember tool to persist important findings across sessions. ' +
+    'Use the recall tool to search your memory for relevant context.',
+  );
+
+  if (skillsPrompt) {
+    parts.push('');
+    parts.push(skillsPrompt);
+  }
+
+  return parts.join('\n');
+}
+
+// ============================================================================
+// Internal Options (for sub-agent recursion)
+// ============================================================================
+
+/** @internal */
+export interface InternalOptions {
+  _spawnDepth?: number;
+}
+
+// ============================================================================
+// Agent Factory
+// ============================================================================
+
+/**
+ * Create an agent — fully equipped, zero config.
+ *
  * @example
  * ```typescript
  * const agent = createAgent({
- *   role: 'coder',
- *   workspaceRoot: '/my/project',
- *   toolPreset: 'standard',
+ *   name: 'deploy-bot',
+ *   instructions: 'You manage deployments for our k8s cluster.',
  * });
- * 
- * const result = await agent.generate({ prompt: 'Create a hello world function' });
- * console.log(result.text);
+ *
+ * const result = await agent.stream({ prompt: 'Roll back staging to yesterday' });
+ * for await (const chunk of result.fullStream) {
+ *   if (chunk.type === 'text-delta') process.stdout.write(chunk.text ?? '');
+ * }
  * ```
  */
-export function createAgent(options: AgentOptions = {}): Agent {
+export function createAgent(options: AgentOptions, _internal: InternalOptions = {}): Agent {
   const {
-    role = 'generic',
-    agentId = generateId(),
-    systemPrompt,
-    maxSteps = 10,
-    enableSubAgents = false,
+    name,
+    instructions,
     workspaceRoot = process.cwd(),
-    telemetry,
   } = options;
 
-  log.info('Creating agent', { agentId, role, maxSteps, enableSubAgents });
+  const spawnDepth = _internal._spawnDepth ?? 0;
+  const isSubAgent = spawnDepth > 0;
+  const maxSteps = options.maxSteps ?? (isSubAgent ? SUB_AGENT_MAX_STEPS : DEFAULT_MAX_STEPS);
 
-  // Get role configuration from registry
-  const roleConfig = getRole(role);
-  
-  // Resolve system prompt
-  const baseSystemPrompt = systemPrompt ?? roleConfig.systemPrompt;
-  const finalSystemPrompt = options.systemPromptPrefix
-    ? `${options.systemPromptPrefix}\n\n${baseSystemPrompt}`
-    : baseSystemPrompt;
-  
-  // Load and inject skills
-  let augmentedSystemPrompt = finalSystemPrompt;
-  if (options.skills) {
-    log.debug('Loading skills', { config: options.skills });
-    const skills = loadSkills(options.skills, workspaceRoot);
-    if (skills.length > 0) {
-      const skillsPrompt = buildSkillsSystemPrompt(skills);
-      augmentedSystemPrompt += skillsPrompt;
-      log.info('Skills injected', { count: skills.length, names: skills.map(s => s.name) });
-    }
+  log.info('Creating agent', { name, maxSteps, workspaceRoot, spawnDepth });
+
+  // ── 1. Resolve model ──────────────────────────────────────────────────
+  const model = options.model ?? resolveModel({ tier: 'standard' });
+  log.debug('Model resolved', { hasExplicitModel: !!options.model });
+
+  // ── 2. Build ALL tools ────────────────────────────────────────────────
+  let tools: ToolSet = createToolPreset('full', { workspaceRoot }) as ToolSet;
+
+  // Merge user-provided tools (escape hatch for testing / custom tools)
+  if (options.tools) {
+    Object.assign(tools, options.tools);
   }
 
-  // Resolve model
-  log.debug('Resolving model', {
-    tier: roleConfig.recommendedModel,
-    provider: options.modelProvider,
-    modelName: options.modelName,
+  log.debug('Base tools built', { count: Object.keys(tools).length });
+
+  // ── 3. Memory — always on ─────────────────────────────────────────────
+  const agentStatePath = resolveAgentStatePath(name);
+  const memoryStore = new MarkdownMemoryStore({
+    projectDir: agentStatePath,
+    globalDir: '.agntk',
+    workspaceRoot,
   });
 
-  const model = options.model ?? resolveModel({
-    tier: (roleConfig.recommendedModel ?? 'standard') as 'fast' | 'standard' | 'reasoning' | 'powerful',
-    provider: options.modelProvider as 'openrouter' | 'ollama' | 'openai' | undefined,
-    modelName: options.modelName,
-  });
+  const memoryTools = createMemoryTools({ store: memoryStore, model });
+  Object.assign(tools, memoryTools);
+  log.info('Memory enabled', { agentStatePath });
 
-  // Build tools
-  let tools = buildTools(options, workspaceRoot);
-  
-  // Add spawn_agent tool if enabled
-  if (enableSubAgents) {
-    log.debug('Enabling sub-agents', { maxSpawnDepth: options.maxSpawnDepth ?? 2 });
-
+  // ── 4. Sub-agents — recursive creation ────────────────────────────────
+  if (spawnDepth < DEFAULT_MAX_SPAWN_DEPTH) {
     const spawnTool = createSpawnAgentTool({
-      maxSpawnDepth: options.maxSpawnDepth ?? 2,
-      currentDepth: 0,
+      maxSpawnDepth: DEFAULT_MAX_SPAWN_DEPTH,
+      currentDepth: spawnDepth,
       createAgent: (subAgentOptions) => {
-        log.info('Spawning sub-agent', {
-          parentId: agentId,
-          role: subAgentOptions.role,
-        });
+        const subName = `${name}/${subAgentOptions.role}`;
+        log.info('Spawning sub-agent', { parentName: name, subName });
 
-        const subAgent = createAgent({
-          role: subAgentOptions.role as AgentRole,
-          systemPrompt: subAgentOptions.instructions,
-          enableSubAgents: false, // Prevent recursion
-          workspaceRoot,
-          maxSteps: subAgentOptions.maxSpawnDepth ?? 5,
-        });
+        const subAgent = createAgent(
+          {
+            name: subName,
+            instructions: subAgentOptions.instructions,
+            workspaceRoot,
+            maxSteps: SUB_AGENT_MAX_STEPS,
+            model: options.model,
+          },
+          {
+            _spawnDepth: spawnDepth + 1,
+          },
+        );
+
         return {
           stream: (input: { prompt: string }) => {
             const streamPromise = subAgent.stream(input);
@@ -195,7 +214,7 @@ export function createAgent(options: AgentOptions = {}): Agent {
                   yield chunk;
                 }
               })(),
-              text: streamPromise.then(r => r.text),
+              text: streamPromise.then((r) => r.text),
             };
           },
         };
@@ -204,272 +223,188 @@ export function createAgent(options: AgentOptions = {}): Agent {
     tools = { ...tools, spawn_agent: spawnTool };
   }
 
-  // Memory: create store, add memory tools, prepare lazy context loading
-  let memoryStore: MarkdownMemoryStore | null = null;
-  let memoryContextLoaded = false;
+  // ── 5. ModelRetry — always on ─────────────────────────────────────────
+  tools = wrapAllToolsWithRetry(tools, 3) as ToolSet;
 
-  if (options.enableMemory) {
-    const memOpts = options.memoryOptions ?? {};
-    memoryStore = (memOpts.store as MarkdownMemoryStore | undefined) ??
-      new MarkdownMemoryStore({
-        projectDir: memOpts.projectDir,
-        globalDir: memOpts.globalDir,
-        workspaceRoot,
-      });
-
-    const memoryTools = createMemoryTools({ store: memoryStore, model });
-    Object.assign(tools, memoryTools);
-
-    log.info('Memory enabled', {
-      projectPath: memoryStore.getProjectPath(),
-      globalPath: memoryStore.getGlobalPath(),
-      tools: Object.keys(memoryTools),
-    });
+  // ── 6. Auto-discover skills ───────────────────────────────────────────
+  let skillsPrompt = '';
+  try {
+    const discovered = discoverSkills(undefined, workspaceRoot);
+    const eligible = filterEligibleSkills(discovered);
+    if (eligible.length > 0) {
+      const loaded = eligible.map((s) => loadSkillContent(s));
+      skillsPrompt = buildSkillsSystemPrompt(loaded);
+      log.info('Skills discovered', { count: eligible.length });
+    }
+  } catch (err) {
+    log.warn('Skill discovery failed', { error: err instanceof Error ? err.message : String(err) });
   }
 
-  // Apply approval to dangerous tools if configured
-  const approvalConfig = resolveApprovalConfig(options.approval);
-  if (approvalConfig?.enabled) {
-    log.debug('Applying tool approval', { tools: approvalConfig.tools ?? 'default dangerous set' });
-    tools = applyApproval(tools, approvalConfig);
-  }
+  // ── 7. Build system prompt ────────────────────────────────────────────
+  let augmentedSystemPrompt = buildBaseInstructions(name, instructions, skillsPrompt);
 
-  // Wrap tools as durable steps if configured
-  if (options.durable) {
-    log.debug('Wrapping tools as durable steps', {
-      toolCount: Object.keys(tools).length,
-      workflowOptions: options.workflowOptions,
-    });
-    const durableConfig = {
-      retryCount: options.workflowOptions?.defaultRetryCount ?? 3,
-    };
-    tools = wrapToolsAsDurable(tools, durableConfig) as ToolSet;
-
-    // Eagerly check workflow availability
-    checkWorkflowAvailability().then((available) => {
-      if (!available) {
-        log.warn(
-          'Workflow package not installed. Durable tool wrapping is inert without the runtime. ' +
-          'Install with: npm install workflow',
-        );
-      }
-    }).catch(() => { /* swallow */ });
-  }
-
-  // Wrap tools with ModelRetry handling
-  const maxToolRetries = options.maxToolRetries;
-  if (maxToolRetries !== 0) {
-    tools = wrapAllToolsWithRetry(tools, maxToolRetries) as ToolSet;
-    log.debug('Tools wrapped with ModelRetry handling', { maxToolRetries: maxToolRetries ?? 3 });
-  }
-
-  // Build stop conditions
+  // ── 8. Stop conditions ────────────────────────────────────────────────
   const stopConditions: Array<(opts: { steps: Array<import('ai').StepResult<ToolSet>> }) => PromiseLike<boolean> | boolean> = [
     stepCountIs(maxSteps),
   ];
 
   if (options.usageLimits) {
-    log.debug('Usage limits configured', { limits: options.usageLimits });
     stopConditions.push(usageLimitStop(options.usageLimits));
   }
 
-  // Build reflection prepareStep if configured
-  const reflectionConfig = options.reflection;
-  const prepareStep = reflectionConfig && reflectionConfig.strategy !== 'none'
-    ? createReflectionPrepareStep(augmentedSystemPrompt, reflectionConfig)
-    : undefined;
-
-  if (prepareStep) {
-    log.debug('Reflection enabled', { strategy: reflectionConfig!.strategy });
-  }
-
-  // Build telemetry settings (sync — just creates the config object)
-  const telemetrySettings = telemetry
-    ? createTelemetrySettings({
-        functionId: telemetry.functionId ?? `agent:${agentId}`,
-        metadata: telemetry.metadata,
-      })
-    : undefined;
-
-  // Create the ToolLoopAgent
-  log.debug('Creating ToolLoopAgent', {
-    promptLength: augmentedSystemPrompt.length,
-    toolCount: Object.keys(tools).length,
-    telemetry: !!telemetrySettings,
+  // ── 9. Reflection — always on (reflact strategy) ──────────────────────
+  const prepareStep = createReflectionPrepareStep(augmentedSystemPrompt, {
+    strategy: 'reflact',
   });
 
+  // ── 10. Guardrails — always on (output: PII content filter) ───────────
+  const outputGuardrails: Guardrail[] = [contentFilter()];
+
+  // ── 11. Telemetry — auto-detect ───────────────────────────────────────
+  const telemetryEnabled = detectTelemetry();
+  const telemetrySettings = telemetryEnabled
+    ? createTelemetrySettings({ functionId: `agent:${name}` })
+    : undefined;
+
+  // ── 12. Build the ToolLoopAgent ───────────────────────────────────────
   const toolLoopAgent = new ToolLoopAgent({
     model,
     instructions: augmentedSystemPrompt,
     tools,
     stopWhen: stopConditions,
-    // prepareCall: dynamically inject the current system prompt (may be updated by memory loading)
     prepareCall: (opts) => ({ ...opts, instructions: augmentedSystemPrompt }),
-    ...(prepareStep ? { prepareStep } : {}),
+    prepareStep,
     ...(telemetrySettings ? { experimental_telemetry: telemetrySettings as AiTelemetrySettings } : {}),
   });
 
-  // Create a child logger for this agent instance
-  const agentLog = log.child({ agentId });
+  log.debug('ToolLoopAgent created', {
+    toolCount: Object.keys(tools).length,
+    telemetry: !!telemetrySettings,
+  });
 
-  // Lazy memory context loader — runs once, cached as a singleton promise
-  let memoryInitPromise: Promise<void> | null = null;
+  // ── Lazy initializers ─────────────────────────────────────────────────
 
-  function ensureMemoryContext(): Promise<void> {
-    if (!memoryStore) return Promise.resolve();
-    if (memoryContextLoaded) return Promise.resolve();
-    if (memoryInitPromise) return memoryInitPromise;
+  const agentLog = log.child({ agent: name });
+  let initialized = false;
+  let initPromise: Promise<void> | null = null;
 
-    memoryInitPromise = (async () => {
+  async function ensureInit(): Promise<void> {
+    if (initialized) return;
+    if (initPromise) return initPromise;
+
+    initPromise = (async () => {
+      // Load memory context into system prompt
       try {
-        const memoryContext = await loadMemoryContext(memoryStore!);
+        const memoryContext = await loadMemoryContext(memoryStore);
         if (memoryContext) {
           augmentedSystemPrompt = memoryContext + '\n\n' + augmentedSystemPrompt;
-          // prepareCall() will pick up the updated augmentedSystemPrompt on next generate/stream
           agentLog.debug('Memory context injected', { chars: memoryContext.length });
         }
       } catch (err) {
-        agentLog.warn('Failed to load memory context', {
+        agentLog.warn('Memory context loading failed', {
           error: err instanceof Error ? err.message : String(err),
         });
-      } finally {
-        memoryContextLoaded = true;
       }
+
+      // Inject dynamic environment context
+      try {
+        augmentedSystemPrompt = await buildDynamicSystemPrompt(augmentedSystemPrompt, {
+          workspaceRoot,
+          includeWorkspaceMap: true,
+        });
+      } catch (err) {
+        agentLog.warn('Dynamic context injection failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+
+      // Apply durable wrapping if workflow runtime is available
+      try {
+        const workflowAvailable = await checkWorkflowAvailability();
+        if (workflowAvailable) {
+          tools = wrapToolsAsDurable(tools, { retryCount: 3 }) as ToolSet;
+          agentLog.info('Durable tool wrapping active');
+        }
+      } catch {
+        agentLog.debug('Workflow detection failed — skipping durable wrapping');
+      }
+
+      // Initialize telemetry if detected
+      if (telemetryEnabled) {
+        try {
+          await initObservability({ provider: 'langfuse' });
+          agentLog.info('Telemetry initialized');
+        } catch (err) {
+          agentLog.warn('Telemetry initialization failed', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      initialized = true;
     })();
 
-    return memoryInitPromise;
+    return initPromise;
   }
 
-  // Lazy telemetry init — registers OTel provider before first LLM call
-  let telemetryInitPromise: Promise<void> | null = null;
+  // ── Build the agent instance ──────────────────────────────────────────
 
-  function ensureTelemetryInit(): Promise<void> {
-    if (!telemetry?.provider) return Promise.resolve();
-    if (telemetryInitPromise) return telemetryInitPromise;
-
-    telemetryInitPromise = initObservability(telemetry.provider)
-      .then((ok) => {
-        if (ok) {
-          agentLog.info('Telemetry initialized', { provider: telemetry.provider!.provider });
-        }
-      })
-      .catch((err) => {
-        agentLog.warn('Telemetry initialization failed', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
-
-    return telemetryInitPromise;
-  }
-
-  // Create the agent instance
   const agent: Agent = {
-    agentId,
-    role,
+    name,
 
-    init: async () => {
-      await Promise.all([ensureMemoryContext(), ensureTelemetryInit()]);
-    },
+    init: ensureInit,
 
-    getToolLoopAgent: () => toolLoopAgent,
     getSystemPrompt: () => augmentedSystemPrompt,
 
-    stream: async (input) => {
-      await Promise.all([ensureMemoryContext(), ensureTelemetryInit()]);
+    getToolNames: () => Object.keys(tools),
+
+    stream: async (input): Promise<AgentStreamResult> => {
+      await ensureInit();
       agentLog.info('stream() called', { promptLength: input.prompt.length });
-      const done = agentLog.time('stream');
-      const result = toolLoopAgent.stream({ prompt: input.prompt });
-      return result;
-    },
 
-    generate: async (input) => {
-      await Promise.all([ensureMemoryContext(), ensureTelemetryInit()]);
-      agentLog.info('generate() called', {
-        promptLength: input.prompt.length,
-        prompt: input.prompt.slice(0, 500) + (input.prompt.length > 500 ? '...' : ''),
-      });
-      const done = agentLog.time('generate');
-      try {
-        const result = await toolLoopAgent.generate({ prompt: input.prompt });
-        done();
+      const result = await toolLoopAgent.stream({ prompt: input.prompt });
 
-        // Log each step with tool calls
-        if (result.steps) {
-          for (let i = 0; i < result.steps.length; i++) {
-            const step = result.steps[i];
+      // Apply output guardrails to the final text
+      const guardedText = result.text.then(async (text: string) => {
+        if (!text || outputGuardrails.length === 0) return text;
 
-            // Log each tool call individually at trace level (full details)
-            if (step.toolCalls) {
-              for (const tc of step.toolCalls) {
-                agentLog.trace(`Tool call: ${tc.toolName}`, {
-                  tool: tc.toolName,
-                  input: (tc as Record<string, unknown>).args ?? (tc as Record<string, unknown>).input,
-                });
-              }
-            }
+        try {
+          const { results, filteredText } = await runGuardrails(outputGuardrails, text, {
+            prompt: input.prompt,
+            phase: 'output',
+          });
 
-            // Log each tool result individually at trace level (full output)
-            if (step.toolResults) {
-              for (const tr of step.toolResults) {
-                const output = (tr as Record<string, unknown>).result ?? (tr as Record<string, unknown>).output ?? '';
-                agentLog.trace(`Tool result: ${tr.toolName}`, {
-                  tool: tr.toolName,
-                  output: typeof output === 'string' ? output.slice(0, 1000) : output,
-                  outputLength: typeof output === 'string' ? output.length : undefined,
-                });
-              }
-            }
-
-            // Summary log for step
-            agentLog.debug(`Step ${i + 1}/${result.steps.length}`, {
-              toolCalls: step.toolCalls?.map(tc => tc.toolName) ?? [],
-              toolResults: step.toolResults?.map(tr => tr.toolName) ?? [],
-              textLength: step.text?.length ?? 0,
+          const check = handleGuardrailResults(results, text, filteredText, 'output', 'filter');
+          if (check.blocked) {
+            agentLog.info('Output guardrails filtered content', {
+              guards: results.filter((r) => !r.passed).map((r) => r.name),
             });
+            return check.text;
           }
-        }
-
-        // Log token usage
-        if (result.totalUsage) {
-          agentLog.info('Token usage', {
-            inputTokens: result.totalUsage.inputTokens,
-            outputTokens: result.totalUsage.outputTokens,
-            totalTokens: result.totalUsage.totalTokens,
-            reasoningTokens: (result.totalUsage as Record<string, unknown>).reasoningTokens ?? 0,
-            cachedInputTokens: (result.totalUsage as Record<string, unknown>).cachedInputTokens ?? 0,
+        } catch (err) {
+          agentLog.warn('Output guardrails failed', {
+            error: err instanceof Error ? err.message : String(err),
           });
         }
 
-        agentLog.info('generate() completed', {
-          steps: result.steps?.length ?? 0,
-          textLength: result.text?.length ?? 0,
-          response: result.text?.slice(0, 500) + ((result.text?.length ?? 0) > 500 ? '...' : ''),
-        });
+        return text;
+      });
 
-        return result;
-      } catch (error) {
-        done();
-        agentLog.error('generate() failed', {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-        throw error;
-      }
+      return {
+        fullStream: result.fullStream,
+        text: guardedText,
+        usage: result.totalUsage,
+      };
     },
   };
 
-  // Wrap with guardrails if configured
-  if (options.guardrails && (options.guardrails.input?.length || options.guardrails.output?.length)) {
-    log.debug('Applying guardrails', {
-      inputCount: options.guardrails.input?.length ?? 0,
-      outputCount: options.guardrails.output?.length ?? 0,
-      onBlock: options.guardrails.onBlock ?? 'throw',
-    });
-    const originalGenerate = agent.generate.bind(agent);
-    agent.generate = wrapWithGuardrails(originalGenerate, options.guardrails);
-  }
-
-  log.info('Agent created', { agentId, role, durable: !!options.durable });
+  log.info('Agent created', {
+    name,
+    spawnDepth,
+    toolCount: Object.keys(tools).length,
+    memoryPath: agentStatePath,
+    telemetry: telemetryEnabled,
+  });
 
   return agent;
 }

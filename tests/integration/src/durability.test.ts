@@ -15,7 +15,7 @@ import {
   wrapSelectedToolsAsDurable,
   parseDuration,
   formatDuration,
-} from '@agntk/core/workflow';
+} from '@agntk/core/advanced';
 import { createMockModel } from './setup';
 
 describe('Durability', () => {
@@ -69,7 +69,6 @@ describe('Durability', () => {
         execute: async ({ input }) => ({ output: input }),
       });
 
-      // Signature: wrapToolAsDurableStep(tool, config?, toolName?)
       const wrapped = wrapToolAsDurableStep(originalTool, {}, 'test-tool');
 
       expect(wrapped).toBeDefined();
@@ -136,29 +135,30 @@ describe('Durability', () => {
     });
   });
 
-  describe('createAgent with durable: true', () => {
-    it('should create a durable agent without error', () => {
+  describe('createAgent (auto-detects durability)', () => {
+    it('should create agent without error', () => {
       const agent = createAgent({
+        name: 'durable-test-agent',
         model: createMockModel('Durable agent response'),
-        toolPreset: 'none',
         maxSteps: 1,
-        durable: true,
       });
 
       expect(agent).toBeDefined();
-      expect(agent.role).toBe('generic');
+      expect(agent.name).toBe('durable-test-agent');
     });
 
-    it('should still generate responses', async () => {
+    it('should stream responses', async () => {
       const agent = createAgent({
+        name: 'durable-stream-agent',
         model: createMockModel('Durable response text'),
-        toolPreset: 'none',
         maxSteps: 1,
-        durable: true,
       });
 
-      const result = await agent.generate({ prompt: 'Test durability' });
-      expect(result.text).toBe('Durable response text');
+      const result = await agent.stream({ prompt: 'Test durability' });
+      // Drain the stream before reading text
+      for await (const _chunk of result.fullStream) { /* drain */ }
+      const text = await result.text;
+      expect(text).toBe('Durable response text');
     });
   });
 });

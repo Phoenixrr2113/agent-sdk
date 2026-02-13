@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MockLanguageModelV3, mockValues } from 'ai/test';
 import type { LanguageModel } from 'ai';
-import type { Agent } from '../agent';
+import type { Agent } from '../types/agent';
 
 vi.mock('@agntk/logger', () => ({
   createLogger: () => ({
@@ -27,20 +27,19 @@ import { withBestOfN } from '../wrappers/best-of-n';
 function createMockAgent(outputs: string[]): Agent {
   let callIndex = 0;
   return {
-    agentId: 'test-agent',
-    role: 'generic',
-    stream: vi.fn(),
-    generate: vi.fn().mockImplementation(async () => {
+    name: 'test-agent',
+    init: vi.fn().mockResolvedValue(undefined),
+    stream: vi.fn().mockImplementation(async () => {
       const idx = callIndex++;
       const text = outputs[idx % outputs.length];
       return {
-        text,
-        steps: [],
-        totalUsage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+        fullStream: (async function* () {})(),
+        text: Promise.resolve(text),
+        usage: Promise.resolve({ inputTokens: 100, outputTokens: 50, totalTokens: 150 }),
       };
     }),
-    getToolLoopAgent: vi.fn(),
     getSystemPrompt: () => 'test prompt',
+    getToolNames: () => [],
   } as unknown as Agent;
 }
 
@@ -92,7 +91,7 @@ describe('withBestOfN', () => {
 
     expect(result.candidates).toHaveLength(3);
     expect(result.runsCompleted).toBe(3);
-    expect(agent.generate).toHaveBeenCalledTimes(3);
+    expect(agent.stream).toHaveBeenCalledTimes(3);
   });
 
   it('should pick the best candidate based on judge scores', async () => {
@@ -230,16 +229,19 @@ describe('execution modes', () => {
   it('should run in parallel by default', async () => {
     const startTimes: number[] = [];
     const agent = {
-      agentId: 'test',
-      role: 'generic',
-      stream: vi.fn(),
-      generate: vi.fn().mockImplementation(async () => {
+      name: 'test',
+      init: vi.fn().mockResolvedValue(undefined),
+      stream: vi.fn().mockImplementation(async () => {
         startTimes.push(Date.now());
         await new Promise((r) => setTimeout(r, 50));
-        return { text: 'ok', steps: [], totalUsage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } };
+        return {
+          fullStream: (async function* () {})(),
+          text: Promise.resolve('ok'),
+          usage: Promise.resolve({ inputTokens: 10, outputTokens: 5, totalTokens: 15 }),
+        };
       }),
-      getToolLoopAgent: vi.fn(),
       getSystemPrompt: () => '',
+      getToolNames: () => [],
     } as unknown as Agent;
     const judge = createMockJudge('1:8\n2:5\n3:3');
 
@@ -260,17 +262,20 @@ describe('execution modes', () => {
     const callOrder: number[] = [];
     let idx = 0;
     const agent = {
-      agentId: 'test',
-      role: 'generic',
-      stream: vi.fn(),
-      generate: vi.fn().mockImplementation(async () => {
+      name: 'test',
+      init: vi.fn().mockResolvedValue(undefined),
+      stream: vi.fn().mockImplementation(async () => {
         const myIdx = idx++;
         callOrder.push(myIdx);
         await new Promise((r) => setTimeout(r, 20));
-        return { text: `output-${myIdx}`, steps: [], totalUsage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } };
+        return {
+          fullStream: (async function* () {})(),
+          text: Promise.resolve(`output-${myIdx}`),
+          usage: Promise.resolve({ inputTokens: 10, outputTokens: 5, totalTokens: 15 }),
+        };
       }),
-      getToolLoopAgent: vi.fn(),
       getSystemPrompt: () => '',
+      getToolNames: () => [],
     } as unknown as Agent;
     const judge = createMockJudge('1:5\n2:5\n3:5');
 
@@ -304,7 +309,7 @@ describe('budget cap', () => {
 
     expect(result.runsCompleted).toBe(2);
     expect(result.budgetExceeded).toBe(true);
-    expect(agent.generate).toHaveBeenCalledTimes(2);
+    expect(agent.stream).toHaveBeenCalledTimes(2);
   });
 
   it('should not stop if budget not exceeded', async () => {
@@ -332,16 +337,19 @@ describe('error handling', () => {
   it('should handle failed agent runs gracefully', async () => {
     let callCount = 0;
     const agent = {
-      agentId: 'test',
-      role: 'generic',
-      stream: vi.fn(),
-      generate: vi.fn().mockImplementation(async () => {
+      name: 'test',
+      init: vi.fn().mockResolvedValue(undefined),
+      stream: vi.fn().mockImplementation(async () => {
         callCount++;
         if (callCount === 2) throw new Error('Agent crashed');
-        return { text: `output-${callCount}`, steps: [], totalUsage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } };
+        return {
+          fullStream: (async function* () {})(),
+          text: Promise.resolve(`output-${callCount}`),
+          usage: Promise.resolve({ inputTokens: 10, outputTokens: 5, totalTokens: 15 }),
+        };
       }),
-      getToolLoopAgent: vi.fn(),
       getSystemPrompt: () => '',
+      getToolNames: () => [],
     } as unknown as Agent;
     const judge = createMockJudge('1:8\n2:5');
 
@@ -358,12 +366,11 @@ describe('error handling', () => {
 
   it('should throw if all runs fail', async () => {
     const agent = {
-      agentId: 'test',
-      role: 'generic',
-      stream: vi.fn(),
-      generate: vi.fn().mockRejectedValue(new Error('All fail')),
-      getToolLoopAgent: vi.fn(),
+      name: 'test',
+      init: vi.fn().mockResolvedValue(undefined),
+      stream: vi.fn().mockRejectedValue(new Error('All fail')),
       getSystemPrompt: () => '',
+      getToolNames: () => [],
     } as unknown as Agent;
     const judge = createMockJudge('unused');
 

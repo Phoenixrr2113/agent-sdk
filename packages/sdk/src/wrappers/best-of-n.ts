@@ -8,7 +8,7 @@
 
 import { createLogger } from '@agntk/logger';
 import type { LanguageModel } from 'ai';
-import type { Agent } from '../agent';
+import type { Agent } from '../types/agent';
 import type { UsageLimits } from '../usage-limits';
 
 const log = createLogger('@agntk/core:best-of-n');
@@ -184,16 +184,21 @@ async function generateCandidate(
   index: number,
 ): Promise<BestOfNCandidate | null> {
   try {
-    const result = await agent.generate({ prompt });
+    const result = await agent.stream({ prompt });
+    // Consume the stream to get the final text
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    for await (const _chunk of result.fullStream) { /* drain */ }
+    const text = await result.text;
+    const usage = await result.usage;
     return {
-      text: result.text ?? '',
+      text: text ?? '',
       score: 0,
       index,
-      usage: result.totalUsage
+      usage: usage
         ? {
-            inputTokens: result.totalUsage.inputTokens ?? 0,
-            outputTokens: result.totalUsage.outputTokens ?? 0,
-            totalTokens: result.totalUsage.totalTokens ?? 0,
+            inputTokens: usage.inputTokens ?? 0,
+            outputTokens: usage.outputTokens ?? 0,
+            totalTokens: (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
           }
         : undefined,
     };

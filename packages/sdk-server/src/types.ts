@@ -59,8 +59,7 @@ export interface AgentServerOptions {
  * Full typing comes from @agntk/core
  */
 export interface AgentInstance {
-  generate: (opts: GenerateOptions) => Promise<GenerateResult>;
-  stream: (opts: GenerateOptions) => StreamResult;
+  stream: (opts: GenerateOptions) => Promise<StreamResult>;
 }
 
 /**
@@ -79,21 +78,16 @@ export interface GenerateOptions {
   options?: {
     userId?: string;
     sessionId?: string;
-    complexity?: 'simple' | 'complex';
-    role?: 'coder' | 'researcher' | 'analyst';
     enabledTools?: string[];
     workspaceRoot?: string;
   };
 }
 
-export interface GenerateResult {
-  text: string;
-  steps: unknown[];
-}
 
 export interface StreamResult {
   fullStream: AsyncIterable<StreamChunk>;
   text: Promise<string>;
+  usage: Promise<unknown>;
 }
 
 export interface StreamChunk {

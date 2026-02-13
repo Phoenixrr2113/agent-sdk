@@ -61,54 +61,58 @@ describe('createAgentRoutes', () => {
       expect(body.error).toContain('Agent not configured');
     });
 
-    it('should call agent.generate and return result', async () => {
+    it('should call agent.stream and return result', async () => {
       const mockAgent = {
-        generate: vi.fn().mockResolvedValue({
-          text: 'Generated response',
-          steps: [1, 2],
+        stream: vi.fn().mockResolvedValue({
+          fullStream: (async function* () {})(),
+          text: Promise.resolve('Generated response'),
+          usage: Promise.resolve({ inputTokens: 10, outputTokens: 20 }),
         }),
       };
 
       const routes = createAgentRoutes({ agent: mockAgent });
-      
+
       const req = new Request('http://localhost/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: 'Hello' }),
       });
-      
+
       const res = await routes.fetch(req);
       expect(res.status).toBe(200);
-      
+
       const body = await res.json();
       expect(body.text).toBe('Generated response');
-      expect(body.steps).toBe(2);
       expect(body.success).toBe(true);
-      
-      expect(mockAgent.generate).toHaveBeenCalledWith(
+
+      expect(mockAgent.stream).toHaveBeenCalledWith(
         expect.objectContaining({ prompt: 'Hello' })
       );
     });
 
     it('should pass options to agent', async () => {
       const mockAgent = {
-        generate: vi.fn().mockResolvedValue({ text: 'OK', steps: [] }),
+        stream: vi.fn().mockResolvedValue({
+          fullStream: (async function* () {})(),
+          text: Promise.resolve('OK'),
+          usage: Promise.resolve({ inputTokens: 0, outputTokens: 0 }),
+        }),
       };
 
       const routes = createAgentRoutes({ agent: mockAgent });
-      
+
       const req = new Request('http://localhost/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           prompt: 'Hello',
-          options: { userId: 'user-123', complexity: 'complex' },
+          options: { userId: 'user-123' },
         }),
       });
-      
+
       await routes.fetch(req);
-      
-      expect(mockAgent.generate).toHaveBeenCalledWith(
+
+      expect(mockAgent.stream).toHaveBeenCalledWith(
         expect.objectContaining({
           prompt: 'Hello',
           options: expect.objectContaining({ userId: 'user-123' }),

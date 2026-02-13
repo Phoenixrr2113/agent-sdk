@@ -25,12 +25,12 @@ describe('Wrappers', () => {
   describe('Best-of-N', () => {
     it('should generate N candidates and select the best via judge', async () => {
       const agent = createAgent({
+        name: 'best-of-n-test',
         model: createMockMultiModel([
           'Candidate 1: A basic greeting',
           'Candidate 2: An eloquent welcome',
         ]),
-        systemPrompt: 'You are a greeting writer.',
-        toolPreset: 'none',
+        instructions: 'You are a greeting writer.',
         maxSteps: 1,
       });
 

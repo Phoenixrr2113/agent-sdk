@@ -3,7 +3,7 @@
  */
 
 import type { StepResult, ToolSet } from 'ai';
-import type { Agent } from '../agent';
+import type { Agent } from '../types/agent';
 
 // ============================================================================
 // Core Types

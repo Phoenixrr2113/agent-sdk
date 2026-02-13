@@ -1,12 +1,20 @@
 /**
  * @agntk/core - Sub-Agent Role Configurations
- * Predefined configurations for specialized sub-agent roles
+ * Predefined configurations for specialized sub-agent roles.
+ *
+ * Sub-agents always use the 'full' tool preset (same as the parent agent).
+ * These configs only define role-specific instructions.
  */
 
-import type { SubAgentConfig } from '../types/agent';
+/**
+ * Configuration for a sub-agent role.
+ */
+export interface SubAgentConfig {
+  instructions: string;
+}
 
 /**
- * Sub-agent role configurations with specialized prompts, tools, and models
+ * Sub-agent role configurations with specialized prompts.
  */
 export const subAgentConfigs: Record<string, SubAgentConfig> = {
   coder: {
@@ -20,8 +28,6 @@ Always read relevant code before making changes. Match the existing style.
 Be thorough but efficient. Don't over-engineer simple tasks.
 
 When you finish, write a clear summary of what you did: files changed, key decisions made, and any issues encountered.`,
-    tools: ['glob', 'grep', 'shell', 'ast_grep_search'],
-    model: 'powerful', // resolved via tier-based model resolution
   },
 
   researcher: {
@@ -35,8 +41,6 @@ Be thorough but efficient. Focus on actionable information.
 Cite sources and provide confidence levels for findings.
 
 When you finish, write a clear summary of your findings: key facts, sources, confidence levels, and recommendations.`,
-    tools: ['web'],
-    model: 'fast', // resolved via tier-based model resolution
   },
 
   analyst: {
@@ -50,8 +54,6 @@ Be systematic and logical. Support conclusions with evidence.
 Present findings clearly with actionable insights.
 
 When you finish, write a clear summary of your analysis: key findings, trade-offs identified, and your recommendations.`,
-    tools: ['glob', 'grep', 'reasoning'],
-    model: 'powerful', // resolved via tier-based model resolution
   },
 
   generic: {
@@ -60,8 +62,6 @@ Use tools fluidly as part of your reasoning process.
 Be autonomous but ask for clarification when genuinely uncertain.
 
 When you finish, write a clear summary of what you accomplished and any important details.`,
-    tools: ['glob', 'grep', 'shell', 'web'],
-    model: 'standard', // resolved via tier-based model resolution
   },
 };
 

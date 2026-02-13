@@ -13,12 +13,15 @@ const log = createLogger('@agntk/core:observability');
 
 let initialized = false;
 
+// Hold references for shutdown/flush
+let tracerProviderRef: { forceFlush: () => Promise<void>; shutdown: () => Promise<void> } | null = null;
+
 /**
  * Initialize observability provider (currently Langfuse).
  *
  * Must be called before any AI SDK calls to enable tracing.
- * This sets up the OpenTelemetry span processor that sends
- * traces to Langfuse.
+ * This sets up a NodeTracerProvider with a SimpleSpanProcessor
+ * that sends traces to Langfuse via the LangfuseExporter.
  *
  * @example
  * ```typescript
@@ -49,30 +52,49 @@ export async function initObservability(config: ObservabilityConfig): Promise<bo
     // These are optional peer deps that may not be installed.
     const dynamicImport = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<Record<string, unknown>>;
 
-    const langfuseModule = await dynamicImport('langfuse-vercel') as { LangfuseExporter: new (config: Record<string, unknown>) => unknown };
+    const langfuseModule = await dynamicImport('langfuse-vercel') as {
+      LangfuseExporter: new (config: Record<string, unknown>) => unknown;
+    };
 
     const publicKey = config.langfuse?.publicKey ?? process.env.LANGFUSE_PUBLIC_KEY;
     const secretKey = config.langfuse?.secretKey ?? process.env.LANGFUSE_SECRET_KEY;
-    const baseUrl = config.langfuse?.baseUrl ?? process.env.LANGFUSE_BASEURL ?? 'https://cloud.langfuse.com';
+    const baseUrl = config.langfuse?.baseUrl ?? process.env.LANGFUSE_BASE_URL ?? process.env.LANGFUSE_BASEURL ?? 'https://cloud.langfuse.com';
 
     if (!publicKey || !secretKey) {
       log.warn('Langfuse keys not provided, observability disabled');
       return false;
     }
 
-    // Register the exporter with OpenTelemetry
-    const otelModule = await dynamicImport('@vercel/otel') as { registerOTel: (config: Record<string, unknown>) => void };
-
-    otelModule.registerOTel({
-      serviceName: 'agent-sdk',
-      traceExporter: new langfuseModule.LangfuseExporter({
-        publicKey,
-        secretKey,
-        baseUrl,
-        debug: config.langfuse?.debug ?? false,
-      }),
+    // Create the Langfuse exporter
+    const exporter = new langfuseModule.LangfuseExporter({
+      publicKey,
+      secretKey,
+      baseUrl,
+      debug: config.langfuse?.debug ?? false,
     });
 
+    // Use NodeTracerProvider + BatchSpanProcessor for proper trace export.
+    // @vercel/otel's registerOTel creates a ProxyTracerProvider that doesn't
+    // actually export spans outside of Vercel's runtime.
+    const nodeTracingModule = await dynamicImport('@opentelemetry/sdk-trace-node') as {
+      NodeTracerProvider: new (config?: Record<string, unknown>) => {
+        register: () => void;
+        forceFlush: () => Promise<void>;
+        shutdown: () => Promise<void>;
+      };
+      SimpleSpanProcessor: new (exporter: unknown) => unknown;
+    };
+
+    // SimpleSpanProcessor exports each span immediately (good for CLI / short-lived processes).
+    const processor = new nodeTracingModule.SimpleSpanProcessor(exporter);
+
+    // In @opentelemetry/sdk-trace-node v2.x, span processors are passed via constructor.
+    const provider = new nodeTracingModule.NodeTracerProvider({
+      spanProcessors: [processor],
+    });
+    provider.register();
+
+    tracerProviderRef = provider;
     initialized = true;
     log.info('Langfuse observability initialized', { baseUrl });
     return true;
@@ -81,7 +103,7 @@ export async function initObservability(config: ObservabilityConfig): Promise<bo
     const message = error instanceof Error ? error.message : String(error);
 
     if (message.includes('Cannot find module') || message.includes('MODULE_NOT_FOUND')) {
-      log.info('Langfuse not installed, observability features disabled. Install with: pnpm add langfuse-vercel @vercel/otel');
+      log.info('Langfuse not installed, observability features disabled. Install with: pnpm add langfuse-vercel @opentelemetry/sdk-trace-node @opentelemetry/api');
     } else {
       log.warn('Failed to initialize Langfuse observability', { error: message });
     }
@@ -99,7 +121,12 @@ export function createTelemetrySettings(options?: {
   metadata?: Record<string, unknown>;
 }): TelemetrySettings {
   return {
-    isEnabled: initialized,
+    // Use a getter so isEnabled reflects the live `initialized` state.
+    // The settings object is created before initObservability() runs,
+    // but the AI SDK reads isEnabled per-call, so this stays in sync.
+    get isEnabled() {
+      return initialized;
+    },
     functionId: options?.functionId,
     metadata: options?.metadata,
   };
@@ -120,10 +147,19 @@ export async function shutdownObservability(): Promise<void> {
   if (!initialized) return;
 
   try {
-    // The registered OTel provider handles shutdown via process events
-    log.info('Observability shutdown requested');
+    log.info('Observability shutdown requested — flushing traces');
+
+    // Flush and shutdown the NodeTracerProvider which flushes all span processors
+    if (tracerProviderRef) {
+      await tracerProviderRef.forceFlush();
+      await tracerProviderRef.shutdown();
+      tracerProviderRef = null;
+    }
+
     initialized = false;
+    log.info('Observability shutdown complete');
   } catch (error) {
     log.warn('Error during observability shutdown', { error: String(error) });
+    initialized = false;
   }
 }
