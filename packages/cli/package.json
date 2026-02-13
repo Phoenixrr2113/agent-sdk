@@ -1,6 +1,6 @@
 {
   "name": "@agntk/cli",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "type": "module",
   "description": "CLI for agntk — portable AI agent you install and point at problems",
   "bin": {

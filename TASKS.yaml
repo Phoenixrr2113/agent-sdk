@@ -1,0 +1,375 @@
+# =============================================================================
+# agntk — Active Task Backlog
+# =============================================================================
+#
+# Architecture reset: the agent model (see UNIFIED-AGENT-DESIGN.md).
+# An agent is a fully-equipped worker. No roles, no tool presets, no feature
+# flags. You give it a name, instructions, and a prompt.
+#
+# Previous phases (P0-P4) completed the foundation: memory, CLI, streaming,
+# config, skills, guardrails, reflection, observability wiring, dead code
+# cleanup. Phase 5 implements the new agent model.
+#
+# Naming: PHASE-AREA-### (e.g., P5-ARCH-001)
+# Status: draft | ready | in_progress | blocked | complete
+# =============================================================================
+
+# =============================================================================
+# PHASE 5: THE AGENT MODEL
+# =============================================================================
+#
+# This is a breaking change. The entire public API surface simplifies.
+# Order matters — ARCH-001 must land first, then everything else follows.
+# =============================================================================
+
+---
+task_id: P5-ARCH-001
+name: Rewrite createAgent() to new signature
+status: ready
+priority: critical
+
+description: |
+  Rewrite AgentOptions and createAgent() to the new minimal interface:
+
+    createAgent({ name, instructions, workspaceRoot?, model?, maxSteps?, usageLimits? })
+
+  Internally, createAgent() now:
+  - Builds ALL tools (no presets, no filtering, no enable/disable)
+  - Auto-detects memory (.agntk/ dir exists → enable)
+  - Auto-detects durability (workflow package importable → enable)
+  - Auto-detects telemetry (LANGFUSE_PUBLIC_KEY set → enable)
+  - Always enables sub-agents (with internal depth limit)
+  - Always enables approval for dangerous tools
+  - Uses internal reflection defaults
+  - Auto-discovers skills from standard directories
+  - Auto-selects model from available API keys (or uses explicit override)
+
+  The old AgentOptions fields (role, toolPreset, tools, enableTools,
+  disableTools, enableMemory, memoryOptions, durable, workflowOptions,
+  enableSubAgents, maxSpawnDepth, reflection, approval, guardrails,
+  enableTransientStreaming, telemetry, skills, systemPrompt,
+  systemPromptPrefix, modelProvider, modelName, agentId, maxToolRetries,
+  onStepFinish, onEvent, askUserHandler, subAgentRoles, stopWhen) are
+  all removed from the public type.
+
+  Internal implementation reuses existing subsystem code — this is a
+  public API change, not a rewrite of internals.
+
+acceptance_criteria:
+  - criterion: AgentOptions has only 6 fields (name, instructions, workspaceRoot, model, maxSteps, usageLimits)
+    verification: Read types/agent.ts
+  - criterion: createAgent({ name: 'test' }) works with zero other config
+    verification: Unit test
+  - criterion: All tools are built (no preset selection)
+    verification: Agent has shell, glob, grep, file_*, ast_grep_*, browser, plan, deep_reasoning, etc.
+  - criterion: Memory auto-detected when .agntk/ exists
+    verification: Unit test with mock filesystem
+  - criterion: Model auto-selected from available API keys
+    verification: Unit test with env var mocking
+  - criterion: Old options are gone from public type
+    verification: TypeScript compilation fails if old options are used
+  - criterion: Existing tests updated to new API
+    verification: pnpm test passes
+
+estimated_duration: 120 minutes
+complexity: high
+
+---
+task_id: P5-ARCH-002
+name: Internalize workflow exports and delete dead code
+status: ready
+priority: high
+
+description: |
+  The @agntk/core/workflow sub-path currently exports 50+ symbols.
+  Only 3 are used in production:
+  - wrapToolsAsDurable (used by agent.ts)
+  - checkWorkflowAvailability (used by agent.ts)
+  - getHookRegistry + error classes (used by @agntk/server)
+
+  Actions:
+  1. Delete dead code:
+     - XState machines (teamCoordinationMachine, teammateMachine) — dead
+     - createDailyBriefing, createWeeklyReport — preset factories
+     - Zero-consumer exports (createWebhook, getWdkErrors,
+       wrapToolAsIndependentStep, getDurabilityConfig, getStepName,
+       DURABILITY_CONFIG)
+     - _reset* testing utilities from public exports
+  2. Remove @agntk/core/workflow from package.json exports field
+  3. Move hook exports needed by @agntk/server to an internal path
+     (server imports directly from source, not via sub-path)
+  4. Keep workflow source files that are used internally (durable-tool,
+     hooks, utils, builders, team, schedulers) — just stop exporting them
+  5. Update @agntk/server imports to use direct paths
+  6. Delete or update tests that test deleted code
+
+acceptance_criteria:
+  - criterion: @agntk/core/workflow is no longer in package.json exports
+    verification: Read package.json
+  - criterion: XState machines deleted
+    verification: workflow/team/machines.ts does not exist
+  - criterion: Zero-consumer exports deleted
+    verification: grep for deleted symbols returns nothing
+  - criterion: "@agntk/server" still builds and works
+    verification: pnpm build --filter=@agntk/server
+  - criterion: Durable wrapping still works in createAgent
+    verification: Unit test with durable: auto-detected
+  - criterion: Hook HTTP endpoints still work
+    verification: Server integration test
+
+estimated_duration: 90 minutes
+complexity: high
+
+---
+task_id: P5-ARCH-003
+name: Delete role system
+status: blocked  # blocked by P5-ARCH-001
+priority: high
+
+description: |
+  Delete the role system entirely:
+  - presets/roles.ts
+  - presets/role-registry.ts (BUILT_IN_ROLES, getRole, registerRole)
+  - The roleConfigs export from index.ts
+  - Role-related types (AgentRole)
+  - Role-related tests
+
+  The agent's personality comes from `instructions`, not from a role enum.
+  The system prompt is now just instructions + auto-injected context
+  (memory, skills).
+
+acceptance_criteria:
+  - criterion: presets/roles.ts deleted
+    verification: File does not exist
+  - criterion: presets/role-registry.ts deleted
+    verification: File does not exist
+  - criterion: AgentRole type removed
+    verification: grep for AgentRole returns nothing
+  - criterion: agent.ts no longer references roles
+    verification: No role imports or role-based logic
+  - criterion: Build succeeds
+    verification: pnpm build
+
+estimated_duration: 30 minutes
+complexity: low
+
+---
+task_id: P5-ARCH-004
+name: Delete tool presets
+status: blocked  # blocked by P5-ARCH-001
+priority: high
+
+description: |
+  Delete the tool preset system:
+  - presets/tools.ts (toolPresets, createToolPreset, ToolPresetLevel,
+    ToolPresetOptions)
+  - The toolPresets/createToolPreset exports from index.ts
+
+  createAgent() now calls ALL tool factories unconditionally.
+  The buildTools() function in agent.ts simplifies to just
+  "create everything, merge, done."
+
+acceptance_criteria:
+  - criterion: presets/tools.ts deleted
+    verification: File does not exist
+  - criterion: ToolPreset type removed
+    verification: grep for ToolPreset returns nothing
+  - criterion: Agent has all tools regardless of any option
+    verification: Unit test checking tool count
+
+estimated_duration: 20 minutes
+complexity: low
+
+---
+task_id: P5-ARCH-005
+name: Update CLI for new agent model
+status: blocked  # blocked by P5-ARCH-001
+priority: high
+
+description: |
+  Update the CLI to match the new agent model:
+  - Remove --role / -r flag
+  - Remove --tools flag
+  - CLI creates agent with just name + instructions derived from context
+  - The agent name could default to "agntk-cli" or similar
+  - Instructions built from environment detection (OS, shell, cwd, etc.)
+    which the CLI already does in detectEnvironment()
+  - --model flag stays (escape hatch)
+  - --memory flag: rethink — maybe auto-detect instead of flag?
+  - --init flag stays (creates .agntk/ directory)
+  - --workspace, --max-steps, --verbose, --config, --dry-run stay
+
+acceptance_criteria:
+  - criterion: --role and --tools flags removed from arg parser
+    verification: Read args.ts
+  - criterion: CLI creates agent with new API (name + instructions)
+    verification: Read runner.ts
+  - criterion: npx agntk "do something" still works
+    verification: Manual test
+  - criterion: npx agntk -i still works (REPL)
+    verification: Manual test
+  - criterion: --help output reflects new flags
+    verification: Run agntk --help
+
+estimated_duration: 45 minutes
+complexity: medium
+
+---
+task_id: P5-ARCH-006
+name: Remove @agntk/core/tools sub-path from public API
+status: blocked  # blocked by P5-ARCH-001
+priority: medium
+
+description: |
+  If users can't customize tools, the @agntk/core/tools sub-path is
+  internal. Remove it from package.json exports. Internal code that
+  imports tool factories already uses direct source paths.
+
+  Evaluate: does anything outside packages/sdk import from
+  @agntk/core/tools? If so, update those imports.
+
+acceptance_criteria:
+  - criterion: "@agntk/core/tools" removed from package.json exports
+    verification: Read package.json
+  - criterion: No external packages import from @agntk/core/tools
+    verification: grep across workspace
+  - criterion: Build succeeds
+    verification: pnpm build
+
+estimated_duration: 15 minutes
+complexity: low
+
+---
+task_id: P5-DOC-001
+name: Rewrite README for new agent model
+status: blocked  # blocked by P5-ARCH-001
+priority: high
+
+description: |
+  Rewrite README.md to match the new API:
+  - Lead with the simple createAgent({ name, instructions }) example
+  - Show CLI usage (npx agntk "do something")
+  - Explain auto-detection (memory, tools, models)
+  - Show skills as the extension mechanism
+  - Keep server/client/logger sections
+  - Remove all role/preset/toolPreset documentation
+  - Under 200 lines
+
+estimated_duration: 30 minutes
+complexity: low
+
+---
+task_id: P5-TEST-001
+name: Write tests for new agent model
+status: blocked  # blocked by P5-ARCH-001
+priority: high
+
+description: |
+  Write/update tests covering the new createAgent behavior:
+  - Minimal creation (name only)
+  - All tools present by default
+  - Memory auto-detection (with and without .agntk/ dir)
+  - Durability auto-detection (with and without workflow package)
+  - Model auto-selection (various API key combinations)
+  - Skills auto-discovery
+  - maxSteps and usageLimits work
+  - model override works
+  - Old options cause TypeScript errors (compile-time test)
+
+  Also update existing integration tests that use the old API.
+
+estimated_duration: 90 minutes
+complexity: medium
+
+# =============================================================================
+# PHASE 5b: POLISH & SHIP (after architecture lands)
+# =============================================================================
+
+---
+task_id: P5-TEST-002
+name: Write memory unit and integration tests
+status: draft
+priority: medium
+
+description: |
+  Carried from P4-TEST-002. Write unit tests for: MemoryStore (all
+  load/save operations), loader (merging, ordering, missing files),
+  extraction (prompt format, LLM interaction), and tools (all 4 tools).
+  Write integration test for end-to-end: create agent with memory →
+  remember fact → new session → fact is loaded.
+
+estimated_duration: 60 minutes
+complexity: medium
+
+---
+task_id: P5-EX-001
+name: Build examples
+status: draft
+priority: medium
+
+description: |
+  Create 2-3 runnable examples demonstrating the new agent model:
+  - examples/file-organizer/ — npx agntk "organize this folder"
+  - examples/codebase-assistant/ — interactive REPL with memory
+  - examples/research-agent/ — agent with custom skills
+
+  Each gets a README and can be run with a single command.
+
+estimated_duration: 60 minutes
+complexity: low
+
+---
+task_id: P5-PUB-001
+name: Configure changesets and publish pipeline
+status: blocked  # blocked by P5-ARCH-001 + P5-TEST-001 + P5-DOC-001
+priority: high
+
+description: |
+  Carried from P4-PUB-001. Configure changesets for all @agntk/*
+  packages. This is a major version bump (breaking API change).
+  Verify npx agntk works after local publish. Test with verdaccio
+  or dry-run.
+
+estimated_duration: 30 minutes
+complexity: low
+
+# =============================================================================
+# DEFERRED
+# =============================================================================
+
+---
+task_id: P1-SDK-001
+name: Extract workflow features to @agntk/workflow package
+status: draft  # deferred — less relevant now that workflow is internalized
+priority: low
+
+description: |
+  Move packages/sdk/src/workflow/ to a new packages/workflow/ package.
+  Less urgent now that workflow exports are internalized. May not be
+  needed if the workflow code stays small.
+
+estimated_duration: 90 minutes
+complexity: high
+
+# =============================================================================
+# DEPENDENCY GRAPH
+# =============================================================================
+#
+# P5-ARCH-001 (rewrite createAgent)      — no blockers, do first
+# P5-ARCH-002 (internalize workflow)     — no blockers, can parallel with 001
+# P5-ARCH-003 (delete roles)            — blocked by 001
+# P5-ARCH-004 (delete tool presets)     — blocked by 001
+# P5-ARCH-005 (update CLI)             — blocked by 001
+# P5-ARCH-006 (remove tools sub-path)  — blocked by 001
+# P5-DOC-001  (rewrite README)         — blocked by 001
+# P5-TEST-001 (new model tests)        — blocked by 001
+# P5-TEST-002 (memory tests)           — no blockers
+# P5-EX-001   (examples)               — blocked by 001 + 005
+# P5-PUB-001  (publish)                — blocked by 001 + TEST-001 + DOC-001
+#
+# Suggested execution order:
+#   1. P5-ARCH-001 + P5-ARCH-002 (parallel)
+#   2. P5-ARCH-003 + P5-ARCH-004 + P5-ARCH-005 + P5-ARCH-006 (parallel, all unblock after 001)
+#   3. P5-DOC-001 + P5-TEST-001 + P5-TEST-002 (parallel)
+#   4. P5-EX-001
+#   5. P5-PUB-001

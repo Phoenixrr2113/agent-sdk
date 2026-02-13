@@ -1,6 +1,6 @@
 ---
 title: "SDK Core"
-description: "Core agent factory — tools, streaming, memory, sub-agents, durability, hooks"
+description: "Core agent factory — tools, roles, config, streaming, durability, hooks, scheduling"
 ---
 
 ## Creating an Agent

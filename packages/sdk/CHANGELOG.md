@@ -1,5 +1,29 @@
 # @agntk/core
 
+## 0.2.0
+
+### Minor Changes
+
+- ### Breaking Changes
+  - **Unified Agent API**: `createAgent()` now uses `name` and `instructions` instead of `role` and `toolPreset`
+  - **Removed**: Legacy workflow builders (`adapt`, `parallel`, `pipeline`), team coordination (`createTeam`), agent pooling (`SpecialistPool`), workflow schedulers, and workflow templates
+  - **Removed**: Role registry and preset role system (`role-registry`, `roles.ts`)
+
+  ### New Features
+  - Simplified `createAgent()` API with automated internal configuration
+  - Overhauled CLI with consolidated single-file architecture
+  - Auto-sync README to docs site
+
+  ### Fixes & Improvements
+  - Updated SDK server routes and types for new agent model
+  - Cleaned up exports and reduced bundle size
+  - Updated documentation and examples throughout
+
+### Patch Changes
+
+- Updated dependencies
+  - @agntk/logger@0.2.0
+
 ## 0.1.2
 
 ### Patch Changes
