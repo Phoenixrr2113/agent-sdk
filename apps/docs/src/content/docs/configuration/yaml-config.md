@@ -5,16 +5,16 @@ description: Configure Agent SDK with config files and environment variables
 
 # Configuration System
 
-The SDK uses a cascading config system:
+The SDK uses a cascading config system (highest priority first):
 
-1. **Config file** — `agntk.config.json` in your project root
-2. **Programmatic** — `configure()` at runtime
-3. **Environment variables** — `MODEL_FAST`, `MODEL_STANDARD`, etc.
+1. **Environment variables** — `AGENT_SDK_MODEL_FAST`, `AGENT_SDK_DEFAULT_PROVIDER`, etc.
+2. **Config file** — `agent-sdk.config.yaml`, `.agent-sdk.json`, etc.
+3. **Programmatic** — `configure()` at runtime
 4. **Defaults** — built-in fallbacks
 
 ## Configuration File
 
-Create `agntk.config.json` in your project root:
+Create `agent-sdk.config.yaml` (or `.json`) in your project root:
 
 ```json
 {
@@ -27,13 +27,6 @@ Create `agntk.config.json` in your project root:
       "powerful": "anthropic/claude-sonnet-4"
     }
   },
-  "roles": {
-    "debugger": {
-      "systemPrompt": "You are a debugging specialist for this project.",
-      "recommendedModel": "reasoning",
-      "defaultTools": ["shell", "grep", "glob"]
-    }
-  },
   "tools": {
     "shell": {
       "timeout": 30000
@@ -42,7 +35,7 @@ Create `agntk.config.json` in your project root:
       "maxFiles": 100
     }
   },
-  "maxSteps": 10
+  "maxSteps": 25
 }
 ```
 
@@ -52,7 +45,7 @@ Create `agntk.config.json` in your project root:
 import { loadConfig, configure, getConfig, resolveModel } from '@agntk/core';
 
 // Load from file
-const config = loadConfig('./agntk.config.json');
+const config = loadConfig('./agent-sdk.config.json');
 
 // Override programmatically
 configure({ models: { defaultProvider: 'openrouter' } });
@@ -101,32 +94,7 @@ export OLLAMA_ENABLED=true
 | `reasoning` | Complex logic, planning | `deepseek/deepseek-r1` |
 | `powerful` | Best quality, highest cost | `z-ai/glm-4.7` |
 
-Override per-tier models via environment variables: `MODEL_FAST`, `MODEL_STANDARD`, `MODEL_REASONING`, `MODEL_POWERFUL`.
-
-## Custom Roles
-
-Define custom roles in your config:
-
-```json
-{
-  "roles": {
-    "myCustomRole": {
-      "systemPrompt": "You are a specialist.",
-      "recommendedModel": "powerful",
-      "defaultTools": ["shell", "grep", "glob", "browser"]
-    }
-  }
-}
-```
-
-Then use it:
-
-```typescript
-const agent = createAgent({
-  role: 'myCustomRole',
-  toolPreset: 'standard',
-});
-```
+Override per-tier models via environment variables: `AGENT_SDK_MODEL_FAST`, `AGENT_SDK_MODEL_STANDARD`, `AGENT_SDK_MODEL_REASONING`, `AGENT_SDK_MODEL_POWERFUL`.
 
 ## Tool Configuration
 

@@ -6,7 +6,7 @@ A modular AI agent framework built on [Vercel AI SDK](https://ai-sdk.dev). Zero-
 
 | Package | Description |
 |---------|-------------|
-| `@agntk/core` | Core agent factory — tools, roles, config, streaming, durability, hooks, scheduling |
+| `@agntk/core` | Core agent factory — tools, streaming, memory, sub-agents, durability, hooks, scheduling |
 | `@agntk/cli` | CLI agent — one-shot prompts, interactive REPL, persistent memory |
 | `agntk` | Thin CLI wrapper — enables `npx agntk` usage |
 | `@agntk/server` | Hono HTTP server — REST + SSE + WebSocket endpoints |
@@ -31,156 +31,101 @@ pnpm test
 import { createAgent } from '@agntk/core';
 
 const agent = createAgent({
-  role: 'coder',
-  toolPreset: 'standard',
+  name: 'my-agent',
+  instructions: 'You are a helpful coding assistant.',
   workspaceRoot: process.cwd(),
-  maxSteps: 10,
+  maxSteps: 25,
 });
 
-// Synchronous generation
-const result = await agent.generate({ prompt: 'Read package.json and list the dependencies' });
-console.log(result.text);
-console.log(result.steps);
+const result = await agent.stream({ prompt: 'Read package.json and list the dependencies' });
 
-// Streaming generation
-const stream = await agent.stream({ prompt: 'Explain this codebase' });
-
-for await (const chunk of stream.fullStream) {
-  if (chunk.type === 'text-delta') process.stdout.write(chunk.textDelta);
+for await (const chunk of result.fullStream) {
+  if (chunk.type === 'text-delta') process.stdout.write(chunk.text ?? '');
 }
 
-const text = await stream.text;
+const text = await result.text;
 ```
 
 ### Agent Interface
 
 ```typescript
 interface Agent {
-  agentId: string;
-  role: AgentRole;
+  readonly name: string;
   init(): Promise<void>;              // Loads memory context, initializes telemetry
-  generate(input: { prompt: string }): Promise<GenerateResult>;
-  stream(input: { prompt: string }): Promise<StreamResult>;
-  getToolLoopAgent(): ToolLoopAgent;   // Access underlying AI SDK instance
+  stream(input: { prompt: string }): Promise<AgentStreamResult>;
   getSystemPrompt(): string;
+  getToolNames(): string[];
+}
+
+interface AgentStreamResult {
+  fullStream: AsyncIterable<StreamChunk>;   // All event types
+  text: PromiseLike<string>;                // Final accumulated text
+  usage: PromiseLike<LanguageModelUsage>;   // Token usage
 }
 ```
 
-`init()` is called automatically by `generate()` and `stream()` on first use.
+`init()` is called automatically by `stream()` on first use.
 
 ### `AgentOptions` Reference
 
 ```typescript
 const agent = createAgent({
   // ── Identity ──────────────────────────────────────────────
-  role: 'coder',                // 'generic' | 'coder' | 'researcher' | 'analyst'
-  systemPrompt: 'You are...',   // Override role-based system prompt
-  systemPromptPrefix: '...',    // Prepend context without replacing role prompt
-  agentId: 'my-agent-1',       // Custom identifier
+  name: 'deploy-bot',                // Display name (required) — used in logs, traces, memory
+  instructions: 'You manage...',     // Natural language context injected as system prompt
 
   // ── Model ─────────────────────────────────────────────────
-  model: myModelInstance,       // AI SDK LanguageModel (highest priority)
-  modelProvider: 'openrouter',  // 'openrouter' | 'ollama' | 'openai'
-  modelName: 'google/gemini-3-flash-preview',
+  model: myModelInstance,            // AI SDK LanguageModel (optional override)
+  // Most users don't need this — the agent auto-selects the best available model
 
   // ── Tools ─────────────────────────────────────────────────
-  toolPreset: 'standard',      // 'none' | 'minimal' | 'standard' | 'full'
-  tools: { myTool: ... },      // Custom tools (merged with preset)
-  enableTools: ['shell'],       // Whitelist — only these tools active
-  disableTools: ['browser'],    // Blacklist — remove from preset
-  maxToolRetries: 3,            // Retries per tool on ModelRetry errors
+  tools: { myTool: ... },           // Custom tools (merged with built-in tools)
 
   // ── Execution ─────────────────────────────────────────────
-  maxSteps: 10,                 // Max tool-loop iterations (default: 10)
-  usageLimits: {                // Token and request caps
+  maxSteps: 25,                      // Max tool-loop iterations (default: 25)
+  usageLimits: {                     // Token and request caps
     maxRequests: 20,
     maxTotalTokens: 100_000,
   },
-  reflection: {                 // Reflection between tool steps
-    strategy: 'reflact',        // 'reflact' | 'periodic' | 'none'
-  },
-
-  // ── Approval & Guardrails ─────────────────────────────────
-  approval: true,               // Require human approval for dangerous tools
-  guardrails: {                 // Input/output validation (generate only)
-    output: [contentFilter()],
-    onBlock: 'retry',
-  },
-
-  // ── Sub-Agents ────────────────────────────────────────────
-  enableSubAgents: true,        // Adds spawn_agent tool (default: false)
-  maxSpawnDepth: 2,             // Prevent infinite recursion (default: 2)
-
-  // ── Durability ────────────────────────────────────────────
-  durable: true,                // Wrap tools with workflow step directives
-  workflowOptions: {
-    defaultRetryCount: 3,
-    defaultTimeout: '5m',
-  },
-
-  // ── Memory ────────────────────────────────────────────────
-  enableMemory: true,           // Markdown-based persistent memory
-  memoryOptions: {
-    projectDir: './.agntk',
-    globalDir: '~/.agntk',
-  },
-
-  // ── Skills ────────────────────────────────────────────────
-  skills: {
-    directories: ['.agents/skills'],  // Discovers SKILL.md files
-  },
 
   // ── Environment ───────────────────────────────────────────
-  workspaceRoot: process.cwd(), // Root for file operations
-
-  // ── Telemetry ─────────────────────────────────────────────
-  telemetry: {                  // Langfuse integration (optional peer deps)
-    provider: { provider: 'langfuse' },
-    functionId: 'my-agent',
-  },
+  workspaceRoot: process.cwd(),      // Root for file operations
 });
 ```
 
-### Tool Presets
+### Built-in Tools
 
-| Preset | Tools |
-|--------|-------|
-| `none` | No tools |
-| `minimal` | `glob` |
-| `standard` | `glob`, `grep`, `file_read`, `file_write`, `file_edit`, `file_create`, `search_skills`, `shell`, `background`, `plan`, `deep_reasoning` |
-| `full` | All standard tools + `ast_grep_search`, `ast_grep_replace`, `progress_read`, `progress_update`, `browser` |
+Every agent comes with a full set of 20 built-in tools:
 
-Custom tools are always merged with the preset:
+| Category | Tools |
+|----------|-------|
+| **Files** | `file_read`, `file_write`, `file_edit`, `file_create`, `glob`, `grep` |
+| **Code** | `ast_grep_search`, `ast_grep_replace` |
+| **Shell** | `shell`, `background` |
+| **Planning** | `plan`, `deep_reasoning` |
+| **Memory** | `remember`, `recall`, `update_context`, `forget` |
+| **Sub-Agents** | `spawn_agent` |
+| **Skills** | `search_skills` |
+| **Progress** | `progress_read`, `progress_update` |
+| **Browser** | `browser` |
+
+Custom tools are merged with the built-in set:
 
 ```typescript
 const agent = createAgent({
-  toolPreset: 'standard',
+  name: 'my-agent',
   tools: { myCustomTool },
-  disableTools: ['shell'],
 });
 ```
-
-### Roles
-
-Each role provides a tuned system prompt and recommended model tier:
-
-| Role | Model Tier | Description |
-|------|-----------|-------------|
-| `generic` | standard | General-purpose assistant |
-| `coder` | powerful | Software engineering — reads/writes code, runs shell commands |
-| `researcher` | standard | Information gathering and analysis |
-| `analyst` | standard | Data analysis and reporting |
-
-Custom roles can be registered programmatically via `registerRole()` or defined in a config file.
 
 ### Streaming
 
 ```typescript
-const stream = await agent.stream({ prompt: 'Build a REST API' });
+const result = await agent.stream({ prompt: 'Build a REST API' });
 
-for await (const chunk of stream.fullStream) {
+for await (const chunk of result.fullStream) {
   switch (chunk.type) {
-    case 'text-delta':    console.log(chunk.textDelta); break;
+    case 'text-delta':    console.log(chunk.text); break;
     case 'tool-call':     console.log('Calling:', chunk.toolName); break;
     case 'tool-result':   console.log('Result:', chunk.result); break;
     case 'step-finish':   console.log('Step done'); break;
@@ -188,7 +133,7 @@ for await (const chunk of stream.fullStream) {
   }
 }
 
-const text = await stream.text;
+const text = await result.text;
 ```
 
 ### Configuration
@@ -219,18 +164,11 @@ Config file discovery order: `AGENT_SDK_CONFIG` env var > `agent-sdk.config.yaml
       }
     }
   },
-  "roles": {
-    "debugger": {
-      "systemPrompt": "You are a debugging specialist.",
-      "recommendedModel": "reasoning",
-      "defaultTools": ["shell", "grep", "glob"]
-    }
-  },
   "tools": {
     "shell": { "timeout": 30000 },
     "glob": { "maxFiles": 100 }
   },
-  "maxSteps": 10
+  "maxSteps": 25
 }
 ```
 
@@ -278,64 +216,14 @@ export OLLAMA_ENABLED=true
 
 Override per-tier via environment variables: `AGENT_SDK_MODEL_FAST`, `AGENT_SDK_MODEL_STANDARD`, `AGENT_SDK_MODEL_REASONING`, `AGENT_SDK_MODEL_POWERFUL`.
 
-### Approval
-
-Require human approval before executing dangerous tools (`shell`, `browser`, `file_write`, `file_edit`, `file_create`):
-
-```typescript
-const agent = createAgent({
-  approval: true,  // Enable for default dangerous tools
-});
-
-// Fine-grained control:
-const agent = createAgent({
-  approval: {
-    enabled: true,
-    tools: ['shell'],
-    timeout: 30000,
-  },
-});
-```
-
-### Guardrails
-
-Input/output validation with built-in guardrails:
-
-```typescript
-import { contentFilter, topicFilter, lengthLimit } from '@agntk/core/advanced';
-
-const agent = createAgent({
-  guardrails: {
-    input: [topicFilter(['harmful-topic'])],
-    output: [contentFilter({ redact: true }), lengthLimit({ maxChars: 5000 })],
-    onBlock: 'retry',   // 'throw' | 'retry' | 'filter'
-    maxRetries: 3,
-  },
-});
-```
-
-Built-in guardrails: `contentFilter` (PII detection/redaction), `topicFilter` (keyword/regex blocklist), `lengthLimit` (character/word limits), `custom` (arbitrary check function).
-
-### Reflection
-
-Inject goal-state reflection between tool steps:
-
-```typescript
-const agent = createAgent({
-  reflection: { strategy: 'reflact' },      // After every step
-  // or
-  reflection: { strategy: 'periodic', frequency: 3 },  // Every 3 steps
-});
-```
-
 ### Memory
 
-Markdown-file-based persistent memory using `.agntk/` (project-local) and `~/.agntk/` (global):
+Markdown-file-based persistent memory is always enabled. State is stored at `~/.agntk/agents/{name}/`:
 
 ```typescript
-const agent = createAgent({ enableMemory: true });
-// Adds tools: remember, recall, update_context, forget
-// Auto-loads memory context into system prompt on first generate/stream
+const agent = createAgent({ name: 'my-agent' });
+// Memory tools are always available: remember, recall, update_context, forget
+// Memory context is auto-loaded into the system prompt on first stream()
 ```
 
 **Memory files**:
@@ -355,7 +243,8 @@ Auto-discover `SKILL.md` files and inject into the agent's system prompt:
 
 ```typescript
 const agent = createAgent({
-  skills: { directories: ['.agents/skills'] },
+  name: 'my-agent',
+  // Skills are auto-discovered from default directories
 });
 ```
 
@@ -363,28 +252,35 @@ Default discovery directories: `.claude/skills`, `.cursor/skills`, `.agents/skil
 
 Skills support YAML frontmatter with `name`, `description`, `tags`, `when_to_use`, `requires-binaries`, `requires-env`, and more. Eligibility filtering checks that required binaries and env vars are present.
 
+### Sub-Agents
+
+Sub-agent spawning is always available via the `spawn_agent` tool:
+
+```typescript
+const agent = createAgent({
+  name: 'coordinator',
+  instructions: 'You coordinate work across specialized sub-agents.',
+});
+
+// The agent can use spawn_agent to delegate tasks to sub-agents with roles:
+// coder, researcher, analyst, generic
+```
+
 ### Durable Agents
 
 Wrap tools with Workflow DevKit step directives for crash recovery:
 
 ```typescript
-const agent = createAgent({
-  durable: true,
-  workflowOptions: {
-    defaultRetryCount: 3,
-    defaultTimeout: '5m',
-  },
-});
+// Durability is auto-enabled when the workflow package is available
+// Requires the `workflow` package (optional peer dependency)
 ```
-
-Requires the `workflow` package (optional peer dependency). Without it, durable wrapping is inert.
 
 ### Workflow Hooks
 
 Human-in-the-loop approval with typed hooks:
 
 ```typescript
-import { defineHook, getHookRegistry } from '@agntk/core/workflow';
+import { defineHook, getHookRegistry } from '@agntk/core/advanced';
 
 const approvalHook = defineHook<{ amount: number }, boolean>({
   name: 'purchase-approval',
@@ -396,35 +292,10 @@ const approvalHook = defineHook<{ amount: number }, boolean>({
 const approved = await approvalHook.wait({ amount: 5000 });
 ```
 
-### Workflow Builders
+### Duration Utilities
 
 ```typescript
-import { createPipeline, createParallel, createTeam } from '@agntk/core/workflow';
-
-// Sequential agent chain
-const pipeline = createPipeline([researchAgent, writerAgent, editorAgent]);
-
-// Parallel execution with synthesis
-const parallel = createParallel([agent1, agent2], synthesizeFn);
-
-// Multi-agent team with coordinator
-const team = createTeam({ coordinator, members: [coder, tester] });
-```
-
-### Scheduled Workflows
-
-```typescript
-import { createScheduledWorkflow, parseDuration, formatDuration } from '@agntk/core/workflow';
-
-const schedule = createScheduledWorkflow({
-  name: 'daily-check',
-  interval: '1h',
-  task: async (iteration) => `Check #${iteration} passed`,
-  onTick: (result, i) => console.log(result),
-  maxIterations: 24,
-});
-
-await schedule.start();
+import { parseDuration, formatDuration } from '@agntk/core/advanced';
 
 parseDuration('2h');      // 7200000 (ms)
 formatDuration(7200000);  // "2h"
@@ -436,10 +307,8 @@ Advanced features are available via sub-path imports:
 
 ```typescript
 import { ... } from '@agntk/core';           // Core essentials
-import { ... } from '@agntk/core/workflow';   // Durability, hooks, teams, pipelines, scheduling
-import { ... } from '@agntk/core/tools';      // Tool factories
 import { ... } from '@agntk/core/evals';      // Eval suite and assertions
-import { ... } from '@agntk/core/advanced';   // Guardrails, reflection, observability, streaming
+import { ... } from '@agntk/core/advanced';   // Durability, hooks, guardrails, reflection, observability, streaming
 ```
 
 ---
@@ -450,32 +319,28 @@ import { ... } from '@agntk/core/advanced';   // Guardrails, reflection, observa
 # One-shot prompt
 agntk "organize this folder by date"
 
-# Interactive REPL
-agntk -i --memory
+# Named agent (enables persistent memory)
+agntk -n my-agent "fix the failing tests"
 
-# With specific role and model
-agntk --role coder --model google/gemini-3-flash-preview "fix the failing tests"
+# Interactive REPL
+agntk -i
+
+# With custom instructions
+agntk --name code-reviewer --instructions "You are a code reviewer" "review src/"
 
 # Pipe input
 cat error.log | agntk "explain these errors"
-
-# Dry run (preview actions)
-agntk --dry-run "delete old logs"
 ```
 
 | Flag | Short | Description |
 |------|-------|-------------|
+| `--name` | `-n` | Agent name (enables persistent memory) |
+| `--instructions` | | System prompt text |
 | `--interactive` | `-i` | Interactive REPL mode |
-| `--role` | `-r` | Agent role (`generic`, `coder`, `researcher`, `analyst`) |
-| `--model` | `-m` | Model to use (e.g. `google/gemini-3-flash-preview`) |
-| `--memory` | | Enable persistent memory |
-| `--tools` | | Tool preset (`minimal`, `standard`, `full`) |
 | `--workspace` | | Workspace root (default: cwd) |
-| `--max-steps` | | Maximum agent steps |
-| `--dry-run` | | Preview actions without executing |
-| `--verbose` | | Show detailed logging |
-| `--config` | | Config file path |
-| `--init` | | Initialize `.agntk/` directory with templates |
+| `--max-steps` | | Maximum agent steps (default: 25) |
+| `--verbose` | | Show full tool args/output |
+| `--quiet` | `-q` | Text output only (for piping) |
 | `--version` | `-v` | Show version |
 | `--help` | `-h` | Show help |
 
@@ -489,7 +354,7 @@ Hono-based HTTP server with REST, SSE streaming, and WebSocket endpoints.
 import { createAgentServer } from '@agntk/server';
 import { createAgent } from '@agntk/core';
 
-const agent = createAgent({ role: 'coder', toolPreset: 'standard' });
+const agent = createAgent({ name: 'server-agent', instructions: 'You are a helpful assistant.' });
 const server = createAgentServer({ agent, port: 3000 });
 server.start();
 ```
@@ -499,7 +364,7 @@ server.start();
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Health check |
-| `GET` | `/status` | Agent info (role, tools, model) |
+| `GET` | `/status` | Agent info (name, tools, model) |
 | `GET` | `/queue` | Concurrency queue stats |
 | `GET` | `/config` | Read config file |
 | `PUT` | `/config` | Update config file |
@@ -584,7 +449,7 @@ agent-sdk/
 - Node.js >= 20
 - pnpm >= 9
 - Workflow DevKit (optional, for durable workflows)
-- Langfuse + @vercel/otel (optional, for observability)
+- Langfuse + @opentelemetry/sdk-trace-node (optional, for observability)
 
 ## License
 

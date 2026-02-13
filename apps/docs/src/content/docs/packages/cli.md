@@ -7,32 +7,28 @@ description: "CLI agent — one-shot prompts, interactive REPL, persistent memor
 # One-shot prompt
 agntk "organize this folder by date"
 
-# Interactive REPL
-agntk -i --memory
+# Named agent (enables persistent memory)
+agntk -n my-agent "fix the failing tests"
 
-# With specific role and model
-agntk --role coder --model google/gemini-3-flash-preview "fix the failing tests"
+# Interactive REPL
+agntk -i
+
+# With custom instructions
+agntk --name code-reviewer --instructions "You are a code reviewer" "review src/"
 
 # Pipe input
 cat error.log | agntk "explain these errors"
-
-# Dry run (preview actions)
-agntk --dry-run "delete old logs"
 ```
 
 | Flag | Short | Description |
 |------|-------|-------------|
+| `--name` | `-n` | Agent name (enables persistent memory) |
+| `--instructions` | | System prompt text |
 | `--interactive` | `-i` | Interactive REPL mode |
-| `--role` | `-r` | Agent role (`generic`, `coder`, `researcher`, `analyst`) |
-| `--model` | `-m` | Model to use (e.g. `google/gemini-3-flash-preview`) |
-| `--memory` | | Enable persistent memory |
-| `--tools` | | Tool preset (`minimal`, `standard`, `full`) |
 | `--workspace` | | Workspace root (default: cwd) |
-| `--max-steps` | | Maximum agent steps |
-| `--dry-run` | | Preview actions without executing |
-| `--verbose` | | Show detailed logging |
-| `--config` | | Config file path |
-| `--init` | | Initialize `.agntk/` directory with templates |
+| `--max-steps` | | Maximum agent steps (default: 25) |
+| `--verbose` | | Show full tool args/output |
+| `--quiet` | `-q` | Text output only (for piping) |
 | `--version` | `-v` | Show version |
 | `--help` | `-h` | Show help |
 

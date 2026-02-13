@@ -14,49 +14,39 @@ pnpm add @agntk/core
 import { createAgent } from '@agntk/core';
 
 const agent = createAgent({
-  role: 'coder',
-  toolPreset: 'standard',
+  name: 'my-agent',
+  instructions: 'You are a helpful coding assistant.',
   workspaceRoot: process.cwd(),
 });
 
-// Generate (waits for full response)
-const result = await agent.generate({
+const result = await agent.stream({
   prompt: 'Read package.json and summarize the dependencies',
 });
-console.log(result.text);
-console.log(result.steps);  // Array of tool calls and results
 
-// Stream (real-time chunks)
-const stream = await agent.stream({ prompt: 'Explain this codebase' });
-for await (const chunk of stream.fullStream) {
-  if (chunk.type === 'text-delta') process.stdout.write(chunk.textDelta);
+for await (const chunk of result.fullStream) {
+  if (chunk.type === 'text-delta') process.stdout.write(chunk.text ?? '');
 }
-// Or just get the text after the stream finishes:
-const text = await stream.text;
+
+const text = await result.text;
 ```
 
 ## Agent Interface
 
 ```typescript
 interface Agent {
-  agentId: string;
-  role: string;
+  readonly name: string;
 
-  generate(input: { prompt: string }): Promise<GenerateResult>;
-  stream(input: { prompt: string }): Promise<StreamResult>;
+  init(): Promise<void>;              // Called automatically by stream()
+  stream(input: { prompt: string }): Promise<AgentStreamResult>;
 
   getSystemPrompt(): string;
-  getToolLoopAgent(): ToolLoopAgent;
+  getToolNames(): string[];
 }
 
-interface GenerateResult {
-  text: string;
-  steps: StepResult[];  // Each step contains toolCalls and toolResults
-}
-
-interface StreamResult {
-  fullStream: AsyncIterable<StreamChunk>;  // All event types
-  text: Promise<string>;                   // Final accumulated text
+interface AgentStreamResult {
+  fullStream: AsyncIterable<StreamChunk>;   // All event types
+  text: PromiseLike<string>;                // Final accumulated text
+  usage: PromiseLike<LanguageModelUsage>;   // Token usage
 }
 ```
 
@@ -64,50 +54,42 @@ interface StreamResult {
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `role` | `'generic' \| 'coder' \| 'researcher' \| 'analyst'` | `'generic'` | Predefined role with system prompt |
-| `systemPrompt` | `string` | Role default | Override system prompt |
-| `systemPromptPrefix` | `string` | None | Prepend context without replacing role prompt |
-| `agentId` | `string` | Auto-generated | Unique identifier |
-| `maxSteps` | `number` | `10` | Max tool-loop iterations |
-| `model` | `LanguageModel` | Auto-resolved | AI SDK model instance |
-| `modelProvider` | `string` | Config default | `'openrouter' \| 'openai' \| 'ollama'` (extensible) |
-| `modelName` | `string` | Tier default | Specific model name |
-| `toolPreset` | `string` | `'standard'` | `'none' \| 'minimal' \| 'standard' \| 'full'` |
-| `tools` | `Record<string, Tool>` | `{}` | Custom tools (merged with preset) |
-| `enableTools` | `string[]` | All | Whitelist — only these tools active |
-| `disableTools` | `string[]` | None | Blacklist — remove from preset |
-| `enableSubAgents` | `boolean` | `false` | Adds `spawn_agent` tool |
-| `maxSpawnDepth` | `number` | `2` | Max sub-agent nesting |
-| `durable` | `boolean` | `false` | Wrap as DurableAgent |
-| `enableMemory` | `boolean` | `false` | Markdown-based persistent memory |
-| `brain` | `BrainInstance` | None | Knowledge graph (auto-injects tools) |
-| `skills` | `SkillsConfig` | None | Auto-discover SKILL.md files |
+| `name` | `string` | **required** | Display name — used in logs, traces, and persistent memory |
+| `instructions` | `string` | None | Natural language context injected as the system prompt |
 | `workspaceRoot` | `string` | `process.cwd()` | Root for file operations |
-| `enableTransientStreaming` | `boolean` | `true` | Stream tool data without context |
-| `onStepFinish` | `(step, index) => void` | None | After each step |
-| `askUserHandler` | `(question) => Promise<string>` | None | Human-in-the-loop input |
+| `maxSteps` | `number` | `25` | Max tool-loop iterations |
+| `model` | `LanguageModel` | Auto-resolved | AI SDK model instance (optional override) |
+| `usageLimits` | `UsageLimits` | None | Token and request caps |
+| `tools` | `Record<string, Tool>` | `{}` | Custom tools (merged with built-in tools) |
 
-## Tool Presets
+## Built-in Tools
 
-| Preset | Tools |
-|--------|-------|
-| `none` | No tools |
-| `minimal` | `glob` |
-| `standard` | `glob`, `grep`, `file_read`, `file_create`, `file_edit`, `shell`, `background`, `plan`, `deep_reasoning`, `search_skills` |
-| `full` | All standard tools + `ast_grep_search`, `ast_grep_replace`, `progress`, `browser` |
+Every agent comes with 20 built-in tools:
+
+| Category | Tools |
+|----------|-------|
+| **Files** | `file_read`, `file_write`, `file_edit`, `file_create`, `glob`, `grep` |
+| **Code** | `ast_grep_search`, `ast_grep_replace` |
+| **Shell** | `shell`, `background` |
+| **Planning** | `plan`, `deep_reasoning` |
+| **Memory** | `remember`, `recall`, `update_context`, `forget` |
+| **Sub-Agents** | `spawn_agent` |
+| **Skills** | `search_skills` |
+| **Progress** | `progress_read`, `progress_update` |
+| **Browser** | `browser` |
 
 ```typescript
-import { createToolPreset } from '@agntk/core';
-
-// Get tools without creating an agent
-const tools = createToolPreset('standard', { workspaceRoot: '/my/project' });
+const agent = createAgent({
+  name: 'my-agent',
+  tools: { myCustomTool },  // Custom tools merge with built-in tools
+});
 ```
 
 ## Configuration
 
 ### Config File
 
-Place `agntk.config.json` in your project root:
+Place `agent-sdk.config.yaml` (or `.json`) in your project root:
 
 ```json
 {
@@ -118,13 +100,6 @@ Place `agntk.config.json` in your project root:
       "standard": "google/gemini-3-flash-preview",
       "reasoning": "deepseek/deepseek-r1",
       "powerful": "anthropic/claude-sonnet-4"
-    }
-  },
-  "roles": {
-    "debugger": {
-      "systemPrompt": "You are a debugging specialist.",
-      "recommendedModel": "reasoning",
-      "defaultTools": ["shell", "grep", "glob"]
     }
   },
   "tools": {
@@ -139,7 +114,7 @@ Place `agntk.config.json` in your project root:
 ```typescript
 import { loadConfig, configure, getConfig, defineConfig, resolveModel } from '@agntk/core';
 
-loadConfig('./agntk.config.json');
+loadConfig('./agent-sdk.config.yaml');
 configure({ models: { defaultProvider: 'openrouter' } });
 
 const model = resolveModel({ tier: 'powerful' });
@@ -166,22 +141,20 @@ All providers use `@ai-sdk/openai-compatible` for unified access:
 | `reasoning` | Complex logic, chain-of-thought |
 | `powerful` | Best quality, highest cost |
 
-## Durable Agents
+## Memory
+
+Memory is always enabled. State is stored at `~/.agntk/agents/{name}/`:
 
 ```typescript
-const agent = createAgent({ durable: true, toolPreset: 'standard' });
-
-// Standard methods still work
-const result = await agent.generate({ prompt: 'Refactor utils.ts' });
-
-// Durable methods (crash recovery, checkpointing)
-const durableResult = await (agent as DurableAgent).durableGenerate('Complex task');
+const agent = createAgent({ name: 'my-agent' });
+// Memory tools are always available: remember, recall, update_context, forget
+// Memory context is auto-loaded into the system prompt on first stream()
 ```
 
 ## Workflow Hooks
 
 ```typescript
-import { defineHook, getHookRegistry } from '@agntk/core';
+import { defineHook, getHookRegistry } from '@agntk/core/advanced';
 
 const hook = defineHook<{ amount: number }, boolean>({
   name: 'purchase-approval',
@@ -192,18 +165,10 @@ const hook = defineHook<{ amount: number }, boolean>({
 const approved = await hook.wait({ amount: 5000 });
 ```
 
-## Scheduled Workflows
+## Duration Utilities
 
 ```typescript
-import { createScheduledWorkflow, parseDuration, formatDuration } from '@agntk/core';
-
-const schedule = createScheduledWorkflow({
-  name: 'hourly-check',
-  interval: '1h',
-  task: async (i) => `Check #${i}`,
-  maxIterations: 24,
-});
-await schedule.start();
+import { parseDuration, formatDuration } from '@agntk/core/advanced';
 
 parseDuration('2h');      // 7200000
 formatDuration(7200000);  // "2h"
@@ -212,10 +177,11 @@ formatDuration(7200000);  // "2h"
 ## Skills
 
 ```typescript
-import { createAgent, discoverSkills, buildSkillsSystemPrompt } from '@agntk/core';
+import { createAgent, discoverSkills } from '@agntk/core';
+import { buildSkillsSystemPrompt } from '@agntk/core/advanced';
 
-// Auto-discover:
-const agent = createAgent({ skills: { directories: ['.agents/skills'] } });
+// Auto-discover from default directories:
+const agent = createAgent({ name: 'my-agent' });
 
 // Manual:
 const skills = await discoverSkills('./.agents/skills');

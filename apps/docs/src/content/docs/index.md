@@ -11,7 +11,7 @@ A modular AI agent framework built on [Vercel AI SDK](https://ai-sdk.dev). Zero-
 
 | Package | Description |
 |---------|-------------|
-| `@agntk/core` | Core agent factory — tools, roles, config, streaming, durability, hooks, scheduling |
+| `@agntk/core` | Core agent factory — tools, streaming, memory, sub-agents, durability, hooks, scheduling |
 | `@agntk/cli` | CLI agent — one-shot prompts, interactive REPL, persistent memory |
 | `agntk` | Thin CLI wrapper — enables `npx agntk` usage |
 | `@agntk/server` | Hono HTTP server — REST + SSE + WebSocket endpoints |
@@ -45,7 +45,7 @@ pnpm test
 - Node.js >= 20
 - pnpm >= 9
 - Workflow DevKit (optional, for durable workflows)
-- Langfuse + @vercel/otel (optional, for observability)
+- Langfuse + @opentelemetry/sdk-trace-node (optional, for observability)
 
 ## License
 

@@ -19,35 +19,29 @@ pnpm test
 import { createAgent } from '@agntk/core';
 
 const agent = createAgent({
-  role: 'coder',
-  toolPreset: 'standard',
+  name: 'my-agent',
+  instructions: 'You are a helpful coding assistant.',
   workspaceRoot: process.cwd(),
-  maxSteps: 10,
+  maxSteps: 25,
 });
 
-// Synchronous generation
-const result = await agent.generate({ prompt: 'Read package.json and list the dependencies' });
-console.log(result.text);
-console.log(result.steps);
+const result = await agent.stream({ prompt: 'Read package.json and list the dependencies' });
 
-// Streaming generation
-const stream = await agent.stream({ prompt: 'Explain this codebase' });
-
-for await (const chunk of stream.fullStream) {
-  if (chunk.type === 'text-delta') process.stdout.write(chunk.textDelta);
+for await (const chunk of result.fullStream) {
+  if (chunk.type === 'text-delta') process.stdout.write(chunk.text ?? '');
 }
 
-const text = await stream.text;
+const text = await result.text;
 ```
 
 ## Streaming
 
 ```typescript
-const stream = await agent.stream({ prompt: 'Build a REST API' });
+const result = await agent.stream({ prompt: 'Build a REST API' });
 
-for await (const chunk of stream.fullStream) {
+for await (const chunk of result.fullStream) {
   switch (chunk.type) {
-    case 'text-delta':    console.log(chunk.textDelta); break;
+    case 'text-delta':    console.log(chunk.text); break;
     case 'tool-call':     console.log('Calling:', chunk.toolName); break;
     case 'tool-result':   console.log('Result:', chunk.result); break;
     case 'step-finish':   console.log('Step done'); break;
@@ -55,7 +49,7 @@ for await (const chunk of stream.fullStream) {
   }
 }
 
-const text = await stream.text;
+const text = await result.text;
 ```
 
 

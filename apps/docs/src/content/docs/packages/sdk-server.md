@@ -9,7 +9,7 @@ Hono-based HTTP server with REST, SSE streaming, and WebSocket endpoints.
 import { createAgentServer } from '@agntk/server';
 import { createAgent } from '@agntk/core';
 
-const agent = createAgent({ role: 'coder', toolPreset: 'standard' });
+const agent = createAgent({ name: 'server-agent', instructions: 'You are a helpful assistant.' });
 const server = createAgentServer({ agent, port: 3000 });
 server.start();
 ```
@@ -19,7 +19,7 @@ server.start();
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Health check |
-| `GET` | `/status` | Agent info (role, tools, model) |
+| `GET` | `/status` | Agent info (name, tools, model) |
 | `GET` | `/queue` | Concurrency queue stats |
 | `GET` | `/config` | Read config file |
 | `PUT` | `/config` | Update config file |
