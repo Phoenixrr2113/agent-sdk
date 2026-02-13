@@ -37,3 +37,4 @@ coverage/
 Thumbs.db
 apps/demo/.vectra-memory/index.json
 .vectra-memory/
+apps/docs/.astro
